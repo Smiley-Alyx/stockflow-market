@@ -31,7 +31,7 @@ class IndexSearchDocument implements ShouldQueue
 
     public function backoff(): int
     {
-        return max(1, (int) ceil(config('stockflow.messaging.retry.backoff_ms') / 1000));
+        return max(0, (int) ceil(config('stockflow.messaging.retry.backoff_ms') / 1000));
     }
 
     public function handle(SearchIndexer $indexer): void

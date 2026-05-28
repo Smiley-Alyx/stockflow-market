@@ -130,6 +130,70 @@ class SearchIndexingTest extends TestCase
         ]);
     }
 
+    public function test_queue_worker_retries_indexing_job_until_dead_letter_threshold(): void
+    {
+        $this->artisan('migrate:fresh --force')->assertExitCode(0);
+
+        config([
+            'queue.default' => 'database',
+            'stockflow.messaging.retry.max_attempts' => 3,
+            'stockflow.messaging.retry.backoff_ms' => 0,
+            'stockflow.messaging.retry.dead_letter_after_attempts' => 3,
+        ]);
+
+        $indexer = new class implements SearchIndexer
+        {
+            public int $attempts = 0;
+
+            /**
+             * @param  array<string, mixed>  $document
+             */
+            public function index(string $index, string $documentId, array $document): void
+            {
+                $this->attempts++;
+
+                throw new RuntimeException('Elasticsearch is unavailable.');
+            }
+        };
+
+        $this->app->instance(SearchIndexer::class, $indexer);
+
+        IndexSearchDocument::dispatch(
+            index: 'catalog_products',
+            documentId: '15',
+            document: ['sku' => 'SCAN-001'],
+        );
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            $this->artisan('queue:work database --queue=search-indexing --once --sleep=0 --tries=3 --backoff=0 --timeout=0')
+                ->assertExitCode(0);
+        }
+
+        $this->assertSame(3, $indexer->attempts);
+        $this->assertDatabaseMissing('jobs', [
+            'queue' => 'search-indexing',
+        ]);
+        $this->assertDatabaseHas('jobs', [
+            'queue' => 'search-indexing-dead-letter',
+        ]);
+
+        $deadLetterJob = DB::table('jobs')
+            ->where('queue', 'search-indexing-dead-letter')
+            ->first();
+
+        $this->assertNotNull($deadLetterJob);
+
+        $payload = json_decode($deadLetterJob->payload, true);
+        $deadLetter = unserialize($payload['data']['command'], [
+            'allowed_classes' => [
+                DeadLetterSearchIndexDocument::class,
+            ],
+        ]);
+
+        $this->assertInstanceOf(DeadLetterSearchIndexDocument::class, $deadLetter);
+        $this->assertSame(3, $deadLetter->attempts);
+    }
+
     public function test_indexing_job_writes_through_the_search_indexer_port(): void
     {
         $indexer = new class implements SearchIndexer
