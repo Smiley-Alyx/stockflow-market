@@ -2,6 +2,7 @@
 
 namespace App\Domains\Catalog\Models;
 
+use App\Domains\Catalog\Events\ProductCreated;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,6 +12,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Product extends Model
 {
     protected $table = 'catalog_products';
+
+    protected static function booted(): void
+    {
+        static::created(function (Product $product): void {
+            ProductCreated::dispatch($product);
+        });
+    }
 
     /**
      * @return BelongsTo<Category, $this>
