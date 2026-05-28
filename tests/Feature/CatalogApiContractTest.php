@@ -39,10 +39,10 @@ class CatalogApiContractTest extends TestCase
 
         foreach ($this->catalogContracts() as $contract) {
             $this->assertContractDeclaresResponse($contract, '/api/catalog/products/{slug}', '200', 'ProductResponse');
-            $this->assertRequiredKeys($contract, 'ProductResponse', $payload);
-            $this->assertRequiredKeys($contract, 'Product', $payload['data']);
-            $this->assertRequiredKeys($contract, 'ProductCategory', $payload['data']['category']);
-            $this->assertRequiredKeys($contract, 'ProductAttribute', $payload['data']['attributes'][0]);
+            $this->assertSchemaMatchesPayload($contract, 'ProductResponse', $payload);
+            $this->assertSchemaMatchesPayload($contract, 'Product', $payload['data']);
+            $this->assertSchemaMatchesPayload($contract, 'ProductCategory', $payload['data']['category']);
+            $this->assertSchemaMatchesPayload($contract, 'ProductAttribute', $payload['data']['attributes'][0]);
         }
     }
 
@@ -55,7 +55,7 @@ class CatalogApiContractTest extends TestCase
 
         foreach ($this->catalogContracts() as $contract) {
             $this->assertContractDeclaresResponse($contract, '/api/catalog/products/{slug}', '404', 'ErrorResponse');
-            $this->assertRequiredKeys($contract, 'ErrorResponse', $payload);
+            $this->assertSchemaMatchesPayload($contract, 'ErrorResponse', $payload);
         }
     }
 
@@ -82,9 +82,9 @@ class CatalogApiContractTest extends TestCase
 
         foreach ($this->catalogContracts() as $contract) {
             $this->assertContractDeclaresResponse($contract, '/api/catalog/categories/tree', '200', 'CategoryTreeResponse');
-            $this->assertRequiredKeys($contract, 'CategoryTreeResponse', $payload);
-            $this->assertRequiredKeys($contract, 'CategoryNode', $payload['data'][0]);
-            $this->assertRequiredKeys($contract, 'CategoryNode', $payload['data'][0]['children'][0]);
+            $this->assertSchemaMatchesPayload($contract, 'CategoryTreeResponse', $payload);
+            $this->assertSchemaMatchesPayload($contract, 'CategoryNode', $payload['data'][0]);
+            $this->assertSchemaMatchesPayload($contract, 'CategoryNode', $payload['data'][0]['children'][0]);
         }
     }
 
@@ -112,10 +112,18 @@ class CatalogApiContractTest extends TestCase
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function assertRequiredKeys(string $contract, string $schema, array $payload): void
+    private function assertSchemaMatchesPayload(string $contract, string $schema, array $payload): void
     {
         foreach ($this->requiredKeys($contract, $schema) as $key) {
             $this->assertArrayHasKey($key, $payload, $contract.' schema '.$schema);
+        }
+
+        foreach ($this->schemaProperties($contract, $schema) as $key => $property) {
+            if (! array_key_exists($key, $payload)) {
+                continue;
+            }
+
+            $this->assertValueMatchesSchema($payload[$key], $property, $contract.' schema '.$schema.' property '.$key);
         }
     }
 
@@ -123,6 +131,24 @@ class CatalogApiContractTest extends TestCase
      * @return array<int, string>
      */
     private function requiredKeys(string $contract, string $schema): array
+    {
+        $schemaBody = $this->schemaBody($contract, $schema);
+
+        preg_match(
+            '/^      required:\n(?<required>(?:        - .+\n)+)/m',
+            $schemaBody,
+            $matches,
+        );
+
+        $this->assertArrayHasKey('required', $matches, $contract.' schema '.$schema);
+
+        return array_map(
+            static fn (string $line): string => preg_replace('/^\s*-\s*/', '', trim($line)),
+            array_filter(explode("\n", trim($matches['required']))),
+        );
+    }
+
+    private function schemaBody(string $contract, string $schema): string
     {
         $contents = file_get_contents($contract);
 
@@ -135,18 +161,133 @@ class CatalogApiContractTest extends TestCase
 
         $this->assertArrayHasKey('body', $schemaMatches, $contract.' schema '.$schema);
 
+        return $schemaMatches['body'];
+    }
+
+    /**
+     * @return array<string, array{types: array<int, string>, ref: string|null, item_ref: string|null}>
+     */
+    private function schemaProperties(string $contract, string $schema): array
+    {
         preg_match(
-            '/^      required:\n(?<required>(?:        - .+\n)+)/m',
-            $schemaMatches['body'],
+            '/^      properties:\n(?<properties>(?:        .+\n|          .+\n|            .+\n)*)/m',
+            $this->schemaBody($contract, $schema),
             $matches,
         );
 
-        $this->assertArrayHasKey('required', $matches, $contract.' schema '.$schema);
+        $this->assertArrayHasKey('properties', $matches, $contract.' schema '.$schema);
 
-        return array_map(
-            static fn (string $line): string => preg_replace('/^\s*-\s*/', '', trim($line)),
-            array_filter(explode("\n", trim($matches['required']))),
-        );
+        $properties = [];
+        $currentProperty = null;
+        $currentBody = [];
+
+        foreach (explode("\n", rtrim($matches['properties'])) as $line) {
+            if (preg_match('/^        (?<property>[A-Za-z0-9_]+):$/', $line, $propertyMatch) === 1) {
+                if ($currentProperty !== null) {
+                    $properties[$currentProperty] = $this->parsePropertySchema(implode("\n", $currentBody));
+                }
+
+                $currentProperty = $propertyMatch['property'];
+                $currentBody = [];
+
+                continue;
+            }
+
+            $currentBody[] = $line;
+        }
+
+        if ($currentProperty !== null) {
+            $properties[$currentProperty] = $this->parsePropertySchema(implode("\n", $currentBody));
+        }
+
+        return $properties;
+    }
+
+    /**
+     * @return array{types: array<int, string>, ref: string|null, item_ref: string|null}
+     */
+    private function parsePropertySchema(string $body): array
+    {
+        preg_match('/^          \$ref: \'#\/components\/schemas\/(?<ref>[A-Za-z0-9_]+)\'$/m', $body, $refMatch);
+        preg_match('/^\s+type: (?<type>[A-Za-z0-9_]+)$/m', $body, $typeMatch);
+        preg_match_all('/^\s+- \'?(?<type>[A-Za-z0-9_]+)\'?$/m', $body, $typeListMatches);
+        preg_match('/^            \$ref: \'#\/components\/schemas\/(?<ref>[A-Za-z0-9_]+)\'$/m', $body, $itemRefMatch);
+
+        $types = [];
+
+        if (isset($typeMatch['type'])) {
+            $types[] = $typeMatch['type'];
+        }
+
+        if (isset($typeListMatches['type'])) {
+            $types = array_merge($types, $typeListMatches['type']);
+        }
+
+        return [
+            'types' => array_values(array_unique($types)),
+            'ref' => $refMatch['ref'] ?? null,
+            'item_ref' => $itemRefMatch['ref'] ?? null,
+        ];
+    }
+
+    /**
+     * @param  array{types: array<int, string>, ref: string|null, item_ref: string|null}  $schema
+     */
+    private function assertValueMatchesSchema(mixed $value, array $schema, string $message): void
+    {
+        if ($value === null) {
+            $this->assertContains('null', $schema['types'], $message);
+
+            return;
+        }
+
+        if ($schema['ref'] !== null) {
+            $this->assertIsArray($value, $message);
+            $this->assertFalse(array_is_list($value), $message);
+
+            return;
+        }
+
+        if (in_array('array', $schema['types'], true)) {
+            $this->assertIsArray($value, $message);
+            $this->assertTrue(array_is_list($value), $message);
+
+            if ($schema['item_ref'] !== null) {
+                foreach ($value as $item) {
+                    $this->assertIsArray($item, $message);
+                    $this->assertFalse(array_is_list($item), $message);
+                }
+            }
+
+            return;
+        }
+
+        if (in_array('integer', $schema['types'], true)) {
+            $this->assertIsInt($value, $message);
+
+            return;
+        }
+
+        if (in_array('string', $schema['types'], true)) {
+            $this->assertIsString($value, $message);
+
+            return;
+        }
+
+        if (in_array('boolean', $schema['types'], true)) {
+            $this->assertIsBool($value, $message);
+
+            return;
+        }
+
+        if (in_array('object', $schema['types'], true)) {
+            $this->assertIsArray($value, $message);
+            $this->assertFalse(array_is_list($value), $message);
+
+            return;
+        }
+
+        $this->fail($message.' has no supported OpenAPI type assertion.');
     }
 
     private function createProduct(): Product
