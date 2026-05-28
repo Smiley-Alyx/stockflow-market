@@ -3,8 +3,10 @@
 namespace App\Domains\Search\Jobs;
 
 use App\Domains\Search\Contracts\SearchIndexer;
+use App\Domains\Search\DeadLetters\SearchIndexDeadLetterStore;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\App;
 use Throwable;
 
 class IndexSearchDocument implements ShouldQueue
@@ -41,7 +43,7 @@ class IndexSearchDocument implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        DeadLetterSearchIndexDocument::dispatch(
+        App::make(SearchIndexDeadLetterStore::class)->put(
             index: $this->index,
             documentId: $this->documentId,
             document: $this->document,

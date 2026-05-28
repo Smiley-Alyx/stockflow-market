@@ -5,9 +5,10 @@ namespace Tests\Feature;
 use App\Domains\Catalog\Events\ProductCreated;
 use App\Domains\Catalog\Models\Product;
 use App\Domains\Search\Contracts\SearchIndexer;
+use App\Domains\Search\DeadLetters\SearchIndexDeadLetterStore;
 use App\Domains\Search\Events\SearchIndexRequested;
-use App\Domains\Search\Jobs\DeadLetterSearchIndexDocument;
 use App\Domains\Search\Jobs\IndexSearchDocument;
+use App\Infrastructure\Search\DeadLetters\ArraySearchIndexDeadLetterStore;
 use App\Infrastructure\Search\ElasticsearchSearchIndexer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -18,6 +19,15 @@ use Tests\TestCase;
 
 class SearchIndexingTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['stockflow.search.indexing.dead_letter_backend' => 'array']);
+        ArraySearchIndexDeadLetterStore::reset();
+        $this->app->bind(SearchIndexDeadLetterStore::class, ArraySearchIndexDeadLetterStore::class);
+    }
+
     public function test_it_requests_product_indexing_when_a_product_is_created(): void
     {
         Event::fake([SearchIndexRequested::class]);
@@ -69,8 +79,6 @@ class SearchIndexingTest extends TestCase
 
     public function test_failed_indexing_job_is_moved_to_the_dead_letter_queue(): void
     {
-        Queue::fake();
-
         $job = new IndexSearchDocument(
             index: 'catalog_products',
             documentId: '15',
@@ -79,14 +87,14 @@ class SearchIndexingTest extends TestCase
 
         $job->failed(new RuntimeException('Elasticsearch is unavailable.'));
 
-        Queue::assertPushedOn('search-indexing-dead-letter', DeadLetterSearchIndexDocument::class);
-        Queue::assertPushed(DeadLetterSearchIndexDocument::class, function (DeadLetterSearchIndexDocument $job) {
-            return $job->index === 'catalog_products'
-                && $job->documentId === '15'
-                && $job->document['sku'] === 'SCAN-001'
-                && $job->attempts === 5
-                && $job->failure === 'Elasticsearch is unavailable.';
-        });
+        $deadLetter = $this->app->make(SearchIndexDeadLetterStore::class)->find(1);
+
+        $this->assertNotNull($deadLetter);
+        $this->assertSame('catalog_products', $deadLetter->index);
+        $this->assertSame('15', $deadLetter->documentId);
+        $this->assertSame('SCAN-001', $deadLetter->document['sku']);
+        $this->assertSame(5, $deadLetter->attempts);
+        $this->assertSame('Elasticsearch is unavailable.', $deadLetter->failure);
     }
 
     public function test_dead_letter_command_lists_and_requeues_search_indexing_jobs(): void
@@ -95,19 +103,13 @@ class SearchIndexingTest extends TestCase
 
         config(['queue.default' => 'database']);
 
-        DeadLetterSearchIndexDocument::dispatch(
+        $deadLetterJob = $this->app->make(SearchIndexDeadLetterStore::class)->put(
             index: 'catalog_products',
             documentId: '15',
             document: ['sku' => 'SCAN-001'],
             attempts: 5,
             failure: 'Elasticsearch is unavailable.',
         );
-
-        $deadLetterJob = DB::table('jobs')
-            ->where('queue', 'search-indexing-dead-letter')
-            ->first();
-
-        $this->assertNotNull($deadLetterJob);
 
         $this->artisan('search:dead-letter list')
             ->expectsTable(
@@ -121,7 +123,6 @@ class SearchIndexingTest extends TestCase
             ->assertExitCode(0);
 
         $this->assertDatabaseMissing('jobs', [
-            'id' => $deadLetterJob->id,
             'queue' => 'search-indexing-dead-letter',
         ]);
 
@@ -136,14 +137,14 @@ class SearchIndexingTest extends TestCase
 
         config(['queue.default' => 'database']);
 
-        DeadLetterSearchIndexDocument::dispatch(
+        $firstDeadLetter = $this->app->make(SearchIndexDeadLetterStore::class)->put(
             index: 'catalog_products',
             documentId: '15',
             document: ['sku' => 'SCAN-001'],
             attempts: 5,
             failure: 'Elasticsearch is unavailable.',
         );
-        DeadLetterSearchIndexDocument::dispatch(
+        $this->app->make(SearchIndexDeadLetterStore::class)->put(
             index: 'catalog_products',
             documentId: '16',
             document: ['sku' => 'SCAN-002'],
@@ -151,22 +152,15 @@ class SearchIndexingTest extends TestCase
             failure: 'Elasticsearch is unavailable.',
         );
 
-        $deadLetterJob = DB::table('jobs')
-            ->where('queue', 'search-indexing-dead-letter')
-            ->orderBy('id')
-            ->first();
-
-        $this->assertNotNull($deadLetterJob);
-
         $this->artisan('search:dead-letter requeue --all --dry-run --index=catalog_products --document-id=15')
             ->expectsTable(
                 ['ID', 'Index', 'Document ID', 'Attempts', 'Failure'],
-                [[$deadLetterJob->id, 'catalog_products', '15', 5, 'Elasticsearch is unavailable.']],
+                [[$firstDeadLetter->id, 'catalog_products', '15', 5, 'Elasticsearch is unavailable.']],
             )
             ->expectsOutput('Dry run: 1 search indexing job(s) matched.')
             ->assertExitCode(0);
 
-        $this->assertDatabaseCount('jobs', 2);
+        $this->assertSame(2, $this->app->make(SearchIndexDeadLetterStore::class)->list(limit: 10)->count());
     }
 
     public function test_dead_letter_bulk_requeue_requires_confirmation(): void
@@ -175,14 +169,14 @@ class SearchIndexingTest extends TestCase
 
         config(['queue.default' => 'database']);
 
-        DeadLetterSearchIndexDocument::dispatch(
+        $this->app->make(SearchIndexDeadLetterStore::class)->put(
             index: 'catalog_products',
             documentId: '15',
             document: ['sku' => 'SCAN-001'],
             attempts: 5,
             failure: 'Elasticsearch is unavailable.',
         );
-        DeadLetterSearchIndexDocument::dispatch(
+        $this->app->make(SearchIndexDeadLetterStore::class)->put(
             index: 'catalog_products',
             documentId: '16',
             document: ['sku' => 'SCAN-002'],
@@ -195,16 +189,14 @@ class SearchIndexingTest extends TestCase
             ->expectsOutput('Requeue cancelled.')
             ->assertExitCode(0);
 
-        $this->assertDatabaseCount('jobs', 2);
+        $this->assertSame(2, $this->app->make(SearchIndexDeadLetterStore::class)->list(limit: 10)->count());
 
         $this->artisan('search:dead-letter requeue --all --index=catalog_products')
             ->expectsConfirmation('Requeue 2 search indexing dead-letter jobs?', 'yes')
             ->expectsOutput('Search indexing jobs requeued: 2.')
             ->assertExitCode(0);
 
-        $this->assertDatabaseMissing('jobs', [
-            'queue' => 'search-indexing-dead-letter',
-        ]);
+        $this->assertTrue($this->app->make(SearchIndexDeadLetterStore::class)->list()->isEmpty());
 
         $this->assertDatabaseCount('jobs', 2);
     }
@@ -252,24 +244,9 @@ class SearchIndexingTest extends TestCase
         $this->assertDatabaseMissing('jobs', [
             'queue' => 'search-indexing',
         ]);
-        $this->assertDatabaseHas('jobs', [
-            'queue' => 'search-indexing-dead-letter',
-        ]);
+        $deadLetter = $this->app->make(SearchIndexDeadLetterStore::class)->find(1);
 
-        $deadLetterJob = DB::table('jobs')
-            ->where('queue', 'search-indexing-dead-letter')
-            ->first();
-
-        $this->assertNotNull($deadLetterJob);
-
-        $payload = json_decode($deadLetterJob->payload, true);
-        $deadLetter = unserialize($payload['data']['command'], [
-            'allowed_classes' => [
-                DeadLetterSearchIndexDocument::class,
-            ],
-        ]);
-
-        $this->assertInstanceOf(DeadLetterSearchIndexDocument::class, $deadLetter);
+        $this->assertNotNull($deadLetter);
         $this->assertSame(3, $deadLetter->attempts);
     }
 

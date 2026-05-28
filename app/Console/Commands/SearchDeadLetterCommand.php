@@ -2,7 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Domains\Search\Jobs\DeadLetterSearchIndexDocument;
+use App\Domains\Search\DeadLetters\SearchIndexDeadLetter;
+use App\Domains\Search\DeadLetters\SearchIndexDeadLetterStore;
 use App\Domains\Search\Jobs\IndexSearchDocument;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
@@ -22,6 +23,11 @@ class SearchDeadLetterCommand extends Command
         {--force : Skip confirmation for bulk requeue}';
 
     protected $description = 'View and manually requeue search indexing dead-letter jobs.';
+
+    public function __construct(private readonly SearchIndexDeadLetterStore $deadLetters)
+    {
+        parent::__construct();
+    }
 
     public function handle(): int
     {
@@ -93,25 +99,19 @@ class SearchDeadLetterCommand extends Command
 
         DB::transaction(function () use ($jobs): void {
             foreach ($jobs as $job) {
-                $deadLetter = $this->deadLetterFrom($job);
-
-                if (! $deadLetter instanceof DeadLetterSearchIndexDocument) {
-                    continue;
-                }
-
                 IndexSearchDocument::dispatch(
-                    index: $deadLetter->index,
-                    documentId: $deadLetter->documentId,
-                    document: $deadLetter->document,
+                    index: $job->index,
+                    documentId: $job->documentId,
+                    document: $job->document,
                 );
 
-                DB::table('jobs')->where('id', $job->id)->delete();
+                $this->deadLetters->delete($job->id);
 
                 Log::info('Search indexing dead-letter job requeued.', [
-                    'queue_job_id' => $job->id,
-                    'index' => $deadLetter->index,
-                    'document_id' => $deadLetter->documentId,
-                    'attempts' => $deadLetter->attempts,
+                    'dead_letter_id' => $job->id,
+                    'index' => $job->index,
+                    'document_id' => $job->documentId,
+                    'attempts' => $job->attempts,
                 ]);
             }
         });
@@ -137,18 +137,12 @@ class SearchDeadLetterCommand extends Command
      */
     private function rowFor(object $job): array
     {
-        $deadLetter = $this->deadLetterFrom($job);
-
-        if (! $deadLetter instanceof DeadLetterSearchIndexDocument) {
-            return [$job->id, '-', '-', '-', 'Unsupported payload'];
-        }
-
         return [
             $job->id,
-            $deadLetter->index,
-            $deadLetter->documentId,
-            $deadLetter->attempts,
-            $deadLetter->failure,
+            $job->index,
+            $job->documentId,
+            $job->attempts,
+            $job->failure,
         ];
     }
 
@@ -157,50 +151,31 @@ class SearchDeadLetterCommand extends Command
      */
     private function matchingJobs(?int $id = null): Collection
     {
-        $jobs = DB::table('jobs')
-            ->where('queue', $this->deadLetterQueue())
-            ->when($id !== null, fn ($query) => $query->where('id', $id))
-            ->orderBy('id')
-            ->get();
+        if ($id !== null) {
+            $job = $this->deadLetters->find($id);
 
-        return $jobs->filter(function (object $job): bool {
-            $deadLetter = $this->deadLetterFrom($job);
-
-            if (! $deadLetter instanceof DeadLetterSearchIndexDocument) {
-                return false;
-            }
-
-            if ($this->option('index') !== null && $deadLetter->index !== $this->option('index')) {
-                return false;
-            }
-
-            if ($this->option('document-id') !== null && $deadLetter->documentId !== $this->option('document-id')) {
-                return false;
-            }
-
-            return true;
-        })->values();
-    }
-
-    private function deadLetterFrom(object $job): ?DeadLetterSearchIndexDocument
-    {
-        $payload = json_decode($job->payload, true);
-
-        if (! is_array($payload) || ! isset($payload['data']['command'])) {
-            return null;
+            return $job instanceof SearchIndexDeadLetter && $this->matchesFilters($job)
+                ? collect([$job])
+                : collect();
         }
 
-        $command = unserialize($payload['data']['command'], [
-            'allowed_classes' => [
-                DeadLetterSearchIndexDocument::class,
-            ],
-        ]);
-
-        return $command instanceof DeadLetterSearchIndexDocument ? $command : null;
+        return $this->deadLetters->list(
+            index: $this->option('index'),
+            documentId: $this->option('document-id'),
+            limit: max(1, (int) $this->option('limit')),
+        );
     }
 
-    private function deadLetterQueue(): string
+    private function matchesFilters(SearchIndexDeadLetter $job): bool
     {
-        return config('stockflow.search.indexing.dead_letter_queue');
+        if ($this->option('index') !== null && $job->index !== $this->option('index')) {
+            return false;
+        }
+
+        if ($this->option('document-id') !== null && $job->documentId !== $this->option('document-id')) {
+            return false;
+        }
+
+        return true;
     }
 }
