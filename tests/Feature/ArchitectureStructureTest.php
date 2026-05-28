@@ -6,23 +6,37 @@ use Tests\TestCase;
 
 class ArchitectureStructureTest extends TestCase
 {
-    public function test_it_keeps_the_planned_modular_monolith_directories_in_place(): void
+    public function test_it_keeps_the_planned_microservice_directories_in_place(): void
     {
         $directories = [
-            'app/Application/Commands',
-            'app/Application/DTO',
-            'app/Application/Queries',
-            'app/Domains/Catalog',
-            'app/Domains/Inventory',
-            'app/Domains/Orders',
-            'app/Domains/Pricing',
-            'app/Domains/Search',
-            'app/Infrastructure/Cache',
-            'app/Infrastructure/Messaging',
-            'app/Infrastructure/Persistence',
-            'app/Infrastructure/Search',
-            'app/Interfaces/Console',
-            'app/Interfaces/Http',
+            'services/gateway/contracts',
+            'services/gateway/src',
+            'services/gateway/tests',
+            'services/catalog/contracts',
+            'services/catalog/database/migrations',
+            'services/catalog/messaging',
+            'services/catalog/src',
+            'services/catalog/tests',
+            'services/inventory/contracts',
+            'services/inventory/database/migrations',
+            'services/inventory/messaging',
+            'services/inventory/src',
+            'services/inventory/tests',
+            'services/orders/contracts',
+            'services/orders/database/migrations',
+            'services/orders/messaging',
+            'services/orders/src',
+            'services/orders/tests',
+            'services/pricing/contracts',
+            'services/pricing/database/migrations',
+            'services/pricing/messaging',
+            'services/pricing/src',
+            'services/pricing/tests',
+            'services/search/contracts',
+            'services/search/database/migrations',
+            'services/search/messaging',
+            'services/search/src',
+            'services/search/tests',
         ];
 
         foreach ($directories as $directory) {
