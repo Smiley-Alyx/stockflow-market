@@ -76,6 +76,10 @@ components:
             - 'null'
         status:
           type: string
+          enum:
+            - draft
+            - published
+            - archived
         published_at:
           type:
             - string

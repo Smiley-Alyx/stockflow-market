@@ -165,7 +165,7 @@ class CatalogApiContractTest extends TestCase
     }
 
     /**
-     * @return array<string, array{types: array<int, string>, ref: string|null, item_ref: string|null}>
+     * @return array<string, array{types: array<int, string>, ref: string|null, item_ref: string|null, format: string|null, enum: array<int, string>}>
      */
     private function schemaProperties(string $contract, string $schema): array
     {
@@ -204,7 +204,7 @@ class CatalogApiContractTest extends TestCase
     }
 
     /**
-     * @return array{types: array<int, string>, ref: string|null, item_ref: string|null}
+     * @return array{types: array<int, string>, ref: string|null, item_ref: string|null, format: string|null, enum: array<int, string>}
      */
     private function parsePropertySchema(string $body): array
     {
@@ -212,8 +212,11 @@ class CatalogApiContractTest extends TestCase
         preg_match('/^\s+type: (?<type>[A-Za-z0-9_]+)$/m', $body, $typeMatch);
         preg_match_all('/^\s+- \'?(?<type>[A-Za-z0-9_]+)\'?$/m', $body, $typeListMatches);
         preg_match('/^            \$ref: \'#\/components\/schemas\/(?<ref>[A-Za-z0-9_]+)\'$/m', $body, $itemRefMatch);
+        preg_match('/^\s+format: (?<format>[A-Za-z0-9_-]+)$/m', $body, $formatMatch);
+        preg_match('/^\s+enum:\n(?<enum>(?:\s+- .+\n?)+)/m', $body, $enumMatch);
 
         $types = [];
+        $enum = [];
 
         if (isset($typeMatch['type'])) {
             $types[] = $typeMatch['type'];
@@ -223,15 +226,24 @@ class CatalogApiContractTest extends TestCase
             $types = array_merge($types, $typeListMatches['type']);
         }
 
+        if (isset($enumMatch['enum'])) {
+            $enum = array_map(
+                static fn (string $line): string => trim(preg_replace('/^\s*-\s*/', '', trim($line)), "'\""),
+                array_filter(explode("\n", trim($enumMatch['enum']))),
+            );
+        }
+
         return [
             'types' => array_values(array_unique($types)),
             'ref' => $refMatch['ref'] ?? null,
             'item_ref' => $itemRefMatch['ref'] ?? null,
+            'format' => $formatMatch['format'] ?? null,
+            'enum' => $enum,
         ];
     }
 
     /**
-     * @param  array{types: array<int, string>, ref: string|null, item_ref: string|null}  $schema
+     * @param  array{types: array<int, string>, ref: string|null, item_ref: string|null, format: string|null, enum: array<int, string>}  $schema
      */
     private function assertValueMatchesSchema(mixed $value, array $schema, string $message): void
     {
@@ -270,6 +282,8 @@ class CatalogApiContractTest extends TestCase
 
         if (in_array('string', $schema['types'], true)) {
             $this->assertIsString($value, $message);
+            $this->assertStringFormatMatchesSchema($value, $schema['format'], $message);
+            $this->assertStringEnumMatchesSchema($value, $schema['enum'], $message);
 
             return;
         }
@@ -288,6 +302,37 @@ class CatalogApiContractTest extends TestCase
         }
 
         $this->fail($message.' has no supported OpenAPI type assertion.');
+    }
+
+    private function assertStringFormatMatchesSchema(string $value, ?string $format, string $message): void
+    {
+        if ($format === null) {
+            return;
+        }
+
+        if ($format === 'date-time') {
+            $this->assertMatchesRegularExpression(
+                '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/',
+                $value,
+                $message,
+            );
+
+            return;
+        }
+
+        $this->fail($message.' has unsupported OpenAPI string format '.$format.'.');
+    }
+
+    /**
+     * @param  array<int, string>  $enum
+     */
+    private function assertStringEnumMatchesSchema(string $value, array $enum, string $message): void
+    {
+        if ($enum === []) {
+            return;
+        }
+
+        $this->assertContains($value, $enum, $message);
     }
 
     private function createProduct(): Product
