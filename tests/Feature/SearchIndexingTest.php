@@ -7,7 +7,9 @@ use App\Domains\Catalog\Models\Product;
 use App\Domains\Search\Contracts\SearchIndexer;
 use App\Domains\Search\Events\SearchIndexRequested;
 use App\Domains\Search\Jobs\IndexSearchDocument;
+use App\Infrastructure\Search\ElasticsearchSearchIndexer;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -97,5 +99,28 @@ class SearchIndexingTest extends TestCase
             'document_id' => '15',
             'document' => ['sku' => 'SCAN-001'],
         ], $indexer->indexed);
+    }
+
+    public function test_elasticsearch_indexer_writes_documents_to_the_configured_cluster(): void
+    {
+        Http::fake([
+            'http://elasticsearch:9200/catalog_products/_doc/15' => Http::response([
+                'result' => 'created',
+            ]),
+        ]);
+
+        $indexer = new ElasticsearchSearchIndexer();
+
+        $indexer->index('catalog_products', '15', [
+            'sku' => 'SCAN-001',
+            'name' => 'Wireless Scanner',
+        ]);
+
+        Http::assertSent(function ($request) {
+            return $request->method() === 'PUT'
+                && $request->url() === 'http://elasticsearch:9200/catalog_products/_doc/15'
+                && $request['sku'] === 'SCAN-001'
+                && $request['name'] === 'Wireless Scanner';
+        });
     }
 }

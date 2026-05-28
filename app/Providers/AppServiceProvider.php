@@ -7,7 +7,7 @@ use App\Domains\Search\Contracts\SearchIndexer;
 use App\Domains\Search\Events\SearchIndexRequested;
 use App\Domains\Search\Listeners\DispatchSearchIndexJob;
 use App\Domains\Search\Listeners\RequestProductIndexing;
-use App\Infrastructure\Search\DeferredSearchIndexer;
+use App\Infrastructure\Search\ElasticsearchSearchIndexer;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -18,7 +18,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(SearchIndexer::class, DeferredSearchIndexer::class);
+        $this->app->bind(SearchIndexer::class, ElasticsearchSearchIndexer::class);
     }
 
     /**
