@@ -2,6 +2,7 @@
 
 namespace App\Domains\Catalog\Models;
 
+use App\Domains\Catalog\Read\CatalogCacheKeys;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,6 +12,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Category extends Model
 {
     protected $table = 'catalog_categories';
+
+    protected static function booted(): void
+    {
+        static::saved(function (): void {
+            CatalogCacheKeys::invalidateCategoryTree();
+            CatalogCacheKeys::invalidateProducts();
+        });
+
+        static::deleted(function (): void {
+            CatalogCacheKeys::invalidateCategoryTree();
+            CatalogCacheKeys::invalidateProducts();
+        });
+    }
 
     /**
      * @return BelongsTo<Category, $this>

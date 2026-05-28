@@ -2,6 +2,7 @@
 
 namespace App\Domains\Catalog\Models;
 
+use App\Domains\Catalog\Read\CatalogCacheKeys;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,6 +11,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ProductAttribute extends Model
 {
     protected $table = 'catalog_product_attributes';
+
+    protected static function booted(): void
+    {
+        static::saved(function (): void {
+            CatalogCacheKeys::invalidateProducts();
+        });
+
+        static::deleted(function (): void {
+            CatalogCacheKeys::invalidateProducts();
+        });
+    }
 
     /**
      * @return BelongsTo<Product, $this>

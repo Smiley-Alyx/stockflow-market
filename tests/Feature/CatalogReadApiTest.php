@@ -98,9 +98,14 @@ class CatalogReadApiTest extends TestCase
     {
         config(['stockflow.catalog.cache.product_ttl_seconds' => 123]);
 
+        Cache::shouldReceive('get')
+            ->once()
+            ->with('catalog:products:version', 1)
+            ->andReturn(1);
+
         Cache::shouldReceive('remember')
             ->once()
-            ->with('catalog:products:slug:wireless-scanner', 123, \Mockery::type(Closure::class))
+            ->with('catalog:products:v1:slug:wireless-scanner', 123, \Mockery::type(Closure::class))
             ->andReturn(null);
 
         $this->app->make(CatalogReadService::class)->productBySlug('wireless-scanner');
@@ -110,9 +115,14 @@ class CatalogReadApiTest extends TestCase
     {
         config(['stockflow.catalog.cache.category_tree_ttl_seconds' => 456]);
 
+        Cache::shouldReceive('get')
+            ->once()
+            ->with('catalog:categories:tree:version', 1)
+            ->andReturn(1);
+
         Cache::shouldReceive('remember')
             ->once()
-            ->with('catalog:categories:tree:active', 456, \Mockery::type(Closure::class))
+            ->with('catalog:categories:tree:v1:active', 456, \Mockery::type(Closure::class))
             ->andReturn([]);
 
         $this->app->make(CatalogReadService::class)->activeCategoryTree();

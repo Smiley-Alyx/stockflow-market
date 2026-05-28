@@ -15,7 +15,7 @@ class CatalogReadService
     public function productBySlug(string $slug): ?array
     {
         return Cache::remember(
-            "catalog:products:slug:{$slug}",
+            CatalogCacheKeys::productBySlug($slug),
             config('stockflow.catalog.cache.product_ttl_seconds'),
             fn () => $this->fetchProductBySlug($slug),
         );
@@ -27,7 +27,7 @@ class CatalogReadService
     public function activeCategoryTree(): array
     {
         return Cache::remember(
-            'catalog:categories:tree:active',
+            CatalogCacheKeys::activeCategoryTree(),
             config('stockflow.catalog.cache.category_tree_ttl_seconds'),
             fn () => $this->fetchActiveCategoryTree(),
         );
