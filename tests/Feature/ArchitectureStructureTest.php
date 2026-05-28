@@ -9,6 +9,7 @@ class ArchitectureStructureTest extends TestCase
     public function test_it_keeps_the_planned_microservice_directories_in_place(): void
     {
         $directories = [
+            'docs/adr',
             'services/gateway/contracts',
             'services/gateway/src',
             'services/gateway/tests',
@@ -42,5 +43,10 @@ class ArchitectureStructureTest extends TestCase
         foreach ($directories as $directory) {
             $this->assertDirectoryExists(base_path($directory));
         }
+    }
+
+    public function test_it_documents_the_transitional_gateway_architecture(): void
+    {
+        $this->assertFileExists(base_path('docs/adr/0001-laravel-gateway-service-workspace.md'));
     }
 }
