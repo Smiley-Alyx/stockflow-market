@@ -13,6 +13,7 @@ StockFlow Market — инженерный pet-проект маркетплей�
 - реализована базовая модель Catalog: категории, товары и атрибуты;
 - добавлена внутренняя публикация `catalog.product.created`;
 - добавлен обработчик, который превращает создание товара в `search.index.requested`;
+- добавлен `config/stockflow.php` для runtime-настроек таймаутов, кеша, очередей, retry и backpressure limits;
 - описан первый ADR по переходной архитектуре Laravel gateway + service workspace;
 - добавлен архитектурный тест, который проверяет наличие сервисной структуры.
 
@@ -89,6 +90,19 @@ docker compose logs -f php
 docker compose down
 ```
 
+## Runtime-настройки
+
+Проектные highload-настройки собраны в `config/stockflow.php`, чтобы прикладной код не хардкодил операционные лимиты. Значения переопределяются через `STOCKFLOW_*` переменные в `.env`.
+
+| Группа | Назначение |
+| --- | --- |
+| `runtime` | имя сервиса, общий request timeout, graceful shutdown budget |
+| `catalog.cache` | TTL кеша товаров и дерева категорий |
+| `search.indexing` | очередь индексации, batch size, max in-flight, timeout Elasticsearch |
+| `messaging.retry` | retry attempts, backoff и порог dead-letter |
+
+Эти настройки пока являются контрактом для ближайших этапов: Redis caching, async indexing workers, retries и backpressure.
+
 ## Проверки
 
 Основная проверка на текущем этапе:
@@ -103,6 +117,7 @@ composer test
 
 - Репозиторий остаётся monorepo, пока сервисы находятся в активной фазе проектирования.
 - Переходная архитектура зафиксирована в `docs/adr/0001-laravel-gateway-service-workspace.md`.
+- Runtime-настройки зафиксированы в `docs/adr/0002-runtime-configuration-boundaries.md`.
 - PostgreSQL выбран как основное хранилище для транзакционных данных.
 - Redis используется для кеша, сессий и быстрых очередей локального контура.
 - RabbitMQ зарезервирован под доменные события между сервисами.
@@ -111,9 +126,9 @@ composer test
 
 ## Ближайший план
 
-1. Расширить Docker Compose worker-процессами для очередей и событий.
-2. Добавить первый Catalog API endpoint для создания товара.
-3. Описать payload событий каталога и поиска в `services/*/messaging`.
+1. Подключить `stockflow.search.indexing` к первому async job pipeline.
+2. Расширить Docker Compose worker-процессами для очередей и событий.
+3. Добавить health/readiness/liveness probes для runtime и зависимостей.
 4. Подготовить Search adapter под Elasticsearch indexing pipeline.
 
 ## Лицензия
