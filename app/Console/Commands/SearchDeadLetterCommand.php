@@ -107,12 +107,7 @@ class SearchDeadLetterCommand extends Command
 
                 $this->deadLetters->delete($job->id);
 
-                Log::info('Search indexing dead-letter job requeued.', [
-                    'dead_letter_id' => $job->id,
-                    'index' => $job->index,
-                    'document_id' => $job->documentId,
-                    'attempts' => $job->attempts,
-                ]);
+                $this->auditRequeue($job);
             }
         });
 
@@ -177,5 +172,17 @@ class SearchDeadLetterCommand extends Command
         }
 
         return true;
+    }
+
+    private function auditRequeue(SearchIndexDeadLetter $job): void
+    {
+        Log::channel(config('stockflow.search.indexing.requeue_audit_channel'))->info('search.dead_letter.requeued', [
+            'event' => 'search.dead_letter.requeued',
+            'service' => config('stockflow.runtime.service_name'),
+            'dead_letter_id' => $job->id,
+            'index' => $job->index,
+            'document_id' => $job->documentId,
+            'attempts' => $job->attempts,
+        ]);
     }
 }

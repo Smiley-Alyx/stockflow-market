@@ -73,6 +73,13 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'search_requeue_audit' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/search-requeue-audit.log'),
+            'level' => env('LOG_SEARCH_REQUEUE_AUDIT_LEVEL', 'info'),
+            'replace_placeholders' => true,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),
