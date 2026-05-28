@@ -14,6 +14,9 @@
 /.zed
 /auth.json
 /node_modules
+/frontend/.nuxt
+/frontend/.output
+/frontend/node_modules
 /public/build
 /public/fonts-manifest.dev.json
 /public/hot

@@ -109,13 +109,16 @@ services:
   frontend:
     image: node:24-alpine
     container_name: stockflow-frontend
-    working_dir: /var/www/html
+    working_dir: /var/www/html/frontend
     volumes:
       - .:/var/www/html
       - npm-cache:/root/.npm
     ports:
-      - "5173:5173"
-    command: sh -c "npm install && npm run dev -- --host=0.0.0.0"
+      - "3000:3000"
+    environment:
+      NUXT_API_BASE: http://php:8000
+      NUXT_PUBLIC_API_BASE: http://localhost:8080
+    command: sh -c "npm install && npm run dev"
     depends_on:
       - php
 

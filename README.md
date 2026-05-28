@@ -1,6 +1,6 @@
 # StockFlow Market
 
-StockFlow Market — инженерный pet-проект маркетплейса с микросервисным контуром вокруг Laravel, PostgreSQL, Redis, RabbitMQ, Elasticsearch и Vite frontend. Проект развивается как реалистичный backend case: каталог, остатки, заказы, цены, поиск, асинхронные события и локальная инфраструктура без лишней имитации enterprise-слоя.
+StockFlow Market — инженерный pet-проект маркетплейса с микросервисным контуром вокруг Laravel, PostgreSQL, Redis, RabbitMQ, Elasticsearch и Nuxt SSR frontend. Проект развивается как реалистичный backend case: каталог, остатки, заказы, цены, поиск, асинхронные события и локальная инфраструктура без лишней имитации enterprise-слоя.
 
 ## Текущий статус
 
@@ -56,7 +56,7 @@ Docker Compose поднимает:
 | Сервис | Назначение | Локальный адрес |
 | --- | --- | --- |
 | `php` | Laravel backend shell | `http://localhost:8080` |
-| `frontend` | Vite dev server | `http://localhost:5173` |
+| `frontend` | Nuxt SSR dev server | `http://localhost:3000` |
 | `postgres` | основная реляционная БД | `localhost:5432` |
 | `redis` | кеш, сессии, очереди | `localhost:6379` |
 | `rabbitmq` | брокер доменных событий | `localhost:5672`, UI `http://localhost:15672` |
@@ -82,7 +82,7 @@ docker compose exec php php artisan migrate
 После запуска:
 
 - backend доступен на `http://localhost:8080`;
-- frontend доступен на `http://localhost:5173`;
+- frontend доступен на `http://localhost:3000`;
 - RabbitMQ Management UI доступен на `http://localhost:15672`.
 
 ## Локальные команды

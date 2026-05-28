@@ -1,0 +1,283 @@
+:root {
+    color: #17201b;
+    background: #f6f8f4;
+    font-family:
+        Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-width: 320px;
+    background:
+        linear-gradient(135deg, rgba(31, 96, 74, 0.12), transparent 34%),
+        linear-gradient(315deg, rgba(190, 92, 48, 0.12), transparent 30%),
+        #f6f8f4;
+}
+
+button,
+input,
+textarea,
+select {
+    font: inherit;
+}
+
+.shell {
+    display: grid;
+    gap: 24px;
+    width: min(1120px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 28px 0;
+}
+
+.overview {
+    display: grid;
+    gap: 48px;
+    min-height: 58vh;
+    padding: 24px;
+    border: 1px solid rgba(23, 32, 27, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.72);
+    box-shadow: 0 24px 70px rgba(30, 45, 39, 0.08);
+}
+
+.topbar,
+.hero,
+.content-grid,
+.panel-heading,
+.category-list li {
+    display: flex;
+    align-items: center;
+}
+
+.topbar {
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    font-weight: 700;
+}
+
+.brand-mark {
+    display: inline-grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    color: #f8fbf7;
+    background: #1f604a;
+    font-size: 0.78rem;
+}
+
+.status {
+    flex: 0 0 auto;
+    border-radius: 999px;
+    padding: 6px 10px;
+    color: #174c39;
+    background: #dff4e8;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.status-muted {
+    color: #6c3a22;
+    background: #ffe5d5;
+}
+
+.hero {
+    justify-content: space-between;
+    gap: 32px;
+}
+
+.hero-copy {
+    max-width: 680px;
+}
+
+.eyebrow {
+    margin: 0 0 12px;
+    color: #be5c30;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+h1,
+h2,
+p {
+    margin-top: 0;
+}
+
+h1 {
+    max-width: 760px;
+    margin-bottom: 18px;
+    font-size: clamp(2.4rem, 7vw, 5.7rem);
+    line-height: 0.96;
+    letter-spacing: 0;
+}
+
+.lede {
+    max-width: 620px;
+    margin-bottom: 0;
+    color: #52635b;
+    font-size: 1.12rem;
+    line-height: 1.65;
+}
+
+.metrics {
+    display: grid;
+    gap: 12px;
+    width: min(100%, 260px);
+}
+
+.metrics article,
+.panel {
+    border: 1px solid rgba(23, 32, 27, 0.1);
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+.metrics article {
+    display: grid;
+    gap: 4px;
+    padding: 18px;
+}
+
+.metrics span,
+.panel-heading span,
+.category-list code {
+    color: #6e7a74;
+    font-size: 0.82rem;
+}
+
+.metrics strong {
+    font-size: 1.45rem;
+}
+
+.content-grid {
+    align-items: stretch;
+    gap: 24px;
+}
+
+.panel {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 22px;
+}
+
+.panel-heading {
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+h2 {
+    margin-bottom: 0;
+    font-size: 1.05rem;
+}
+
+.category-list {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.category-list li {
+    justify-content: space-between;
+    gap: 14px;
+    min-height: 46px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(23, 32, 27, 0.08);
+}
+
+.category-list li:last-child {
+    border-bottom: 0;
+}
+
+.category-list span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-weight: 700;
+}
+
+.category-list code {
+    flex: 0 1 auto;
+    overflow-wrap: anywhere;
+}
+
+.empty-state {
+    margin-bottom: 0;
+    color: #66746d;
+    line-height: 1.6;
+}
+
+.accent-panel {
+    background: #18352c;
+    color: #f7fbf6;
+}
+
+.accent-panel .panel-heading span {
+    color: #b8d6ca;
+}
+
+.timeline {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 16px 14px;
+}
+
+.timeline span {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    color: #18352c;
+    background: #f0b35d;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.timeline p {
+    margin-bottom: 0;
+    color: #e5f0eb;
+    line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+    .shell {
+        width: min(100% - 20px, 1120px);
+        padding: 10px 0;
+    }
+
+    .overview {
+        min-height: auto;
+        padding: 18px;
+    }
+
+    .topbar,
+    .hero,
+    .content-grid {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .metrics {
+        width: 100%;
+    }
+
+    h1 {
+        font-size: 2.5rem;
+        line-height: 1;
+    }
+}
