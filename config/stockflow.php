@@ -4,7 +4,18 @@ return [
     'runtime' => [
         'service_name' => env('STOCKFLOW_SERVICE_NAME', 'gateway'),
         'request_timeout_ms' => (int) env('STOCKFLOW_REQUEST_TIMEOUT_MS', 2500),
+        'dependency_timeout_seconds' => (int) env('STOCKFLOW_DEPENDENCY_TIMEOUT_SECONDS', 2),
         'shutdown_timeout_seconds' => (int) env('STOCKFLOW_SHUTDOWN_TIMEOUT_SECONDS', 15),
+    ],
+
+    'dependencies' => [
+        'rabbitmq' => [
+            'host' => env('RABBITMQ_HOST', 'rabbitmq'),
+            'port' => (int) env('RABBITMQ_PORT', 5672),
+        ],
+        'elasticsearch' => [
+            'host' => env('ELASTICSEARCH_HOST', 'http://elasticsearch:9200'),
+        ],
     ],
 
     'catalog' => [
