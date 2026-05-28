@@ -51,7 +51,7 @@ class CatalogReadApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.sku', 'SCAN-001');
 
-        $product->delete();
+        Product::withoutEvents(fn () => $product->delete());
 
         $this->getJson('/api/catalog/products/wireless-scanner')
             ->assertOk()
