@@ -1,58 +1,117 @@
 # StockFlow Market
 
-StockFlow Market — pet-проект маркетплейса на Laravel и Vue.js. Цель проекта — показать реалистичный engineering case: каталог, остатки, заказы, поиск, асинхронные события, наблюдаемость и нагрузочные сценарии без лишней архитектурной имитации.
+StockFlow Market — инженерный pet-проект маркетплейса с микросервисным контуром вокруг Laravel, PostgreSQL, Redis, RabbitMQ, Elasticsearch и Vite frontend. Проект развивается как реалистичный backend case: каталог, остатки, заказы, цены, поиск, асинхронные события и локальная инфраструктура без лишней имитации enterprise-слоя.
 
-## Текущий этап
+## Текущий статус
 
-Создан базовый Laravel-проект и зафиксирована стартовая структура backend-кода под modular monolith:
+Сейчас проект находится на этапе закладки фундамента:
+
+- поднят Laravel backend shell, который временно выполняет роль API gateway;
+- добавлен Docker Compose для локального запуска инфраструктуры;
+- заведён `services/` workspace под будущие сервисы;
+- зафиксированы первые OpenAPI-заготовки и события по доменам;
+- добавлен архитектурный тест, который проверяет наличие сервисной структуры.
+
+## Архитектура
+
+Целевое направление — микросервисный marketplace, где каждый сервис владеет своей моделью, контрактами и схемой данных. На раннем этапе реализация остаётся в одном репозитории, чтобы быстрее развивать сценарии и не платить стоимость распределённой системы до появления реальной доменной нагрузки.
 
 ```text
-app/
-  Application/
-    Commands/
-    DTO/
-    Queries/
-  Domains/
-    Catalog/
-    Inventory/
-    Orders/
-    Pricing/
-    Search/
-  Infrastructure/
-    Cache/
-    Messaging/
-    Persistence/
-    Search/
-  Interfaces/
-    Console/
-    Http/
+stockflow-market/
+  app/                    # Laravel backend shell / gateway на текущем этапе
+  services/
+    gateway/              # внешний API слой
+    catalog/              # товары, категории, атрибуты
+    inventory/            # остатки, резервы, складские движения
+    orders/               # корзина и жизненный цикл заказа
+    pricing/              # цены, промо-правила, расчёты
+    search/               # Elasticsearch индексы и read-модели
+  docker/
+    php/                  # локальный PHP runtime
+  compose.yaml            # локальный стек разработки
 ```
 
-Пока директории пустые намеренно: доменная модель, миграции, API и интеграции будут добавляться маленькими этапами.
+Каждый доменный сервис уже содержит одинаковые рабочие зоны:
 
-## Локальный запуск
+- `contracts/` — OpenAPI и внешние контракты;
+- `database/migrations/` — будущая схема данных сервиса;
+- `messaging/` — входящие и исходящие события;
+- `src/` — прикладной и доменный код;
+- `tests/` — модульные, контрактные и интеграционные проверки.
 
-Текущий минимальный запуск использует стандартные команды Laravel:
+## Локальная инфраструктура
+
+Docker Compose поднимает:
+
+| Сервис | Назначение | Локальный адрес |
+| --- | --- | --- |
+| `php` | Laravel backend shell | `http://localhost:8080` |
+| `frontend` | Vite dev server | `http://localhost:5173` |
+| `postgres` | основная реляционная БД | `localhost:5432` |
+| `redis` | кеш, сессии, очереди | `localhost:6379` |
+| `rabbitmq` | брокер доменных событий | `localhost:5672`, UI `http://localhost:15672` |
+| `elasticsearch` | поисковый движок | `http://localhost:9200` |
+
+Дефолтные локальные креды:
+
+```text
+PostgreSQL: stockflow / secret
+RabbitMQ:   stockflow / secret
+```
+
+## Быстрый старт
 
 ```bash
-composer install
 cp .env.example .env
-php artisan key:generate
-php artisan serve
+docker compose up -d --build
+docker compose exec php composer install
+docker compose exec php php artisan key:generate
+docker compose exec php php artisan migrate
 ```
 
-Полноценный запуск через Docker Compose с PostgreSQL, Redis, RabbitMQ, Elasticsearch, Prometheus и Grafana будет добавлен отдельным этапом.
+После запуска:
+
+- backend доступен на `http://localhost:8080`;
+- frontend доступен на `http://localhost:5173`;
+- RabbitMQ Management UI доступен на `http://localhost:15672`.
+
+## Локальные команды
+
+```bash
+composer test
+docker compose config
+docker compose ps
+docker compose logs -f php
+docker compose down
+```
 
 ## Проверки
+
+Основная проверка на текущем этапе:
 
 ```bash
 composer test
 ```
 
-Если локальный PHP не содержит SQLite-драйвер, миграции SQLite из стандартного post-install шага Laravel могут завершиться предупреждением. На следующих этапах проект будет переведён на PostgreSQL в Docker.
+Тесты пока лёгкие и намеренно инфраструктурные: они страхуют базовый Laravel bootstrap и наличие сервисной структуры. По мере появления бизнес-сценариев сюда будут добавляться контрактные тесты, feature-тесты API и интеграционные проверки событий.
 
-## Ближайшие шаги
+## Инженерные решения
 
-1. Добавить Docker Compose для Laravel, PostgreSQL, Redis, RabbitMQ и Elasticsearch.
-2. Описать первое ADR по выбору modular monolith.
-3. Реализовать базовую доменную модель Catalog и миграции.
+- Репозиторий остаётся monorepo, пока сервисы находятся в активной фазе проектирования.
+- PostgreSQL выбран как основное хранилище для транзакционных данных.
+- Redis используется для кеша, сессий и быстрых очередей локального контура.
+- RabbitMQ зарезервирован под доменные события между сервисами.
+- Elasticsearch выделен под поисковые read-модели и индексацию каталога.
+- Контракты сервисов описываются до реализации публичных API.
+
+## Ближайший план
+
+1. Описать первый ADR по переходной архитектуре: Laravel gateway + сервисный workspace.
+2. Реализовать базовую модель Catalog: товары, категории, атрибуты.
+3. Добавить публикацию события `catalog.product.created`.
+4. Подключить обработчик индексации в Search Service.
+5. Расширить Docker Compose worker-процессами для очередей и событий.
+
+## Лицензия
+
+MIT.
