@@ -17,6 +17,7 @@ StockFlow Market — инженерный pet-проект маркетплей�
 - добавлены Docker Compose worker-процессы для общей очереди и поисковой индексации;
 - добавлены `health/live` и `health/ready` probes для runtime и зависимостей;
 - подключён Elasticsearch adapter для записи поисковых документов;
+- добавлена операционная команда `search:dead-letter` для просмотра и ручного возврата документов поисковой индексации;
 - добавлен `config/stockflow.php` для runtime-настроек таймаутов, кеша, очередей, retry и backpressure limits;
 - описан первый ADR по переходной архитектуре Laravel gateway + service workspace;
 - добавлен архитектурный тест, который проверяет наличие сервисной структуры.
@@ -94,6 +95,8 @@ docker compose logs -f php
 docker compose down
 ```
 
+`composer test` запускает локальный PHP, если есть подходящий PDO-драйвер. При наличии `pdo_sqlite` используется in-memory SQLite; если локально доступен только `pdo_pgsql`, тесты переключаются на PostgreSQL с дефолтными локальными кредами `stockflow / secret`. Если локальный PHP не подходит, wrapper запускает suite внутри `docker compose run php`.
+
 ## Runtime-настройки
 
 Проектные highload-настройки собраны в `config/stockflow.php`, чтобы прикладной код не хардкодил операционные лимиты. Значения переопределяются через `STOCKFLOW_*` переменные в `.env`.
@@ -107,6 +110,39 @@ docker compose down
 
 Эти настройки пока являются контрактом для ближайших этапов: Redis caching, Elasticsearch adapter, retries и backpressure. Очередь `search-indexing` уже используется job pipeline для поисковой индексации, а окончательно упавшие документы отправляются в `search-indexing-dead-letter`.
 
+## Search dead-letter операции
+
+Документы, которые не удалось проиндексировать после retry-порога, попадают в очередь `search-indexing-dead-letter`. Для диагностики и ручного восстановления используется artisan-команда:
+
+```bash
+php artisan search:dead-letter list
+php artisan search:dead-letter list --limit=50
+php artisan search:dead-letter list --index=catalog_products --document-id=15
+```
+
+Возврат одного документа в основную очередь индексации:
+
+```bash
+php artisan search:dead-letter requeue --id=123
+```
+
+Безопасный bulk requeue для production-сценариев:
+
+```bash
+php artisan search:dead-letter requeue --all --index=catalog_products --dry-run
+php artisan search:dead-letter requeue --all --index=catalog_products --document-id=15 --dry-run
+php artisan search:dead-letter requeue --all --index=catalog_products
+php artisan search:dead-letter requeue --all --index=catalog_products --force
+```
+
+Защитные правила:
+
+- `requeue` требует `--id` или явный `--all`;
+- `--dry-run` показывает найденные документы и не меняет очереди;
+- bulk requeue без `--force` требует интерактивного подтверждения;
+- `--index` и `--document-id` сужают выборку перед requeue;
+- каждый реально возвращённый документ пишет audit-событие в application log с queue job id, index, document id и attempts.
+
 ## Проверки
 
 Основная проверка на текущем этапе:
@@ -115,7 +151,7 @@ docker compose down
 composer test
 ```
 
-Тесты пока лёгкие и намеренно инфраструктурные: они страхуют базовый Laravel bootstrap, наличие сервисной структуры, модель каталога и первый внутренний событийный поток. По мере появления бизнес-сценариев сюда будут добавляться контрактные тесты, feature-тесты API и интеграционные проверки событий.
+Тесты страхуют базовый Laravel bootstrap, runtime-конфигурацию, сервисную структуру, модель каталога, OpenAPI-контракты, HTTP read API и поисковый indexing pipeline, включая retry/dead-letter поведение и ручной requeue.
 
 ## Инженерные решения
 
@@ -131,8 +167,8 @@ composer test
 ## Ближайший план
 
 1. Добавить Redis caching для чтения каталога и дерева категорий.
-2. Описать contract tests для первых gateway/catalog API сценариев.
-3. Подготовить retry/dead-letter поведение для событийной доставки.
+2. Перенести поисковую dead-letter очередь с database queue на production-совместимый backend и сохранить тот же operational contract.
+3. Описать contract tests для первых gateway/catalog API сценариев.
 
 ## Лицензия
 
