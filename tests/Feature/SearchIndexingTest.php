@@ -6,11 +6,13 @@ use App\Domains\Catalog\Events\ProductCreated;
 use App\Domains\Catalog\Models\Product;
 use App\Domains\Search\Contracts\SearchIndexer;
 use App\Domains\Search\Events\SearchIndexRequested;
+use App\Domains\Search\Jobs\DeadLetterSearchIndexDocument;
 use App\Domains\Search\Jobs\IndexSearchDocument;
 use App\Infrastructure\Search\ElasticsearchSearchIndexer;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use RuntimeException;
 use Tests\TestCase;
 
 class SearchIndexingTest extends TestCase
@@ -64,6 +66,28 @@ class SearchIndexingTest extends TestCase
         });
     }
 
+    public function test_failed_indexing_job_is_moved_to_the_dead_letter_queue(): void
+    {
+        Queue::fake();
+
+        $job = new IndexSearchDocument(
+            index: 'catalog_products',
+            documentId: '15',
+            document: ['sku' => 'SCAN-001'],
+        );
+
+        $job->failed(new RuntimeException('Elasticsearch is unavailable.'));
+
+        Queue::assertPushedOn('search-indexing-dead-letter', DeadLetterSearchIndexDocument::class);
+        Queue::assertPushed(DeadLetterSearchIndexDocument::class, function (DeadLetterSearchIndexDocument $job) {
+            return $job->index === 'catalog_products'
+                && $job->documentId === '15'
+                && $job->document['sku'] === 'SCAN-001'
+                && $job->attempts === 5
+                && $job->failure === 'Elasticsearch is unavailable.';
+        });
+    }
+
     public function test_indexing_job_writes_through_the_search_indexer_port(): void
     {
         $indexer = new class implements SearchIndexer
@@ -109,7 +133,7 @@ class SearchIndexingTest extends TestCase
             ]),
         ]);
 
-        $indexer = new ElasticsearchSearchIndexer();
+        $indexer = new ElasticsearchSearchIndexer;
 
         $indexer->index('catalog_products', '15', [
             'sku' => 'SCAN-001',

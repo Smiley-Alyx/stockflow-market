@@ -102,10 +102,10 @@ docker compose down
 | --- | --- |
 | `runtime` | имя сервиса, общий request timeout, graceful shutdown budget |
 | `catalog.cache` | TTL кеша товаров и дерева категорий |
-| `search.indexing` | очередь индексации, batch size, max in-flight, timeout Elasticsearch |
+| `search.indexing` | очередь индексации, dead-letter очередь, batch size, max in-flight, timeout Elasticsearch |
 | `messaging.retry` | retry attempts, backoff и порог dead-letter |
 
-Эти настройки пока являются контрактом для ближайших этапов: Redis caching, Elasticsearch adapter, retries и backpressure. Очередь `search-indexing` уже используется job pipeline для поисковой индексации.
+Эти настройки пока являются контрактом для ближайших этапов: Redis caching, Elasticsearch adapter, retries и backpressure. Очередь `search-indexing` уже используется job pipeline для поисковой индексации, а окончательно упавшие документы отправляются в `search-indexing-dead-letter`.
 
 ## Проверки
 

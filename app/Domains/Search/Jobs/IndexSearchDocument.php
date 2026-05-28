@@ -5,6 +5,7 @@ namespace App\Domains\Search\Jobs;
 use App\Domains\Search\Contracts\SearchIndexer;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Throwable;
 
 class IndexSearchDocument implements ShouldQueue
 {
@@ -36,5 +37,16 @@ class IndexSearchDocument implements ShouldQueue
     public function handle(SearchIndexer $indexer): void
     {
         $indexer->index($this->index, $this->documentId, $this->document);
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        DeadLetterSearchIndexDocument::dispatch(
+            index: $this->index,
+            documentId: $this->documentId,
+            document: $this->document,
+            attempts: max($this->attempts(), (int) config('stockflow.messaging.retry.dead_letter_after_attempts')),
+            failure: $exception?->getMessage() ?? 'Search indexing failed.',
+        );
     }
 }

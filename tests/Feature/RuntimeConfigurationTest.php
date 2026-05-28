@@ -16,6 +16,7 @@ class RuntimeConfigurationTest extends TestCase
         $this->assertSame('http://elasticsearch:9200', config('stockflow.dependencies.elasticsearch.host'));
         $this->assertSame(300, config('stockflow.catalog.cache.product_ttl_seconds'));
         $this->assertSame('search-indexing', config('stockflow.search.indexing.queue'));
+        $this->assertSame('search-indexing-dead-letter', config('stockflow.search.indexing.dead_letter_queue'));
         $this->assertSame(100, config('stockflow.search.indexing.batch_size'));
         $this->assertSame(500, config('stockflow.search.indexing.max_in_flight'));
         $this->assertSame('rabbitmq', config('stockflow.messaging.event_bus'));
@@ -29,6 +30,7 @@ class RuntimeConfigurationTest extends TestCase
         $this->assertStringContainsString('STOCKFLOW_REQUEST_TIMEOUT_MS=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_DEPENDENCY_TIMEOUT_SECONDS=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_SEARCH_INDEX_MAX_IN_FLIGHT=', $envExample);
+        $this->assertStringContainsString('STOCKFLOW_SEARCH_INDEX_DEAD_LETTER_QUEUE=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_MESSAGE_RETRY_ATTEMPTS=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_MESSAGE_DEAD_LETTER_AFTER=', $envExample);
     }
