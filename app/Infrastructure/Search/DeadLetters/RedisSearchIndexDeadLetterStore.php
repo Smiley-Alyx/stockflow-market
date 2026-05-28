@@ -35,17 +35,40 @@ class RedisSearchIndexDeadLetterStore implements SearchIndexDeadLetterStore
      */
     public function list(?string $index = null, ?string $documentId = null, int $limit = 10, int $afterId = 0): Collection
     {
-        $ids = $this->redis()->zrangebyscore($this->indexKey(), '('.$afterId, '+inf', [
-            'limit' => [0, max(1, $limit * 4)],
-        ]);
+        $records = collect();
+        $cursor = $afterId;
+        $pageSize = max(1, $limit * 4);
 
-        return collect($ids)
-            ->map(fn (string $id): ?SearchIndexDeadLetter => $this->find((int) $id))
-            ->filter()
-            ->filter(fn (SearchIndexDeadLetter $record): bool => $index === null || $record->index === $index)
-            ->filter(fn (SearchIndexDeadLetter $record): bool => $documentId === null || $record->documentId === $documentId)
-            ->take(max(1, $limit))
-            ->values();
+        do {
+            $ids = $this->redis()->zrangebyscore($this->indexKey(), '('.$cursor, '+inf', [
+                'limit' => [0, $pageSize],
+            ]);
+
+            foreach ($ids as $id) {
+                $cursor = (int) $id;
+                $record = $this->find($cursor);
+
+                if (! $record instanceof SearchIndexDeadLetter) {
+                    continue;
+                }
+
+                if ($index !== null && $record->index !== $index) {
+                    continue;
+                }
+
+                if ($documentId !== null && $record->documentId !== $documentId) {
+                    continue;
+                }
+
+                $records->push($record);
+
+                if ($records->count() >= max(1, $limit)) {
+                    return $records->values();
+                }
+            }
+        } while (count($ids) === $pageSize);
+
+        return $records->values();
     }
 
     public function delete(int $id): void

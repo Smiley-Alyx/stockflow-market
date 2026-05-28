@@ -201,6 +201,34 @@ class SearchIndexingTest extends TestCase
         $this->assertDatabaseCount('jobs', 2);
     }
 
+    public function test_dead_letter_bulk_requeue_uses_bounded_batches(): void
+    {
+        $this->artisan('migrate:fresh --force')->assertExitCode(0);
+
+        config([
+            'queue.default' => 'database',
+            'stockflow.search.indexing.requeue_batch_size' => 3,
+            'stockflow.search.indexing.max_requeue_batch_size' => 5,
+        ]);
+
+        for ($documentId = 1; $documentId <= 7; $documentId++) {
+            $this->app->make(SearchIndexDeadLetterStore::class)->put(
+                index: 'catalog_products',
+                documentId: (string) $documentId,
+                document: ['sku' => 'SCAN-'.$documentId],
+                attempts: 5,
+                failure: 'Elasticsearch is unavailable.',
+            );
+        }
+
+        $this->artisan('search:dead-letter requeue --all --index=catalog_products --batch-size=99 --force')
+            ->expectsOutput('Search indexing jobs requeued: 7.')
+            ->assertExitCode(0);
+
+        $this->assertTrue($this->app->make(SearchIndexDeadLetterStore::class)->list(limit: 10)->isEmpty());
+        $this->assertDatabaseCount('jobs', 7);
+    }
+
     public function test_queue_worker_retries_indexing_job_until_dead_letter_threshold(): void
     {
         $this->artisan('migrate:fresh --force')->assertExitCode(0);

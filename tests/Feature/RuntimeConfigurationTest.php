@@ -19,6 +19,8 @@ class RuntimeConfigurationTest extends TestCase
         $this->assertSame('search-indexing-dead-letter', config('stockflow.search.indexing.dead_letter_queue'));
         $this->assertSame('redis', config('stockflow.search.indexing.dead_letter_backend'));
         $this->assertSame('search_requeue_audit', config('stockflow.search.indexing.requeue_audit_channel'));
+        $this->assertSame(100, config('stockflow.search.indexing.requeue_batch_size'));
+        $this->assertSame(500, config('stockflow.search.indexing.max_requeue_batch_size'));
         $this->assertSame(100, config('stockflow.search.indexing.batch_size'));
         $this->assertSame(500, config('stockflow.search.indexing.max_in_flight'));
         $this->assertSame('rabbitmq', config('stockflow.messaging.event_bus'));
@@ -35,6 +37,7 @@ class RuntimeConfigurationTest extends TestCase
         $this->assertStringContainsString('STOCKFLOW_SEARCH_INDEX_DEAD_LETTER_QUEUE=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_SEARCH_INDEX_DEAD_LETTER_BACKEND=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_SEARCH_REQUEUE_AUDIT_CHANNEL=', $envExample);
+        $this->assertStringContainsString('STOCKFLOW_SEARCH_REQUEUE_BATCH_SIZE=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_MESSAGE_RETRY_ATTEMPTS=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_MESSAGE_DEAD_LETTER_AFTER=', $envExample);
     }

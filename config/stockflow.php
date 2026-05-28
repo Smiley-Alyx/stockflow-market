@@ -33,6 +33,8 @@ return [
             'dead_letter_redis_connection' => env('STOCKFLOW_SEARCH_INDEX_DEAD_LETTER_REDIS_CONNECTION', 'default'),
             'dead_letter_redis_key' => env('STOCKFLOW_SEARCH_INDEX_DEAD_LETTER_REDIS_KEY', 'stockflow:search:dead-letter'),
             'requeue_audit_channel' => env('STOCKFLOW_SEARCH_REQUEUE_AUDIT_CHANNEL', 'search_requeue_audit'),
+            'requeue_batch_size' => (int) env('STOCKFLOW_SEARCH_REQUEUE_BATCH_SIZE', 100),
+            'max_requeue_batch_size' => (int) env('STOCKFLOW_SEARCH_MAX_REQUEUE_BATCH_SIZE', 500),
             'batch_size' => (int) env('STOCKFLOW_SEARCH_INDEX_BATCH_SIZE', 100),
             'max_in_flight' => (int) env('STOCKFLOW_SEARCH_INDEX_MAX_IN_FLIGHT', 500),
             'timeout_ms' => (int) env('STOCKFLOW_SEARCH_INDEX_TIMEOUT_MS', 1500),

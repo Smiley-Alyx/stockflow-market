@@ -17,7 +17,7 @@ StockFlow Market — инженерный pet-проект маркетплей�
 - добавлены Docker Compose worker-процессы для общей очереди и поисковой индексации;
 - добавлены `health/live` и `health/ready` probes для runtime и зависимостей;
 - подключён Elasticsearch adapter для записи поисковых документов;
-- добавлена операционная команда `search:dead-letter` для просмотра и ручного возврата документов поисковой индексации;
+- добавлена операционная команда `search:dead-letter` для просмотра и ручного возврата документов поисковой индексации из отдельного dead-letter backend;
 - добавлен `config/stockflow.php` для runtime-настроек таймаутов, кеша, очередей, retry и backpressure limits;
 - описан первый ADR по переходной архитектуре Laravel gateway + service workspace;
 - добавлен архитектурный тест, который проверяет наличие сервисной структуры.
@@ -105,14 +105,14 @@ docker compose down
 | --- | --- |
 | `runtime` | имя сервиса, общий request timeout, graceful shutdown budget |
 | `catalog.cache` | TTL кеша товаров и дерева категорий |
-| `search.indexing` | очередь индексации, dead-letter очередь, batch size, max in-flight, timeout Elasticsearch |
+| `search.indexing` | очередь индексации, Redis dead-letter backend, requeue audit channel, batch size, max in-flight, timeout Elasticsearch |
 | `messaging.retry` | retry attempts, backoff и порог dead-letter |
 
-Эти настройки пока являются контрактом для ближайших этапов: Redis caching, Elasticsearch adapter, retries и backpressure. Очередь `search-indexing` уже используется job pipeline для поисковой индексации, а окончательно упавшие документы отправляются в `search-indexing-dead-letter`.
+Эти настройки пока являются контрактом для ближайших этапов: Redis caching, Elasticsearch adapter, retries и backpressure. Очередь `search-indexing` уже используется job pipeline для поисковой индексации, а окончательно упавшие документы сохраняются в Redis-backed dead-letter storage с operational name `search-indexing-dead-letter`.
 
 ## Search dead-letter операции
 
-Документы, которые не удалось проиндексировать после retry-порога, попадают в очередь `search-indexing-dead-letter`. Для диагностики и ручного восстановления используется artisan-команда:
+Документы, которые не удалось проиндексировать после retry-порога, сохраняются в production-совместимое dead-letter хранилище. По умолчанию используется Redis backend с ключом `stockflow:search:dead-letter`; CLI-контракт остаётся прежним: оператор работает с числовым `ID`, фильтрами и теми же action `list` / `requeue`.
 
 ```bash
 php artisan search:dead-letter list
@@ -133,6 +133,7 @@ php artisan search:dead-letter requeue --all --index=catalog_products --dry-run
 php artisan search:dead-letter requeue --all --index=catalog_products --document-id=15 --dry-run
 php artisan search:dead-letter requeue --all --index=catalog_products
 php artisan search:dead-letter requeue --all --index=catalog_products --force
+php artisan search:dead-letter requeue --all --index=catalog_products --batch-size=50 --force
 ```
 
 Защитные правила:
@@ -140,8 +141,9 @@ php artisan search:dead-letter requeue --all --index=catalog_products --force
 - `requeue` требует `--id` или явный `--all`;
 - `--dry-run` показывает найденные документы и не меняет очереди;
 - bulk requeue без `--force` требует интерактивного подтверждения;
+- bulk requeue обрабатывает документы страницами по `ID` и чанками не больше `STOCKFLOW_SEARCH_MAX_REQUEUE_BATCH_SIZE`;
 - `--index` и `--document-id` сужают выборку перед requeue;
-- каждый реально возвращённый документ пишет audit-событие в application log с queue job id, index, document id и attempts.
+- каждый реально возвращённый документ пишет структурированное audit-событие `search.dead_letter.requeued` в канал `STOCKFLOW_SEARCH_REQUEUE_AUDIT_CHANNEL`, чтобы его можно было отдельно направлять в SIEM.
 
 ## Проверки
 
@@ -167,8 +169,7 @@ composer test
 ## Ближайший план
 
 1. Добавить Redis caching для чтения каталога и дерева категорий.
-2. Перенести поисковую dead-letter очередь с database queue на production-совместимый backend и сохранить тот же operational contract.
-3. Описать contract tests для первых gateway/catalog API сценариев.
+2. Описать contract tests для первых gateway/catalog API сценариев.
 
 ## Лицензия
 

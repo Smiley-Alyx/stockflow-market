@@ -18,6 +18,7 @@ class SearchDeadLetterCommand extends Command
         {--index= : Search index filter}
         {--document-id= : Search document id filter}
         {--limit=10 : Maximum jobs to list}
+        {--batch-size= : Maximum jobs to requeue per chunk}
         {--all : Requeue all jobs matching filters}
         {--dry-run : Show matching jobs without requeueing}
         {--force : Skip confirmation for bulk requeue}';
@@ -72,23 +73,35 @@ class SearchDeadLetterCommand extends Command
             return self::INVALID;
         }
 
-        $jobs = $this->matchingJobs($id === null ? null : (int) $id);
+        if ($id !== null) {
+            return $this->requeueSingleJob((int) $id);
+        }
 
-        if ($jobs->isEmpty()) {
+        $batchSize = $this->bulkBatchSize();
+
+        if ($batchSize === null) {
+            return self::INVALID;
+        }
+
+        $total = $this->countMatchingJobs($batchSize);
+
+        if ($total === 0) {
             $this->error('Search indexing dead-letter job was not found.');
 
             return self::FAILURE;
         }
 
         if ($this->option('dry-run')) {
+            $jobs = $this->matchingJobs(limit: max(1, (int) $this->option('limit')));
+
             $this->table(['ID', 'Index', 'Document ID', 'Attempts', 'Failure'], $jobs->map(fn (object $job): array => $this->rowFor($job))->all());
-            $this->info('Dry run: '.$jobs->count().' search indexing job(s) matched.');
+            $this->info('Dry run: '.$total.' search indexing job(s) matched.');
 
             return self::SUCCESS;
         }
 
-        if ($jobs->count() > 1 && ! $this->option('force')) {
-            $confirmed = $this->confirm('Requeue '.$jobs->count().' search indexing dead-letter jobs?');
+        if ($total > 1 && ! $this->option('force')) {
+            $confirmed = $this->confirm('Requeue '.$total.' search indexing dead-letter jobs?');
 
             if (! $confirmed) {
                 $this->info('Requeue cancelled.');
@@ -97,24 +110,12 @@ class SearchDeadLetterCommand extends Command
             }
         }
 
-        DB::transaction(function () use ($jobs): void {
-            foreach ($jobs as $job) {
-                IndexSearchDocument::dispatch(
-                    index: $job->index,
-                    documentId: $job->documentId,
-                    document: $job->document,
-                );
+        $requeued = $this->requeueMatchingJobs($batchSize, $total);
 
-                $this->deadLetters->delete($job->id);
-
-                $this->auditRequeue($job);
-            }
-        });
-
-        if ($jobs->count() === 1) {
+        if ($requeued === 1) {
             $this->info('Search indexing job requeued.');
         } else {
-            $this->info('Search indexing jobs requeued: '.$jobs->count().'.');
+            $this->info('Search indexing jobs requeued: '.$requeued.'.');
         }
 
         return self::SUCCESS;
@@ -144,7 +145,33 @@ class SearchDeadLetterCommand extends Command
     /**
      * @return Collection<int, object>
      */
-    private function matchingJobs(?int $id = null): Collection
+    private function requeueSingleJob(int $id): int
+    {
+        $jobs = $this->matchingJobs($id);
+
+        if ($jobs->isEmpty()) {
+            $this->error('Search indexing dead-letter job was not found.');
+
+            return self::FAILURE;
+        }
+
+        if ($this->option('dry-run')) {
+            $this->table(['ID', 'Index', 'Document ID', 'Attempts', 'Failure'], $jobs->map(fn (object $job): array => $this->rowFor($job))->all());
+            $this->info('Dry run: 1 search indexing job(s) matched.');
+
+            return self::SUCCESS;
+        }
+
+        $this->requeueJobs($jobs);
+        $this->info('Search indexing job requeued.');
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * @return Collection<int, SearchIndexDeadLetter>
+     */
+    private function matchingJobs(?int $id = null, ?int $limit = null, int $afterId = 0): Collection
     {
         if ($id !== null) {
             $job = $this->deadLetters->find($id);
@@ -157,7 +184,8 @@ class SearchDeadLetterCommand extends Command
         return $this->deadLetters->list(
             index: $this->option('index'),
             documentId: $this->option('document-id'),
-            limit: max(1, (int) $this->option('limit')),
+            limit: $limit ?? max(1, (int) $this->option('limit')),
+            afterId: $afterId,
         );
     }
 
@@ -172,6 +200,75 @@ class SearchDeadLetterCommand extends Command
         }
 
         return true;
+    }
+
+    private function bulkBatchSize(): ?int
+    {
+        $batchSize = $this->option('batch-size') === null
+            ? (int) config('stockflow.search.indexing.requeue_batch_size')
+            : (int) $this->option('batch-size');
+
+        if ($batchSize < 1) {
+            $this->error('The --batch-size option must be at least 1.');
+
+            return null;
+        }
+
+        return min($batchSize, max(1, (int) config('stockflow.search.indexing.max_requeue_batch_size')));
+    }
+
+    private function countMatchingJobs(int $batchSize): int
+    {
+        $afterId = 0;
+        $total = 0;
+
+        do {
+            $jobs = $this->matchingJobs(limit: $batchSize, afterId: $afterId);
+            $total += $jobs->count();
+            $afterId = $jobs->last()?->id ?? $afterId;
+        } while ($jobs->isNotEmpty());
+
+        return $total;
+    }
+
+    private function requeueMatchingJobs(int $batchSize, int $limit): int
+    {
+        $afterId = 0;
+        $requeued = 0;
+
+        while ($requeued < $limit) {
+            $jobs = $this->matchingJobs(limit: min($batchSize, $limit - $requeued), afterId: $afterId);
+
+            if ($jobs->isEmpty()) {
+                break;
+            }
+
+            $afterId = $jobs->last()->id;
+            $this->requeueJobs($jobs);
+            $requeued += $jobs->count();
+        }
+
+        return $requeued;
+    }
+
+    /**
+     * @param  Collection<int, SearchIndexDeadLetter>  $jobs
+     */
+    private function requeueJobs(Collection $jobs): void
+    {
+        DB::transaction(function () use ($jobs): void {
+            foreach ($jobs as $job) {
+                IndexSearchDocument::dispatch(
+                    index: $job->index,
+                    documentId: $job->documentId,
+                    document: $job->document,
+                );
+
+                $this->deadLetters->delete($job->id);
+
+                $this->auditRequeue($job);
+            }
+        });
     }
 
     private function auditRequeue(SearchIndexDeadLetter $job): void
