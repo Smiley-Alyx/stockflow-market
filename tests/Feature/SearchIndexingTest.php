@@ -130,6 +130,85 @@ class SearchIndexingTest extends TestCase
         ]);
     }
 
+    public function test_dead_letter_requeue_can_dry_run_with_index_and_document_filters(): void
+    {
+        $this->artisan('migrate:fresh --force')->assertExitCode(0);
+
+        config(['queue.default' => 'database']);
+
+        DeadLetterSearchIndexDocument::dispatch(
+            index: 'catalog_products',
+            documentId: '15',
+            document: ['sku' => 'SCAN-001'],
+            attempts: 5,
+            failure: 'Elasticsearch is unavailable.',
+        );
+        DeadLetterSearchIndexDocument::dispatch(
+            index: 'catalog_products',
+            documentId: '16',
+            document: ['sku' => 'SCAN-002'],
+            attempts: 5,
+            failure: 'Elasticsearch is unavailable.',
+        );
+
+        $deadLetterJob = DB::table('jobs')
+            ->where('queue', 'search-indexing-dead-letter')
+            ->orderBy('id')
+            ->first();
+
+        $this->assertNotNull($deadLetterJob);
+
+        $this->artisan('search:dead-letter requeue --all --dry-run --index=catalog_products --document-id=15')
+            ->expectsTable(
+                ['ID', 'Index', 'Document ID', 'Attempts', 'Failure'],
+                [[$deadLetterJob->id, 'catalog_products', '15', 5, 'Elasticsearch is unavailable.']],
+            )
+            ->expectsOutput('Dry run: 1 search indexing job(s) matched.')
+            ->assertExitCode(0);
+
+        $this->assertDatabaseCount('jobs', 2);
+    }
+
+    public function test_dead_letter_bulk_requeue_requires_confirmation(): void
+    {
+        $this->artisan('migrate:fresh --force')->assertExitCode(0);
+
+        config(['queue.default' => 'database']);
+
+        DeadLetterSearchIndexDocument::dispatch(
+            index: 'catalog_products',
+            documentId: '15',
+            document: ['sku' => 'SCAN-001'],
+            attempts: 5,
+            failure: 'Elasticsearch is unavailable.',
+        );
+        DeadLetterSearchIndexDocument::dispatch(
+            index: 'catalog_products',
+            documentId: '16',
+            document: ['sku' => 'SCAN-002'],
+            attempts: 5,
+            failure: 'Elasticsearch is unavailable.',
+        );
+
+        $this->artisan('search:dead-letter requeue --all --index=catalog_products')
+            ->expectsConfirmation('Requeue 2 search indexing dead-letter jobs?', 'no')
+            ->expectsOutput('Requeue cancelled.')
+            ->assertExitCode(0);
+
+        $this->assertDatabaseCount('jobs', 2);
+
+        $this->artisan('search:dead-letter requeue --all --index=catalog_products')
+            ->expectsConfirmation('Requeue 2 search indexing dead-letter jobs?', 'yes')
+            ->expectsOutput('Search indexing jobs requeued: 2.')
+            ->assertExitCode(0);
+
+        $this->assertDatabaseMissing('jobs', [
+            'queue' => 'search-indexing-dead-letter',
+        ]);
+
+        $this->assertDatabaseCount('jobs', 2);
+    }
+
     public function test_queue_worker_retries_indexing_job_until_dead_letter_threshold(): void
     {
         $this->artisan('migrate:fresh --force')->assertExitCode(0);
