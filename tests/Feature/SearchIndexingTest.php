@@ -4,8 +4,11 @@ namespace Tests\Feature;
 
 use App\Domains\Catalog\Events\ProductCreated;
 use App\Domains\Catalog\Models\Product;
+use App\Domains\Search\Contracts\SearchIndexer;
 use App\Domains\Search\Events\SearchIndexRequested;
+use App\Domains\Search\Jobs\IndexSearchDocument;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class SearchIndexingTest extends TestCase
@@ -31,5 +34,68 @@ class SearchIndexingTest extends TestCase
                 && $event->payload()['event'] === SearchIndexRequested::NAME
                 && $event->payload()['document']['sku'] === 'SCAN-001';
         });
+    }
+
+    public function test_it_queues_product_indexing_on_the_search_indexing_queue(): void
+    {
+        Queue::fake();
+
+        $product = new Product([
+            'category_id' => 7,
+            'name' => 'Wireless Scanner',
+            'slug' => 'wireless-scanner',
+            'sku' => 'SCAN-001',
+            'status' => 'draft',
+        ]);
+        $product->id = 15;
+
+        ProductCreated::dispatch($product);
+
+        Queue::assertPushedOn('search-indexing', IndexSearchDocument::class);
+        Queue::assertPushed(IndexSearchDocument::class, function (IndexSearchDocument $job) {
+            return $job->index === 'catalog_products'
+                && $job->documentId === '15'
+                && $job->document['sku'] === 'SCAN-001'
+                && $job->tries === 5
+                && $job->timeout === 2
+                && $job->backoff() === 1;
+        });
+    }
+
+    public function test_indexing_job_writes_through_the_search_indexer_port(): void
+    {
+        $indexer = new class implements SearchIndexer
+        {
+            /**
+             * @var array<string, mixed>
+             */
+            public array $indexed = [];
+
+            /**
+             * @param  array<string, mixed>  $document
+             */
+            public function index(string $index, string $documentId, array $document): void
+            {
+                $this->indexed = [
+                    'index' => $index,
+                    'document_id' => $documentId,
+                    'document' => $document,
+                ];
+            }
+        };
+
+        $job = new IndexSearchDocument(
+            index: 'catalog_products',
+            documentId: '15',
+            document: ['sku' => 'SCAN-001'],
+        );
+
+        $job->handle($indexer);
+
+        $this->assertSame([
+            'index' => 'catalog_products',
+            'document_id' => '15',
+            'document' => ['sku' => 'SCAN-001'],
+        ], $indexer->indexed);
     }
 }

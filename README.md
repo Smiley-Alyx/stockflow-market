@@ -13,6 +13,7 @@ StockFlow Market — инженерный pet-проект маркетплей�
 - реализована базовая модель Catalog: категории, товары и атрибуты;
 - добавлена внутренняя публикация `catalog.product.created`;
 - добавлен обработчик, который превращает создание товара в `search.index.requested`;
+- добавлен первый async job pipeline для индексации поисковых документов;
 - добавлен `config/stockflow.php` для runtime-настроек таймаутов, кеша, очередей, retry и backpressure limits;
 - описан первый ADR по переходной архитектуре Laravel gateway + service workspace;
 - добавлен архитектурный тест, который проверяет наличие сервисной структуры.
@@ -101,7 +102,7 @@ docker compose down
 | `search.indexing` | очередь индексации, batch size, max in-flight, timeout Elasticsearch |
 | `messaging.retry` | retry attempts, backoff и порог dead-letter |
 
-Эти настройки пока являются контрактом для ближайших этапов: Redis caching, async indexing workers, retries и backpressure.
+Эти настройки пока являются контрактом для ближайших этапов: Redis caching, Elasticsearch adapter, retries и backpressure. Очередь `search-indexing` уже используется job pipeline для поисковой индексации.
 
 ## Проверки
 
@@ -126,10 +127,9 @@ composer test
 
 ## Ближайший план
 
-1. Подключить `stockflow.search.indexing` к первому async job pipeline.
-2. Расширить Docker Compose worker-процессами для очередей и событий.
-3. Добавить health/readiness/liveness probes для runtime и зависимостей.
-4. Подготовить Search adapter под Elasticsearch indexing pipeline.
+1. Расширить Docker Compose worker-процессами для очередей и событий.
+2. Добавить health/readiness/liveness probes для runtime и зависимостей.
+3. Подготовить Search adapter под Elasticsearch indexing pipeline.
 
 ## Лицензия
 
