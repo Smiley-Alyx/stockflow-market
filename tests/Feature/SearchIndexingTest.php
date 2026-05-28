@@ -9,6 +9,7 @@ use App\Domains\Search\Events\SearchIndexRequested;
 use App\Domains\Search\Jobs\DeadLetterSearchIndexDocument;
 use App\Domains\Search\Jobs\IndexSearchDocument;
 use App\Infrastructure\Search\ElasticsearchSearchIndexer;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -86,6 +87,47 @@ class SearchIndexingTest extends TestCase
                 && $job->attempts === 5
                 && $job->failure === 'Elasticsearch is unavailable.';
         });
+    }
+
+    public function test_dead_letter_command_lists_and_requeues_search_indexing_jobs(): void
+    {
+        $this->artisan('migrate:fresh --force')->assertExitCode(0);
+
+        config(['queue.default' => 'database']);
+
+        DeadLetterSearchIndexDocument::dispatch(
+            index: 'catalog_products',
+            documentId: '15',
+            document: ['sku' => 'SCAN-001'],
+            attempts: 5,
+            failure: 'Elasticsearch is unavailable.',
+        );
+
+        $deadLetterJob = DB::table('jobs')
+            ->where('queue', 'search-indexing-dead-letter')
+            ->first();
+
+        $this->assertNotNull($deadLetterJob);
+
+        $this->artisan('search:dead-letter list')
+            ->expectsTable(
+                ['ID', 'Index', 'Document ID', 'Attempts', 'Failure'],
+                [[$deadLetterJob->id, 'catalog_products', '15', 5, 'Elasticsearch is unavailable.']],
+            )
+            ->assertExitCode(0);
+
+        $this->artisan('search:dead-letter requeue --id='.$deadLetterJob->id)
+            ->expectsOutput('Search indexing job requeued.')
+            ->assertExitCode(0);
+
+        $this->assertDatabaseMissing('jobs', [
+            'id' => $deadLetterJob->id,
+            'queue' => 'search-indexing-dead-letter',
+        ]);
+
+        $this->assertDatabaseHas('jobs', [
+            'queue' => 'search-indexing',
+        ]);
     }
 
     public function test_indexing_job_writes_through_the_search_indexer_port(): void
