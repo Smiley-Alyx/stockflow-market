@@ -36,6 +36,71 @@ services:
         condition: service_healthy
     command: php artisan serve --host=0.0.0.0 --port=8000
 
+  queue-worker:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: stockflow-queue-worker
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+      - composer-cache:/tmp/composer-cache
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: stockflow
+      DB_USERNAME: stockflow
+      DB_PASSWORD: secret
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      SESSION_DRIVER: redis
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+      ELASTICSEARCH_HOST: http://elasticsearch:9200
+    depends_on:
+      php:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    command: php artisan queue:work redis --queue=default --sleep=1 --tries=5 --timeout=15
+
+  search-index-worker:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: stockflow-search-index-worker
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+      - composer-cache:/tmp/composer-cache
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: stockflow
+      DB_USERNAME: stockflow
+      DB_PASSWORD: secret
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      SESSION_DRIVER: redis
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+      ELASTICSEARCH_HOST: http://elasticsearch:9200
+      STOCKFLOW_SEARCH_INDEX_QUEUE: search-indexing
+    depends_on:
+      php:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    command: php artisan queue:work redis --queue=search-indexing --sleep=1 --tries=5 --timeout=15
+
   frontend:
     image: node:24-alpine
     container_name: stockflow-frontend

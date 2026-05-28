@@ -49,4 +49,14 @@ class ArchitectureStructureTest extends TestCase
     {
         $this->assertFileExists(base_path('docs/adr/0001-laravel-gateway-service-workspace.md'));
     }
+
+    public function test_compose_defines_queue_worker_processes(): void
+    {
+        $compose = (string) file_get_contents(base_path('compose.yaml'));
+
+        $this->assertStringContainsString('queue-worker:', $compose);
+        $this->assertStringContainsString('search-index-worker:', $compose);
+        $this->assertStringContainsString('php artisan queue:work redis --queue=default', $compose);
+        $this->assertStringContainsString('php artisan queue:work redis --queue=search-indexing', $compose);
+    }
 }
