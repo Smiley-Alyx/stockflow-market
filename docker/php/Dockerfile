@@ -13,12 +13,14 @@ RUN apk add --no-cache \
         libzip-dev \
         oniguruma-dev \
         postgresql-dev \
+        sqlite-dev \
         unzip \
     && docker-php-ext-install \
         bcmath \
         intl \
         pcntl \
         pdo_pgsql \
+        pdo_sqlite \
         zip \
     && addgroup -g "${GID}" stockflow \
     && adduser -D -u "${UID}" -G stockflow stockflow
