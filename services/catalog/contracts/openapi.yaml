@@ -2,4 +2,142 @@ openapi: 3.1.0
 info:
   title: StockFlow Catalog API
   version: 0.1.0
-paths: {}
+paths:
+  /api/catalog/products/{slug}:
+    get:
+      summary: Get catalog product by slug
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/catalog/categories/tree:
+    get:
+      summary: Get active catalog category tree
+      responses:
+        '200':
+          description: Active category tree
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryTreeResponse'
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+    ProductResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/Product'
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+        - sku
+        - status
+        - category
+        - attributes
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        sku:
+          type: string
+        description:
+          type:
+            - string
+            - 'null'
+        status:
+          type: string
+        published_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        category:
+          $ref: '#/components/schemas/ProductCategory'
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductAttribute'
+    ProductCategory:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+    ProductAttribute:
+      type: object
+      required:
+        - name
+        - value
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+    CategoryTreeResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryNode'
+    CategoryNode:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+        - children
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type:
+            - string
+            - 'null'
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryNode'
