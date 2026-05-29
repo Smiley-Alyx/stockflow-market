@@ -14,13 +14,15 @@ return new class extends Migration
         Schema::create('pricing_product_prices', function (Blueprint $table) {
             $table->id();
             $table->foreignId('product_id')->constrained('catalog_products')->restrictOnDelete();
+            $table->string('price_type')->default('retail');
             $table->unsignedBigInteger('amount_minor');
             $table->char('currency', 3);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            $table->unique('product_id');
+            $table->unique(['product_id', 'price_type']);
             $table->index(['currency', 'is_active']);
+            $table->index(['price_type', 'is_active']);
         });
     }
 

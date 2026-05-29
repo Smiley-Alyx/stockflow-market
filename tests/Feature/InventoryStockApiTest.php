@@ -60,9 +60,41 @@ class InventoryStockApiTest extends TestCase
             ->assertJsonPath('data.reserved_quantity', 4)
             ->assertJsonPath('data.available_quantity', 11)
             ->assertJsonPath('data.warehouses.0.warehouse_code', 'WAW')
+            ->assertJsonPath('data.warehouses.0.city_code', 'waw')
             ->assertJsonPath('data.warehouses.0.available_quantity', 7)
             ->assertJsonPath('data.warehouses.1.warehouse_code', 'KRK')
             ->assertJsonPath('data.warehouses.1.available_quantity', 4);
+    }
+
+    public function test_stock_endpoint_filters_warehouses_by_city(): void
+    {
+        $product = $this->createProduct();
+        $warsaw = $this->createWarehouse('WAW', 'waw', 'Warsaw');
+        $krakow = $this->createWarehouse('KRK', 'krk', 'Krakow');
+
+        StockItem::query()->create([
+            'warehouse_id' => $warsaw->id,
+            'product_id' => $product->id,
+            'sku' => 'SCAN-001',
+            'on_hand_quantity' => 10,
+            'reserved_quantity' => 2,
+        ]);
+
+        StockItem::query()->create([
+            'warehouse_id' => $krakow->id,
+            'product_id' => $product->id,
+            'sku' => 'SCAN-001',
+            'on_hand_quantity' => 20,
+            'reserved_quantity' => 5,
+        ]);
+
+        $this->getJson('/api/inventory/stock?sku=SCAN-001&city_code=krk')
+            ->assertOk()
+            ->assertJsonPath('data.on_hand_quantity', 20)
+            ->assertJsonPath('data.available_quantity', 15)
+            ->assertJsonCount(1, 'data.warehouses')
+            ->assertJsonPath('data.warehouses.0.warehouse_code', 'KRK')
+            ->assertJsonPath('data.warehouses.0.city_name', 'Krakow');
     }
 
     public function test_stock_endpoint_returns_aggregated_stock_by_product_id(): void
@@ -252,6 +284,44 @@ class InventoryStockApiTest extends TestCase
         $this->assertSame(2, $stockItem->fresh()->reserved_quantity);
     }
 
+    public function test_reservation_api_selects_available_warehouse_from_city(): void
+    {
+        $product = $this->createProduct();
+        $warsaw = $this->createWarehouse('WAW', 'waw', 'Warsaw');
+        $krakow = $this->createWarehouse('KRK', 'krk', 'Krakow');
+        $expiresAt = now()->addMinutes(10)->toJSON();
+
+        StockItem::query()->create([
+            'warehouse_id' => $warsaw->id,
+            'product_id' => $product->id,
+            'sku' => 'SCAN-001',
+            'on_hand_quantity' => 1,
+            'reserved_quantity' => 0,
+        ]);
+
+        $krakowStock = StockItem::query()->create([
+            'warehouse_id' => $krakow->id,
+            'product_id' => $product->id,
+            'sku' => 'SCAN-001',
+            'on_hand_quantity' => 5,
+            'reserved_quantity' => 0,
+        ]);
+
+        $this->withHeader('Idempotency-Key', 'api-reserve-krk')
+            ->postJson('/api/inventory/reservations', [
+                'product_id' => $product->id,
+                'city_code' => 'krk',
+                'quantity' => 3,
+                'reservation_expires_at' => $expiresAt,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.stock_item_id', $krakowStock->id)
+            ->assertJsonPath('data.warehouse_code', 'KRK')
+            ->assertJsonPath('data.city_code', 'krk');
+
+        $this->assertSame(3, $krakowStock->fresh()->reserved_quantity);
+    }
+
     /**
      * @return array<string, string>
      */
@@ -274,11 +344,13 @@ class InventoryStockApiTest extends TestCase
         ]);
     }
 
-    private function createWarehouse(string $code): Warehouse
+    private function createWarehouse(string $code, ?string $cityCode = null, ?string $cityName = null): Warehouse
     {
         return Warehouse::query()->create([
             'code' => $code,
             'name' => $code.' Warehouse',
+            'city_code' => $cityCode ?? strtolower($code),
+            'city_name' => $cityName ?? $code,
             'is_active' => true,
         ]);
     }

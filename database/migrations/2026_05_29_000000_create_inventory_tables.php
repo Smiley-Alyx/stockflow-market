@@ -15,8 +15,12 @@ return new class extends Migration
             $table->id();
             $table->string('code')->unique();
             $table->string('name');
+            $table->string('city_code');
+            $table->string('city_name');
             $table->boolean('is_active')->default(true);
             $table->timestamps();
+
+            $table->index(['city_code', 'is_active']);
         });
 
         Schema::create('inventory_stock_items', function (Blueprint $table) {

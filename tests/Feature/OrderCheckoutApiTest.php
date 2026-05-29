@@ -41,6 +41,13 @@ class OrderCheckoutApiTest extends TestCase
         $product = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');
         $stockItem = $this->createStockItem($product, 10);
         $this->createPrice($product, 129900);
+        ProductPrice::query()->create([
+            'product_id' => $product->id,
+            'price_type' => 'wholesale',
+            'amount_minor' => 99900,
+            'currency' => 'USD',
+            'is_active' => true,
+        ]);
 
         $cart = $this->postJson('/api/cart/items', [
             'product_id' => $product->id,
@@ -214,6 +221,8 @@ class OrderCheckoutApiTest extends TestCase
             'warehouse_id' => Warehouse::query()->create([
                 'code' => 'WAW',
                 'name' => 'WAW Warehouse',
+                'city_code' => 'waw',
+                'city_name' => 'Warsaw',
                 'is_active' => true,
             ])->id,
             'product_id' => $product->id,
@@ -227,6 +236,7 @@ class OrderCheckoutApiTest extends TestCase
     {
         return ProductPrice::query()->create([
             'product_id' => $product->id,
+            'price_type' => 'retail',
             'amount_minor' => $amountMinor,
             'currency' => 'USD',
             'is_active' => true,

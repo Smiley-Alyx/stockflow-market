@@ -180,6 +180,8 @@ PHP;
         $warehouse = Warehouse::query()->create([
             'code' => 'WAW',
             'name' => 'WAW Warehouse',
+            'city_code' => 'waw',
+            'city_name' => 'Warsaw',
             'is_active' => true,
         ]);
 

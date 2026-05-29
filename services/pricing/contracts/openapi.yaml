@@ -17,6 +17,16 @@ paths:
             items:
               type: integer
               minimum: 1
+        - name: price_types
+          in: query
+          required: false
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 20
+            items:
+              type: string
+              maxLength: 64
       responses:
         '200':
           description: Product prices calculated
@@ -52,11 +62,14 @@ components:
       type: object
       required:
         - product_id
+        - price_type
         - amount_minor
         - currency
       properties:
         product_id:
           type: integer
+        price_type:
+          type: string
         amount_minor:
           type: integer
           minimum: 0

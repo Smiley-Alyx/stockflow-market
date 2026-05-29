@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['product_id', 'amount_minor', 'currency', 'is_active'])]
+#[Fillable(['product_id', 'price_type', 'amount_minor', 'currency', 'is_active'])]
 class ProductPrice extends Model
 {
     protected $table = 'pricing_product_prices';

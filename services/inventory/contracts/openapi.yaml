@@ -18,6 +18,11 @@ paths:
           schema:
             type: integer
             minimum: 1
+        - name: city_code
+          in: query
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: Stock found
@@ -61,6 +66,12 @@ paths:
                 $ref: '#/components/schemas/ReservationResponse'
         '409':
           description: Reservation conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Stock not found
           content:
             application/json:
               schema:
@@ -119,13 +130,19 @@ components:
     CreateReservationRequest:
       type: object
       required:
-        - stock_item_id
         - quantity
         - reservation_expires_at
       properties:
         stock_item_id:
           type: integer
           minimum: 1
+        product_id:
+          type: integer
+          minimum: 1
+        sku:
+          type: string
+        city_code:
+          type: string
         quantity:
           type: integer
           minimum: 1
@@ -146,6 +163,9 @@ components:
       required:
         - id
         - stock_item_id
+        - warehouse_id
+        - warehouse_code
+        - city_code
         - idempotency_key
         - quantity
         - status
@@ -156,6 +176,18 @@ components:
           type: integer
         stock_item_id:
           type: integer
+        warehouse_id:
+          type:
+            - integer
+            - 'null'
+        warehouse_code:
+          type:
+            - string
+            - 'null'
+        city_code:
+          type:
+            - string
+            - 'null'
         idempotency_key:
           type: string
         quantity:
@@ -203,6 +235,9 @@ components:
       required:
         - warehouse_id
         - warehouse_code
+        - warehouse_name
+        - city_code
+        - city_name
         - on_hand_quantity
         - reserved_quantity
         - available_quantity
@@ -210,6 +245,18 @@ components:
         warehouse_id:
           type: integer
         warehouse_code:
+          type:
+            - string
+            - 'null'
+        warehouse_name:
+          type:
+            - string
+            - 'null'
+        city_code:
+          type:
+            - string
+            - 'null'
+        city_name:
           type:
             - string
             - 'null'

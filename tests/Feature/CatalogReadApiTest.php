@@ -340,6 +340,8 @@ class CatalogReadApiTest extends TestCase
         return Warehouse::query()->create([
             'code' => $code,
             'name' => $code.' Warehouse',
+            'city_code' => strtolower($code),
+            'city_name' => $code,
             'is_active' => true,
         ]);
     }

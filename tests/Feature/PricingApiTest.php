@@ -30,6 +30,7 @@ class PricingApiTest extends TestCase
 
         ProductPrice::query()->create([
             'product_id' => $scanner->id,
+            'price_type' => 'retail',
             'amount_minor' => 129900,
             'currency' => 'USD',
             'is_active' => true,
@@ -37,6 +38,7 @@ class PricingApiTest extends TestCase
 
         ProductPrice::query()->create([
             'product_id' => $printer->id,
+            'price_type' => 'retail',
             'amount_minor' => 49900,
             'currency' => 'EUR',
             'is_active' => true,
@@ -44,6 +46,7 @@ class PricingApiTest extends TestCase
 
         ProductPrice::query()->create([
             'product_id' => $inactive->id,
+            'price_type' => 'retail',
             'amount_minor' => 29900,
             'currency' => 'USD',
             'is_active' => false,
@@ -53,6 +56,7 @@ class PricingApiTest extends TestCase
             ->assertOk()
             ->assertJsonCount(2, 'data')
             ->assertJsonPath('data.0.product_id', $scanner->id)
+            ->assertJsonPath('data.0.price_type', 'retail')
             ->assertJsonPath('data.0.amount_minor', 129900)
             ->assertJsonPath('data.0.currency', 'USD')
             ->assertJsonPath('data.1.product_id', $printer->id)
@@ -61,12 +65,46 @@ class PricingApiTest extends TestCase
             ->assertJsonMissing(['product_id' => $inactive->id]);
     }
 
+    public function test_prices_endpoint_returns_multiple_price_types_and_can_filter_them(): void
+    {
+        $product = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');
+
+        ProductPrice::query()->create([
+            'product_id' => $product->id,
+            'price_type' => 'retail',
+            'amount_minor' => 129900,
+            'currency' => 'USD',
+            'is_active' => true,
+        ]);
+
+        ProductPrice::query()->create([
+            'product_id' => $product->id,
+            'price_type' => 'wholesale',
+            'amount_minor' => 119900,
+            'currency' => 'USD',
+            'is_active' => true,
+        ]);
+
+        $this->getJson('/api/pricing/prices?product_ids[]='.$product->id)
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.price_type', 'retail')
+            ->assertJsonPath('data.1.price_type', 'wholesale');
+
+        $this->getJson('/api/pricing/prices?product_ids[]='.$product->id.'&price_types[]=wholesale')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.price_type', 'wholesale')
+            ->assertJsonPath('data.0.amount_minor', 119900);
+    }
+
     public function test_prices_endpoint_matches_gateway_and_pricing_contracts(): void
     {
         $product = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');
 
         ProductPrice::query()->create([
             'product_id' => $product->id,
+            'price_type' => 'retail',
             'amount_minor' => 129900,
             'currency' => 'USD',
             'is_active' => true,

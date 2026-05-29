@@ -10,12 +10,16 @@ class InventoryReadService
     /**
      * @return array<string, mixed>|null
      */
-    public function stock(?string $sku = null, ?int $productId = null): ?array
+    public function stock(?string $sku = null, ?int $productId = null, ?string $cityCode = null): ?array
     {
         $items = StockItem::query()
             ->with('warehouse')
             ->when($sku !== null, fn (Builder $query): Builder => $query->where('sku', $sku))
             ->when($productId !== null, fn (Builder $query): Builder => $query->where('product_id', $productId))
+            ->when($cityCode !== null, fn (Builder $query): Builder => $query->whereHas(
+                'warehouse',
+                fn (Builder $query): Builder => $query->where('city_code', $cityCode),
+            ))
             ->orderBy('warehouse_id')
             ->get();
 
@@ -33,6 +37,9 @@ class InventoryReadService
                 ->map(fn (StockItem $item): array => [
                     'warehouse_id' => $item->warehouse_id,
                     'warehouse_code' => $item->warehouse?->code,
+                    'warehouse_name' => $item->warehouse?->name,
+                    'city_code' => $item->warehouse?->city_code,
+                    'city_name' => $item->warehouse?->city_name,
                     'on_hand_quantity' => $item->on_hand_quantity,
                     'reserved_quantity' => $item->reserved_quantity,
                     'available_quantity' => $item->availableQuantity(),

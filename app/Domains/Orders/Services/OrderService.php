@@ -38,6 +38,7 @@ class OrderService
 
             $prices = ProductPrice::query()
                 ->whereIn('product_id', $cart->items->pluck('product_id'))
+                ->where('price_type', 'retail')
                 ->where('is_active', true)
                 ->lockForUpdate()
                 ->get()

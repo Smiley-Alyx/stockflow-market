@@ -14,11 +14,13 @@ class StockController extends Controller
         $filters = $request->validate([
             'sku' => ['required_without:product_id', 'string', 'max:255'],
             'product_id' => ['required_without:sku', 'integer', 'min:1'],
+            'city_code' => ['sometimes', 'string', 'max:255'],
         ]);
 
         $stock = $inventory->stock(
             sku: $filters['sku'] ?? null,
             productId: isset($filters['product_id']) ? (int) $filters['product_id'] : null,
+            cityCode: $filters['city_code'] ?? null,
         );
 
         if ($stock === null) {
