@@ -49,6 +49,7 @@ select {
 .content-grid,
 .panel-heading,
 .category-list li,
+.topbar-actions,
 .lookup-form div {
     display: flex;
     align-items: center;
@@ -57,6 +58,18 @@ select {
 .topbar {
     justify-content: space-between;
     gap: 16px;
+}
+
+.brand-block {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.brand-block p {
+    margin-bottom: 0;
+    color: #6e7a74;
+    font-size: 0.82rem;
 }
 
 .brand {
@@ -76,6 +89,26 @@ select {
     color: #f8fbf7;
     background: #1f604a;
     font-size: 0.78rem;
+}
+
+.topbar-actions {
+    justify-content: flex-end;
+    gap: 10px;
+    min-width: 0;
+}
+
+.topbar-actions a {
+    flex: 0 1 auto;
+    min-width: 0;
+    border: 1px solid rgba(23, 32, 27, 0.12);
+    border-radius: 8px;
+    padding: 7px 10px;
+    color: #174c39;
+    background: #ffffff;
+    font-size: 0.82rem;
+    font-weight: 800;
+    text-decoration: none;
+    white-space: nowrap;
 }
 
 .status {
@@ -166,10 +199,11 @@ h1 {
 .content-grid {
     align-items: stretch;
     gap: 24px;
+    flex-wrap: wrap;
 }
 
 .panel {
-    flex: 1 1 0;
+    flex: 1 1 300px;
     min-width: 0;
     padding: 22px;
 }
@@ -183,6 +217,33 @@ h1 {
 h2 {
     margin-bottom: 0;
     font-size: 1.05rem;
+}
+
+.filter-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+}
+
+.filter-row button {
+    flex: 0 0 auto;
+    min-height: 34px;
+    border: 1px solid rgba(23, 32, 27, 0.12);
+    border-radius: 8px;
+    padding: 0 11px;
+    color: #52635b;
+    background: #f8faf7;
+    font-size: 0.82rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.filter-row button.active {
+    border-color: #1f604a;
+    color: #ffffff;
+    background: #1f604a;
 }
 
 .category-list {
@@ -205,14 +266,65 @@ h2 {
     border-bottom: 0;
 }
 
-.category-list span {
+.category-list div {
+    display: grid;
+    gap: 4px;
     min-width: 0;
+}
+
+.category-list span {
     overflow-wrap: anywhere;
     font-weight: 700;
 }
 
+.category-list small {
+    color: #6e7a74;
+    font-size: 0.78rem;
+}
+
 .category-list code {
     flex: 0 1 auto;
+    overflow-wrap: anywhere;
+}
+
+.product-list-panel {
+    flex-basis: 360px;
+}
+
+.product-list {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.product-list button {
+    display: grid;
+    gap: 5px;
+    width: 100%;
+    min-height: 88px;
+    border: 1px solid rgba(23, 32, 27, 0.1);
+    border-radius: 8px;
+    padding: 14px;
+    color: #17201b;
+    background: #fbfcfa;
+    text-align: left;
+    cursor: pointer;
+}
+
+.product-list button:hover {
+    border-color: rgba(31, 96, 74, 0.34);
+    background: #f4faf7;
+}
+
+.product-list span,
+.product-list code {
+    color: #6e7a74;
+    font-size: 0.82rem;
+}
+
+.product-list strong {
     overflow-wrap: anywhere;
 }
 
@@ -356,9 +468,15 @@ h2 {
     .topbar,
     .hero,
     .content-grid,
+    .topbar-actions,
     .lookup-form div {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .topbar-actions a,
+    .status {
+        text-align: center;
     }
 
     .metrics {

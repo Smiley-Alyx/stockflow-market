@@ -4,10 +4,26 @@ import type { CatalogCategory } from '~/composables/useCatalogApi';
 const catalogApi = useCatalogApi();
 const productSlug = ref('wireless-scanner');
 const productSlugInput = ref(productSlug.value);
+const selectedCategorySlug = ref('');
 
 const { data: categories, error: categoriesError, pending: categoriesPending } = await useAsyncData(
     'catalog-categories',
     () => catalogApi.fetchCategoryTree(),
+);
+const {
+    data: productList,
+    error: productListError,
+    pending: productListPending,
+} = await useAsyncData(
+    'catalog-products',
+    () =>
+        catalogApi.fetchProducts({
+            category: selectedCategorySlug.value || undefined,
+            per_page: 6,
+        }),
+    {
+        watch: [selectedCategorySlug],
+    },
 );
 const {
     data: product,
@@ -19,13 +35,20 @@ const {
 });
 
 const visibleCategories = computed(() => categories.value?.slice(0, 4) ?? []);
+const categoryOptions = computed(() => flattenCategories(categories.value ?? []));
 const categoryCount = computed(() => countCategories(categories.value ?? []));
+const selectedCategory = computed(
+    () => categoryOptions.value.find((category) => category.slug === selectedCategorySlug.value) ?? null,
+);
+const products = computed(() => productList.value?.products ?? []);
+const productTotal = computed(() => productList.value?.meta.total ?? 0);
+const publishedCount = computed(() => (productListPending.value ? '...' : productTotal.value.toString()));
 const catalogStatus = computed(() => {
-    if (categoriesError.value) {
+    if (categoriesError.value || productListError.value) {
         return 'API offline';
     }
 
-    return categoriesPending.value ? 'API loading' : 'API ready';
+    return categoriesPending.value || productListPending.value ? 'API loading' : 'API ready';
 });
 
 const productStatus = computed(() => {
@@ -59,6 +82,10 @@ function countCategories(nodes: CatalogCategory[]): number {
     return nodes.reduce((total, category) => total + 1 + countCategories(category.children), 0);
 }
 
+function flattenCategories(nodes: CatalogCategory[]): CatalogCategory[] {
+    return nodes.flatMap((category) => [category, ...flattenCategories(category.children)]);
+}
+
 useHead({
     htmlAttrs: {
         lang: 'ru',
@@ -70,12 +97,20 @@ useHead({
     <main class="shell">
         <section class="overview">
             <header class="topbar">
-                <div class="brand">
-                    <span class="brand-mark">SF</span>
-                    <span>StockFlow Market</span>
+                <div class="brand-block">
+                    <div class="brand">
+                        <span class="brand-mark">SF</span>
+                        <span>StockFlow Market</span>
+                    </div>
+                    <p>Gateway shell</p>
                 </div>
 
-                <span class="status" :class="{ 'status-muted': categoriesError }">{{ catalogStatus }}</span>
+                <div class="topbar-actions">
+                    <a href="/api/catalog/products?per_page=10">Catalog API</a>
+                    <span class="status" :class="{ 'status-muted': categoriesError || productListError }">
+                        {{ catalogStatus }}
+                    </span>
+                </div>
             </header>
 
             <div class="hero">
@@ -92,6 +127,10 @@ useHead({
                     <article>
                         <span>Каталог</span>
                         <strong>{{ categoryCount }}</strong>
+                    </article>
+                    <article>
+                        <span>Опубликовано</span>
+                        <strong>{{ publishedCount }}</strong>
                     </article>
                     <article>
                         <span>Товар</span>
@@ -112,15 +151,62 @@ useHead({
                     <span>read API</span>
                 </div>
 
+                <div class="filter-row" aria-label="Фильтр каталога">
+                    <button
+                        type="button"
+                        :class="{ active: selectedCategorySlug === '' }"
+                        @click="selectedCategorySlug = ''"
+                    >
+                        Все
+                    </button>
+                    <button
+                        v-for="category in categoryOptions.slice(0, 5)"
+                        :key="category.id"
+                        type="button"
+                        :class="{ active: selectedCategorySlug === category.slug }"
+                        @click="selectedCategorySlug = category.slug"
+                    >
+                        {{ category.name }}
+                    </button>
+                </div>
+
                 <ul v-if="visibleCategories.length" class="category-list">
                     <li v-for="category in visibleCategories" :key="category.id">
-                        <span>{{ category.name }}</span>
+                        <div>
+                            <span>{{ category.name }}</span>
+                            <small>{{ category.children.length }} вложенных</small>
+                        </div>
                         <code>{{ category.slug }}</code>
                     </li>
                 </ul>
 
                 <p v-else class="empty-state">
                     Категории появятся после миграций, сидов и доступности backend API.
+                </p>
+            </article>
+
+            <article class="panel product-list-panel">
+                <div class="panel-heading">
+                    <h2>Витрина</h2>
+                    <span>{{ selectedCategory?.name ?? 'все категории' }}</span>
+                </div>
+
+                <ul v-if="products.length" class="product-list">
+                    <li v-for="item in products" :key="item.id">
+                        <button type="button" @click="productSlugInput = item.slug; productSlug = item.slug">
+                            <span>{{ item.category?.name ?? 'Без категории' }}</span>
+                            <strong>{{ item.name }}</strong>
+                            <code>{{ item.sku }}</code>
+                        </button>
+                    </li>
+                </ul>
+
+                <p v-else-if="productListError" class="empty-state">
+                    Backend API недоступен для списка опубликованных товаров.
+                </p>
+
+                <p v-else class="empty-state">
+                    Опубликованные товары появятся после наполнения каталога.
                 </p>
             </article>
 
