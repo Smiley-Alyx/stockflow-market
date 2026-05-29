@@ -37,6 +37,62 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/inventory/reservations:
+    post:
+      summary: Reserve stock with idempotency and TTL
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReservationRequest'
+      responses:
+        '201':
+          description: Reservation created or reused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+        '409':
+          description: Reservation conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Invalid reservation payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/inventory/reservations/cancel:
+    post:
+      summary: Cancel active stock reservation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelReservationRequest'
+      responses:
+        '200':
+          description: Reservation canceled or already inactive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+        '422':
+          description: Invalid cancel payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
     ErrorResponse:
@@ -53,6 +109,71 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/Stock'
+    ReservationResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/Reservation'
+    CreateReservationRequest:
+      type: object
+      required:
+        - stock_item_id
+        - quantity
+        - reservation_expires_at
+      properties:
+        stock_item_id:
+          type: integer
+          minimum: 1
+        quantity:
+          type: integer
+          minimum: 1
+        reservation_expires_at:
+          type: string
+          format: date-time
+        idempotency_key:
+          type: string
+    CancelReservationRequest:
+      type: object
+      required:
+        - idempotency_key
+      properties:
+        idempotency_key:
+          type: string
+    Reservation:
+      type: object
+      required:
+        - id
+        - stock_item_id
+        - idempotency_key
+        - quantity
+        - status
+        - reservation_expires_at
+        - canceled_at
+      properties:
+        id:
+          type: integer
+        stock_item_id:
+          type: integer
+        idempotency_key:
+          type: string
+        quantity:
+          type: integer
+        status:
+          type: string
+          enum:
+            - active
+            - canceled
+            - expired
+        reservation_expires_at:
+          type: string
+          format: date-time
+        canceled_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
     Stock:
       type: object
       required:

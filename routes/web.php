@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Catalog\CategoryController;
 use App\Http\Controllers\Api\Catalog\ProductController;
+use App\Http\Controllers\Api\Inventory\ReservationController;
 use App\Http\Controllers\Api\Inventory\StockController;
 use App\Http\Controllers\Api\Orders\CartItemController;
 use App\Http\Controllers\Api\Orders\DraftOrderController;
@@ -22,6 +23,8 @@ Route::get('/api/catalog/products', [ProductController::class, 'index']);
 Route::get('/api/catalog/products/{slug}', [ProductController::class, 'show']);
 Route::get('/api/catalog/categories/tree', [CategoryController::class, 'tree']);
 Route::get('/api/inventory/stock', [StockController::class, 'show']);
+Route::post('/api/inventory/reservations', [ReservationController::class, 'store']);
+Route::post('/api/inventory/reservations/cancel', [ReservationController::class, 'cancel']);
 Route::get('/api/pricing/prices', [PriceController::class, 'index']);
 Route::get('/api/search/products', ProductSearchController::class);
 Route::post('/api/cart/items', [CartItemController::class, 'store']);

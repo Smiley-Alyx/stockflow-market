@@ -164,9 +164,15 @@ class OrderService
                 continue;
             }
 
-            $this->inventory->reserve($stockItem, $quantity, 'order', (string) $order->id, [
-                'order_item_id' => $item->id,
-            ]);
+            $this->inventory->reserve(
+                $stockItem,
+                $quantity,
+                "order:{$order->id}:item:{$item->id}:stock:{$stockItem->id}",
+                now()->addMinutes(15),
+                'order',
+                (string) $order->id,
+                ['order_item_id' => $item->id],
+            );
 
             $remaining -= $quantity;
 

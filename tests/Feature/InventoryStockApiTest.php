@@ -5,9 +5,11 @@ namespace Tests\Feature;
 use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Models\Product;
 use App\Domains\Inventory\Events\StockChanged;
+use App\Domains\Inventory\Models\Reservation;
 use App\Domains\Inventory\Models\StockItem;
 use App\Domains\Inventory\Models\StockMovement;
 use App\Domains\Inventory\Models\Warehouse;
+use App\Domains\Inventory\Services\IdempotencyConflict;
 use App\Domains\Inventory\Services\InsufficientStock;
 use App\Domains\Inventory\Services\InventoryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -118,20 +120,23 @@ class InventoryStockApiTest extends TestCase
             ->assertJsonValidationErrors(['sku', 'product_id']);
     }
 
-    public function test_inventory_service_reserves_deducts_and_returns_stock(): void
+    public function test_inventory_service_reserves_idempotently_deducts_and_returns_stock(): void
     {
         Event::fake([StockChanged::class]);
 
         $stockItem = $this->createStockItem(onHand: 10);
         $inventory = $this->app->make(InventoryService::class);
 
-        $reservation = $inventory->reserve($stockItem, 4, 'order', 'ORD-1');
+        $reservation = $inventory->reserve($stockItem, 4, 'order-ORD-1', now()->addMinutes(10), 'order', 'ORD-1');
+        $repeated = $inventory->reserve($stockItem, 4, 'order-ORD-1', $reservation->reservation_expires_at, 'order', 'ORD-1');
         $stockItem->refresh();
 
         $this->assertSame(10, $stockItem->on_hand_quantity);
         $this->assertSame(4, $stockItem->reserved_quantity);
         $this->assertSame(6, $stockItem->availableQuantity());
-        $this->assertSame(StockMovement::TYPE_RESERVED, $reservation->type);
+        $this->assertTrue($reservation->is($repeated));
+        $this->assertSame(Reservation::STATUS_ACTIVE, $reservation->status);
+        $this->assertSame(1, $stockItem->reservations()->count());
 
         $deduction = $inventory->deduct($stockItem, 3, 'order', 'ORD-1');
         $stockItem->refresh();
@@ -164,7 +169,87 @@ class InventoryStockApiTest extends TestCase
 
         $this->expectException(InsufficientStock::class);
 
-        $this->app->make(InventoryService::class)->reserve($stockItem, 3);
+        $this->app->make(InventoryService::class)->reserve($stockItem, 3, 'order-ORD-1', now()->addMinutes(10));
+    }
+
+    public function test_reservation_idempotency_key_cannot_change_request_shape(): void
+    {
+        $stockItem = $this->createStockItem(onHand: 10);
+        $inventory = $this->app->make(InventoryService::class);
+
+        $inventory->reserve($stockItem, 2, 'order-ORD-1', now()->addMinutes(10));
+
+        $this->expectException(IdempotencyConflict::class);
+
+        $inventory->reserve($stockItem, 3, 'order-ORD-1', now()->addMinutes(10));
+    }
+
+    public function test_reservation_can_be_canceled_idempotently(): void
+    {
+        $stockItem = $this->createStockItem(onHand: 10);
+        $inventory = $this->app->make(InventoryService::class);
+
+        $inventory->reserve($stockItem, 4, 'order-ORD-1', now()->addMinutes(10));
+
+        $canceled = $inventory->cancelReservation('order-ORD-1');
+        $repeated = $inventory->cancelReservation('order-ORD-1');
+        $stockItem->refresh();
+
+        $this->assertTrue($canceled->is($repeated));
+        $this->assertSame(Reservation::STATUS_CANCELED, $repeated->status);
+        $this->assertSame(0, $stockItem->reserved_quantity);
+        $this->assertSame(2, $stockItem->movements()->count());
+    }
+
+    public function test_expired_reservation_releases_stock(): void
+    {
+        $stockItem = $this->createStockItem(onHand: 10);
+        $inventory = $this->app->make(InventoryService::class);
+
+        $inventory->reserve($stockItem, 4, 'order-ORD-1', now()->addSecond());
+        $expired = $inventory->expireReservations(now()->addMinutes(2));
+        $stockItem->refresh();
+
+        $this->assertSame(1, $expired);
+        $this->assertSame(0, $stockItem->reserved_quantity);
+        $this->assertDatabaseHas('inventory_reservations', [
+            'idempotency_key' => 'order-ORD-1',
+            'status' => Reservation::STATUS_EXPIRED,
+        ]);
+    }
+
+    public function test_reservation_api_requires_idempotency_and_reuses_successful_response(): void
+    {
+        $stockItem = $this->createStockItem(onHand: 10);
+        $expiresAt = now()->addMinutes(10)->toJSON();
+
+        $this->postJson('/api/inventory/reservations', [
+            'stock_item_id' => $stockItem->id,
+            'quantity' => 2,
+            'reservation_expires_at' => $expiresAt,
+        ])->assertUnprocessable();
+
+        $first = $this->withHeader('Idempotency-Key', 'api-reserve-1')
+            ->postJson('/api/inventory/reservations', [
+                'stock_item_id' => $stockItem->id,
+                'quantity' => 2,
+                'reservation_expires_at' => $expiresAt,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.status', Reservation::STATUS_ACTIVE)
+            ->json('data');
+
+        $second = $this->withHeader('Idempotency-Key', 'api-reserve-1')
+            ->postJson('/api/inventory/reservations', [
+                'stock_item_id' => $stockItem->id,
+                'quantity' => 2,
+                'reservation_expires_at' => $expiresAt,
+            ])
+            ->assertCreated()
+            ->json('data');
+
+        $this->assertSame($first['id'], $second['id']);
+        $this->assertSame(2, $stockItem->fresh()->reserved_quantity);
     }
 
     /**
