@@ -8,12 +8,34 @@ use App\Domains\Orders\Services\OrderService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 
-class OrderConfirmationController extends Controller
+class OrderLifecycleController extends Controller
 {
-    public function store(int $id, OrderService $orders): JsonResponse
+    public function paid(int $id, OrderService $orders): JsonResponse
     {
         try {
-            $order = $orders->confirm($id);
+            $order = $orders->pay($id);
+        } catch (OrderConflict $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        }
+
+        return response()->json(['data' => $this->orderPayload($order)]);
+    }
+
+    public function cancelled(int $id, OrderService $orders): JsonResponse
+    {
+        try {
+            $order = $orders->cancel($id);
+        } catch (OrderConflict $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        }
+
+        return response()->json(['data' => $this->orderPayload($order)]);
+    }
+
+    public function expired(int $id, OrderService $orders): JsonResponse
+    {
+        try {
+            $order = $orders->expire($id);
         } catch (OrderConflict $exception) {
             return response()->json(['message' => $exception->getMessage()], 409);
         }

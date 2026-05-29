@@ -316,6 +316,75 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/orders/{id}/paid:
+    post:
+      summary: Mark confirmed order paid and deduct reserved stock
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Order paid or already paid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '409':
+          description: Order payment conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/orders/{id}/cancelled:
+    post:
+      summary: Cancel order and release reserved stock
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Order cancelled or already cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '409':
+          description: Order cancellation conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/orders/{id}/expired:
+    post:
+      summary: Expire order and release reserved stock
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Order expired or already expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '409':
+          description: Order expiration conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
     ErrorResponse:
@@ -577,6 +646,7 @@ components:
             - active
             - canceled
             - expired
+            - consumed
         reservation_expires_at:
           type: string
           format: date-time
@@ -645,6 +715,9 @@ components:
         - total_amount_minor
         - currency
         - confirmed_at
+        - paid_at
+        - cancelled_at
+        - expired_at
         - items
       properties:
         id:
@@ -660,6 +733,9 @@ components:
             - reservation_pending
             - confirmed
             - reservation_failed
+            - paid
+            - cancelled
+            - expired
         total_amount_minor:
           type: integer
         currency:
@@ -667,6 +743,21 @@ components:
             - string
             - 'null'
         confirmed_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        paid_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        cancelled_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        expired_at:
           type:
             - string
             - 'null'

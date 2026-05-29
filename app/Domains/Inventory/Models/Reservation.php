@@ -15,6 +15,8 @@ class Reservation extends Model
 
     public const STATUS_EXPIRED = 'expired';
 
+    public const STATUS_CONSUMED = 'consumed';
+
     protected $table = 'inventory_reservations';
 
     /**

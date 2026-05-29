@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['cart_id', 'status', 'total_amount_minor', 'currency', 'confirmed_at'])]
+#[Fillable(['cart_id', 'status', 'total_amount_minor', 'currency', 'confirmed_at', 'paid_at', 'cancelled_at', 'expired_at'])]
 class Order extends Model
 {
     public const STATUS_DRAFT = 'draft';
@@ -16,6 +16,12 @@ class Order extends Model
     public const STATUS_CONFIRMED = 'confirmed';
 
     public const STATUS_RESERVATION_FAILED = 'reservation_failed';
+
+    public const STATUS_PAID = 'paid';
+
+    public const STATUS_CANCELLED = 'cancelled';
+
+    public const STATUS_EXPIRED = 'expired';
 
     protected $table = 'orders_orders';
 
@@ -36,6 +42,9 @@ class Order extends Model
     {
         return [
             'confirmed_at' => 'datetime',
+            'paid_at' => 'datetime',
+            'cancelled_at' => 'datetime',
+            'expired_at' => 'datetime',
             'total_amount_minor' => 'integer',
         ];
     }

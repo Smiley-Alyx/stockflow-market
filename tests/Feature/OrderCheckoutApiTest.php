@@ -4,10 +4,15 @@ namespace Tests\Feature;
 
 use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Models\Product;
+use App\Domains\Inventory\Models\Reservation;
 use App\Domains\Inventory\Models\StockItem;
+use App\Domains\Inventory\Models\StockMovement;
 use App\Domains\Inventory\Models\Warehouse;
+use App\Domains\Orders\Events\OrderCancelled;
 use App\Domains\Orders\Events\OrderConfirmationRequested;
 use App\Domains\Orders\Events\OrderCreated;
+use App\Domains\Orders\Events\OrderExpired;
+use App\Domains\Orders\Events\OrderPaid;
 use App\Domains\Orders\Events\OrderReservationFailed;
 use App\Domains\Orders\Events\OrderReservationSucceeded;
 use App\Domains\Orders\Models\Order;
@@ -157,6 +162,78 @@ class OrderCheckoutApiTest extends TestCase
         $this->assertStringContainsString('Insufficient available stock', $failedEvent->payload['reason']);
     }
 
+    public function test_paid_order_deducts_reserved_stock_idempotently(): void
+    {
+        [$order, $stockItem] = $this->confirmedOrder(quantity: 2, onHand: 10);
+
+        $this->postJson('/api/orders/'.$order['id'].'/paid')
+            ->assertOk()
+            ->assertJsonPath('data.status', Order::STATUS_PAID);
+
+        $this->postJson('/api/orders/'.$order['id'].'/paid')
+            ->assertOk()
+            ->assertJsonPath('data.status', Order::STATUS_PAID);
+
+        $stockItem->refresh();
+
+        $this->assertSame(8, $stockItem->on_hand_quantity);
+        $this->assertSame(0, $stockItem->reserved_quantity);
+        $this->assertSame(1, StockMovement::query()->where('type', StockMovement::TYPE_DEDUCTED)->count());
+        $this->assertSame(1, Reservation::query()
+            ->where('idempotency_key', 'like', 'order:'.$order['id'].':item:%')
+            ->where('status', Reservation::STATUS_CONSUMED)
+            ->count());
+        $this->assertSame(1, OutboxMessage::query()->where('event_name', OrderPaid::NAME)->count());
+    }
+
+    public function test_cancelled_order_releases_reserved_stock_idempotently(): void
+    {
+        [$order, $stockItem] = $this->confirmedOrder(quantity: 2, onHand: 10);
+
+        $this->postJson('/api/orders/'.$order['id'].'/cancelled')
+            ->assertOk()
+            ->assertJsonPath('data.status', Order::STATUS_CANCELLED);
+
+        $this->postJson('/api/orders/'.$order['id'].'/cancelled')
+            ->assertOk()
+            ->assertJsonPath('data.status', Order::STATUS_CANCELLED);
+
+        $stockItem->refresh();
+
+        $this->assertSame(10, $stockItem->on_hand_quantity);
+        $this->assertSame(0, $stockItem->reserved_quantity);
+        $this->assertSame(1, StockMovement::query()->where('type', StockMovement::TYPE_RELEASED)->count());
+        $this->assertSame(1, Reservation::query()
+            ->where('idempotency_key', 'like', 'order:'.$order['id'].':item:%')
+            ->where('status', Reservation::STATUS_CANCELED)
+            ->count());
+        $this->assertSame(1, OutboxMessage::query()->where('event_name', OrderCancelled::NAME)->count());
+    }
+
+    public function test_expired_order_releases_reserved_stock_idempotently(): void
+    {
+        [$order, $stockItem] = $this->confirmedOrder(quantity: 2, onHand: 10);
+
+        $this->postJson('/api/orders/'.$order['id'].'/expired')
+            ->assertOk()
+            ->assertJsonPath('data.status', Order::STATUS_EXPIRED);
+
+        $this->postJson('/api/orders/'.$order['id'].'/expired')
+            ->assertOk()
+            ->assertJsonPath('data.status', Order::STATUS_EXPIRED);
+
+        $stockItem->refresh();
+
+        $this->assertSame(10, $stockItem->on_hand_quantity);
+        $this->assertSame(0, $stockItem->reserved_quantity);
+        $this->assertSame(1, StockMovement::query()->where('type', StockMovement::TYPE_EXPIRED)->count());
+        $this->assertSame(1, Reservation::query()
+            ->where('idempotency_key', 'like', 'order:'.$order['id'].':item:%')
+            ->where('status', Reservation::STATUS_EXPIRED)
+            ->count());
+        $this->assertSame(1, OutboxMessage::query()->where('event_name', OrderExpired::NAME)->count());
+    }
+
     public function test_draft_endpoint_rejects_cart_without_active_price(): void
     {
         $product = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');
@@ -204,6 +281,9 @@ class OrderCheckoutApiTest extends TestCase
             $this->assertContractDeclaresResponse($contract, '/api/orders/draft', '201', 'OrderResponse');
             $this->assertContractDeclaresResponse($contract, '/api/orders/{id}/confirm', '200', 'OrderResponse');
             $this->assertContractDeclaresResponse($contract, '/api/orders/{id}/confirm', '409', 'ErrorResponse');
+            $this->assertContractDeclaresResponse($contract, '/api/orders/{id}/paid', '200', 'OrderResponse');
+            $this->assertContractDeclaresResponse($contract, '/api/orders/{id}/cancelled', '200', 'OrderResponse');
+            $this->assertContractDeclaresResponse($contract, '/api/orders/{id}/expired', '200', 'OrderResponse');
             $this->assertSchemaMatchesPayload($contract, 'CartResponse', $cartPayload);
             $this->assertSchemaMatchesPayload($contract, 'Cart', $cartPayload['data']);
             $this->assertSchemaMatchesPayload($contract, 'CartItem', $cartPayload['data']['items'][0]);
@@ -271,5 +351,29 @@ class OrderCheckoutApiTest extends TestCase
             'currency' => 'USD',
             'is_active' => true,
         ]);
+    }
+
+    /**
+     * @return array{0: array<string, mixed>, 1: StockItem}
+     */
+    private function confirmedOrder(int $quantity, int $onHand): array
+    {
+        $product = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');
+        $stockItem = $this->createStockItem($product, $onHand);
+        $this->createPrice($product, 129900);
+
+        $cart = $this->postJson('/api/cart/items', [
+            'product_id' => $product->id,
+            'quantity' => $quantity,
+        ])->json('data');
+
+        $order = $this->postJson('/api/orders/draft', [
+            'cart_id' => $cart['id'],
+        ])->json('data');
+
+        $this->postJson('/api/orders/'.$order['id'].'/confirm')->assertOk();
+        $this->app->make(DomainEventPublisher::class)->publishPending();
+
+        return [$order, $stockItem->fresh()];
     }
 }

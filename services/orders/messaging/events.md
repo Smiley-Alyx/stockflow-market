@@ -6,6 +6,7 @@
 - `order.reservation_failed`
 - `orders.order.paid`
 - `orders.order.cancelled`
+- `orders.order.expired`
 
 # Входящие события остатков
 

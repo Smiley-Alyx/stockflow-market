@@ -38,6 +38,9 @@ class DraftOrderController extends Controller
             'total_amount_minor' => $order->total_amount_minor,
             'currency' => $order->currency,
             'confirmed_at' => $order->confirmed_at?->toJSON(),
+            'paid_at' => $order->paid_at?->toJSON(),
+            'cancelled_at' => $order->cancelled_at?->toJSON(),
+            'expired_at' => $order->expired_at?->toJSON(),
             'items' => $order->items
                 ->map(fn ($item): array => [
                     'product_id' => $item->product_id,

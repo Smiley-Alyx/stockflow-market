@@ -137,6 +137,60 @@ class InventoryService
         });
     }
 
+    public function consumeReservation(string $idempotencyKey): Reservation
+    {
+        return DB::transaction(function () use ($idempotencyKey): Reservation {
+            /** @var Reservation $reservation */
+            $reservation = Reservation::query()
+                ->where('idempotency_key', $idempotencyKey)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->expireReservationIfNeeded($reservation);
+            $reservation->refresh();
+
+            if (! $reservation->isActive()) {
+                return $reservation;
+            }
+
+            $this->decrementReservedAndOnHandQuantity($reservation);
+
+            $reservation->status = Reservation::STATUS_CONSUMED;
+            $reservation->save();
+
+            $this->createMovement($reservation, StockMovement::TYPE_DEDUCTED, $reservation->quantity);
+
+            return $reservation;
+        });
+    }
+
+    public function expireReservation(string $idempotencyKey, ?CarbonInterface $now = null): Reservation
+    {
+        $now ??= now();
+
+        return DB::transaction(function () use ($idempotencyKey, $now): Reservation {
+            /** @var Reservation $reservation */
+            $reservation = Reservation::query()
+                ->where('idempotency_key', $idempotencyKey)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! $reservation->isActive()) {
+                return $reservation;
+            }
+
+            $this->decrementReservedQuantity($reservation);
+            $reservation->status = Reservation::STATUS_EXPIRED;
+            $reservation->save();
+
+            $this->createMovement($reservation, StockMovement::TYPE_EXPIRED, $reservation->quantity, metadata: [
+                'expired_at' => $now->toJSON(),
+            ]);
+
+            return $reservation;
+        });
+    }
+
     public function expireReservations(?CarbonInterface $now = null): int
     {
         $now ??= now();
@@ -269,6 +323,26 @@ class InventoryService
             ->where('reserved_quantity', '>=', $reservation->quantity)
             ->update([
                 'reserved_quantity' => DB::raw('reserved_quantity - '.$reservation->quantity),
+                'updated_at' => now(),
+            ]);
+
+        if ($affected === 0) {
+            /** @var StockItem $stockItem */
+            $stockItem = StockItem::query()->findOrFail($reservation->stock_item_id);
+
+            throw InsufficientStock::reserved($stockItem->sku, $reservation->quantity, $stockItem->reserved_quantity);
+        }
+    }
+
+    private function decrementReservedAndOnHandQuantity(Reservation $reservation): void
+    {
+        $affected = StockItem::query()
+            ->whereKey($reservation->stock_item_id)
+            ->where('reserved_quantity', '>=', $reservation->quantity)
+            ->where('on_hand_quantity', '>=', $reservation->quantity)
+            ->update([
+                'reserved_quantity' => DB::raw('reserved_quantity - '.$reservation->quantity),
+                'on_hand_quantity' => DB::raw('on_hand_quantity - '.$reservation->quantity),
                 'updated_at' => now(),
             ]);
 

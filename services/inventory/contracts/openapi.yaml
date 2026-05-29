@@ -198,6 +198,7 @@ components:
             - active
             - canceled
             - expired
+            - consumed
         reservation_expires_at:
           type: string
           format: date-time
