@@ -48,7 +48,8 @@ select {
 .hero,
 .content-grid,
 .panel-heading,
-.category-list li {
+.category-list li,
+.lookup-form div {
     display: flex;
     align-items: center;
 }
@@ -215,6 +216,93 @@ h2 {
     overflow-wrap: anywhere;
 }
 
+.lookup-form {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.lookup-form label {
+    color: #53635c;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.lookup-form div {
+    gap: 10px;
+}
+
+.lookup-form input {
+    min-width: 0;
+    width: 100%;
+    height: 42px;
+    border: 1px solid rgba(23, 32, 27, 0.16);
+    border-radius: 8px;
+    padding: 0 12px;
+    color: #17201b;
+    background: #ffffff;
+}
+
+.lookup-form button {
+    flex: 0 0 auto;
+    height: 42px;
+    border: 0;
+    border-radius: 8px;
+    padding: 0 16px;
+    color: #ffffff;
+    background: #1f604a;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.lookup-form button:disabled {
+    cursor: wait;
+    opacity: 0.62;
+}
+
+.product-summary {
+    display: grid;
+    gap: 16px;
+}
+
+.product-summary > div {
+    display: grid;
+    gap: 5px;
+}
+
+.product-summary span,
+.product-summary code,
+.attribute-list dt {
+    color: #6e7a74;
+    font-size: 0.82rem;
+}
+
+.product-summary strong {
+    font-size: 1.35rem;
+}
+
+.product-summary p {
+    margin-bottom: 0;
+    color: #52635b;
+    line-height: 1.6;
+}
+
+.attribute-list {
+    display: grid;
+    grid-template-columns: minmax(90px, auto) 1fr;
+    gap: 8px 12px;
+    margin: 0;
+    padding-top: 14px;
+    border-top: 1px solid rgba(23, 32, 27, 0.08);
+}
+
+.attribute-list dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-weight: 700;
+}
+
 .empty-state {
     margin-bottom: 0;
     color: #66746d;
@@ -267,7 +355,8 @@ h2 {
 
     .topbar,
     .hero,
-    .content-grid {
+    .content-grid,
+    .lookup-form div {
         align-items: stretch;
         flex-direction: column;
     }
