@@ -5,10 +5,10 @@ namespace App\Domains\Orders\Services;
 use App\Domains\Inventory\Models\StockItem;
 use App\Domains\Inventory\Services\InsufficientStock;
 use App\Domains\Inventory\Services\InventoryService;
-use App\Domains\Orders\Events\InventoryReservationFailed;
-use App\Domains\Orders\Events\InventoryReserved;
-use App\Domains\Orders\Events\InventoryReserveRequested;
+use App\Domains\Orders\Events\OrderConfirmationRequested;
 use App\Domains\Orders\Events\OrderCreated;
+use App\Domains\Orders\Events\OrderReservationFailed;
+use App\Domains\Orders\Events\OrderReservationSucceeded;
 use App\Domains\Orders\Models\Cart;
 use App\Domains\Orders\Models\CartItem;
 use App\Domains\Orders\Models\Order;
@@ -84,13 +84,33 @@ class OrderService
 
     public function confirm(int $orderId): Order
     {
-        /** @var Order $order */
-        $order = Order::query()->with('items')->findOrFail($orderId);
+        return DB::transaction(function () use ($orderId): Order {
+            /** @var Order $locked */
+            $locked = Order::query()
+                ->with('items')
+                ->whereKey($orderId)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $this->events->record(new InventoryReserveRequested($order), 'order', (string) $order->id);
+            if ($locked->status !== Order::STATUS_DRAFT) {
+                throw OrderConflict::orderIsNotDraft($locked->id);
+            }
 
+            $locked->status = Order::STATUS_RESERVATION_PENDING;
+            $locked->save();
+
+            $requested = $locked->load('items');
+
+            $this->events->record(new OrderConfirmationRequested($requested), 'order', (string) $requested->id);
+
+            return $requested;
+        });
+    }
+
+    public function reserveInventory(int $orderId): Order
+    {
         try {
-            $confirmed = DB::transaction(function () use ($orderId): Order {
+            return DB::transaction(function () use ($orderId): Order {
                 /** @var Order $locked */
                 $locked = Order::query()
                     ->with('items')
@@ -98,7 +118,11 @@ class OrderService
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                if ($locked->status !== Order::STATUS_DRAFT) {
+                if ($locked->status === Order::STATUS_CONFIRMED || $locked->status === Order::STATUS_RESERVATION_FAILED) {
+                    return $locked;
+                }
+
+                if ($locked->status !== Order::STATUS_RESERVATION_PENDING) {
                     throw OrderConflict::orderIsNotDraft($locked->id);
                 }
 
@@ -112,18 +136,14 @@ class OrderService
 
                 $confirmed = $locked->load('items');
 
-                $this->events->record(new InventoryReserved($confirmed), 'order', (string) $confirmed->id);
+                $this->events->record(new OrderReservationSucceeded($confirmed), 'order', (string) $confirmed->id);
                 $this->events->record(new OrderCreated($confirmed), 'order', (string) $confirmed->id);
 
                 return $confirmed;
             });
         } catch (InsufficientStock $exception) {
-            $this->markReservationFailed($orderId, $exception->getMessage());
-
-            throw $exception;
+            return $this->markReservationFailed($orderId, $exception->getMessage());
         }
-
-        return $confirmed;
     }
 
     /**
@@ -200,7 +220,7 @@ class OrderService
             $order->status = Order::STATUS_RESERVATION_FAILED;
             $order->save();
 
-            $this->events->record(new InventoryReservationFailed($order, $reason), 'order', (string) $order->id);
+            $this->events->record(new OrderReservationFailed($order, $reason), 'order', (string) $order->id);
 
             return $order;
         });

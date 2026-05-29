@@ -6,15 +6,16 @@ use App\Domains\Orders\Models\Order;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class InventoryReserved
+class OrderReservationFailed
 {
     use Dispatchable;
     use SerializesModels;
 
-    public const NAME = 'inventory.reserved';
+    public const NAME = 'order.reservation_failed';
 
     public function __construct(
         public readonly Order $order,
+        public readonly string $reason,
     ) {}
 
     /**
@@ -25,7 +26,7 @@ class InventoryReserved
         return [
             'event' => self::NAME,
             'order_id' => $this->order->id,
-            'reserved_at' => $this->order->confirmed_at?->toJSON(),
+            'reason' => $this->reason,
         ];
     }
 }

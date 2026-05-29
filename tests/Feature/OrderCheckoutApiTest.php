@@ -6,12 +6,13 @@ use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Models\Product;
 use App\Domains\Inventory\Models\StockItem;
 use App\Domains\Inventory\Models\Warehouse;
-use App\Domains\Orders\Events\InventoryReservationFailed;
-use App\Domains\Orders\Events\InventoryReserved;
-use App\Domains\Orders\Events\InventoryReserveRequested;
+use App\Domains\Orders\Events\OrderConfirmationRequested;
 use App\Domains\Orders\Events\OrderCreated;
+use App\Domains\Orders\Events\OrderReservationFailed;
+use App\Domains\Orders\Events\OrderReservationSucceeded;
 use App\Domains\Orders\Models\Order;
 use App\Domains\Pricing\Models\ProductPrice;
+use App\Infrastructure\Messaging\DomainEventPublisher;
 use App\Infrastructure\Messaging\OutboxMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -30,7 +31,7 @@ class OrderCheckoutApiTest extends TestCase
         Queue::fake();
     }
 
-    public function test_cart_draft_and_confirm_reserve_stock_with_price_snapshot(): void
+    public function test_cart_draft_and_confirm_requests_async_stock_reservation_with_price_snapshot(): void
     {
         $product = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');
         $stockItem = $this->createStockItem($product, 10);
@@ -67,9 +68,23 @@ class OrderCheckoutApiTest extends TestCase
 
         $this->postJson('/api/orders/'.$order['id'].'/confirm')
             ->assertOk()
-            ->assertJsonPath('data.status', Order::STATUS_CONFIRMED)
+            ->assertJsonPath('data.status', Order::STATUS_RESERVATION_PENDING)
             ->assertJsonPath('data.total_amount_minor', 259800)
             ->assertJsonPath('data.items.0.unit_amount_minor', 129900);
+
+        $stockItem->refresh();
+
+        $this->assertSame(10, $stockItem->on_hand_quantity);
+        $this->assertSame(0, $stockItem->reserved_quantity);
+        $this->assertSame(10, $stockItem->availableQuantity());
+
+        $this->assertDatabaseHas('messaging_outbox', [
+            'event_name' => OrderConfirmationRequested::NAME,
+            'aggregate_type' => 'order',
+            'aggregate_id' => (string) $order['id'],
+        ]);
+
+        $this->app->make(DomainEventPublisher::class)->publishPending();
 
         $stockItem->refresh();
 
@@ -77,13 +92,12 @@ class OrderCheckoutApiTest extends TestCase
         $this->assertSame(2, $stockItem->reserved_quantity);
         $this->assertSame(8, $stockItem->availableQuantity());
 
-        $this->assertDatabaseHas('messaging_outbox', [
-            'event_name' => InventoryReserveRequested::NAME,
-            'aggregate_type' => 'order',
-            'aggregate_id' => (string) $order['id'],
+        $this->assertDatabaseHas('orders_orders', [
+            'id' => $order['id'],
+            'status' => Order::STATUS_CONFIRMED,
         ]);
         $this->assertDatabaseHas('messaging_outbox', [
-            'event_name' => InventoryReserved::NAME,
+            'event_name' => OrderReservationSucceeded::NAME,
             'aggregate_type' => 'order',
             'aggregate_id' => (string) $order['id'],
         ]);
@@ -94,7 +108,7 @@ class OrderCheckoutApiTest extends TestCase
         ]);
     }
 
-    public function test_confirm_marks_order_failed_when_stock_is_not_available(): void
+    public function test_async_reservation_marks_order_failed_when_stock_is_not_available(): void
     {
         $product = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');
         $stockItem = $this->createStockItem($product, 1);
@@ -110,8 +124,15 @@ class OrderCheckoutApiTest extends TestCase
         ])->json('data');
 
         $this->postJson('/api/orders/'.$order['id'].'/confirm')
-            ->assertStatus(409)
-            ->assertJsonPath('message', 'Insufficient available stock for SCAN-001: requested 2, available 1.');
+            ->assertOk()
+            ->assertJsonPath('data.status', Order::STATUS_RESERVATION_PENDING);
+
+        $this->assertDatabaseHas('orders_orders', [
+            'id' => $order['id'],
+            'status' => Order::STATUS_RESERVATION_PENDING,
+        ]);
+
+        $this->app->make(DomainEventPublisher::class)->publishPending();
 
         $stockItem->refresh();
 
@@ -122,14 +143,14 @@ class OrderCheckoutApiTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('messaging_outbox', [
-            'event_name' => InventoryReserveRequested::NAME,
+            'event_name' => OrderConfirmationRequested::NAME,
             'aggregate_type' => 'order',
             'aggregate_id' => (string) $order['id'],
         ]);
 
         /** @var OutboxMessage $failedEvent */
         $failedEvent = OutboxMessage::query()
-            ->where('event_name', InventoryReservationFailed::NAME)
+            ->where('event_name', OrderReservationFailed::NAME)
             ->firstOrFail();
 
         $this->assertSame((string) $order['id'], $failedEvent->aggregate_id);

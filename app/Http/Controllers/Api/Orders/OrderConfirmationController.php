@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\Orders;
 
-use App\Domains\Inventory\Services\InsufficientStock;
 use App\Domains\Orders\Models\Order;
 use App\Domains\Orders\Services\OrderConflict;
 use App\Domains\Orders\Services\OrderService;
@@ -15,7 +14,7 @@ class OrderConfirmationController extends Controller
     {
         try {
             $order = $orders->confirm($id);
-        } catch (OrderConflict|InsufficientStock $exception) {
+        } catch (OrderConflict $exception) {
             return response()->json(['message' => $exception->getMessage()], 409);
         }
 

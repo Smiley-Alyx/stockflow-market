@@ -11,6 +11,8 @@ class Order extends Model
 {
     public const STATUS_DRAFT = 'draft';
 
+    public const STATUS_RESERVATION_PENDING = 'reservation_pending';
+
     public const STATUS_CONFIRMED = 'confirmed';
 
     public const STATUS_RESERVATION_FAILED = 'reservation_failed';

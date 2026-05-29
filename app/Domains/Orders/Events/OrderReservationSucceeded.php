@@ -6,12 +6,12 @@ use App\Domains\Orders\Models\Order;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class InventoryReserveRequested
+class OrderReservationSucceeded
 {
     use Dispatchable;
     use SerializesModels;
 
-    public const NAME = 'inventory.reserve.requested';
+    public const NAME = 'order.reservation_succeeded';
 
     public function __construct(
         public readonly Order $order,
@@ -25,14 +25,7 @@ class InventoryReserveRequested
         return [
             'event' => self::NAME,
             'order_id' => $this->order->id,
-            'items' => $this->order->items
-                ->map(fn ($item): array => [
-                    'product_id' => $item->product_id,
-                    'sku' => $item->sku,
-                    'quantity' => $item->quantity,
-                ])
-                ->values()
-                ->all(),
+            'reserved_at' => $this->order->confirmed_at?->toJSON(),
         ];
     }
 }

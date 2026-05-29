@@ -6,16 +6,15 @@ use App\Domains\Orders\Models\Order;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class InventoryReservationFailed
+class OrderConfirmationRequested
 {
     use Dispatchable;
     use SerializesModels;
 
-    public const NAME = 'inventory.reservation.failed';
+    public const NAME = 'order.confirmation.requested';
 
     public function __construct(
         public readonly Order $order,
-        public readonly string $reason,
     ) {}
 
     /**
@@ -26,7 +25,14 @@ class InventoryReservationFailed
         return [
             'event' => self::NAME,
             'order_id' => $this->order->id,
-            'reason' => $this->reason,
+            'items' => $this->order->items
+                ->map(fn ($item): array => [
+                    'product_id' => $item->product_id,
+                    'sku' => $item->sku,
+                    'quantity' => $item->quantity,
+                ])
+                ->values()
+                ->all(),
         ];
     }
 }

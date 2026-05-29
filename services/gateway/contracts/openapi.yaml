@@ -295,7 +295,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
   /api/orders/{id}/confirm:
     post:
-      summary: Confirm draft order and reserve inventory
+      summary: Request draft order confirmation and async inventory reservation
       parameters:
         - name: id
           in: path
@@ -305,7 +305,7 @@ paths:
             minimum: 1
       responses:
         '200':
-          description: Order confirmed
+          description: Order confirmation requested
           content:
             application/json:
               schema:
@@ -657,6 +657,7 @@ components:
           type: string
           enum:
             - draft
+            - reservation_pending
             - confirmed
             - reservation_failed
         total_amount_minor:

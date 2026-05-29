@@ -7,6 +7,8 @@ use App\Domains\Catalog\Events\ProductCreated;
 use App\Domains\Catalog\Events\ProductUpdated;
 use App\Domains\Catalog\Listeners\InvalidateCatalogProductsOnStockChanged;
 use App\Domains\Inventory\Events\StockChanged;
+use App\Domains\Orders\Events\OrderConfirmationRequested;
+use App\Domains\Orders\Listeners\ReserveInventoryForOrder;
 use App\Domains\Search\Contracts\ProductSearch;
 use App\Domains\Search\Contracts\SearchIndexer;
 use App\Domains\Search\DeadLetters\SearchIndexDeadLetterStore;
@@ -47,6 +49,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(ProductUpdated::class, RequestProductIndexing::class);
         Event::listen(ProductArchived::class, RequestProductIndexDeletion::class);
         Event::listen(StockChanged::class, InvalidateCatalogProductsOnStockChanged::class);
+        Event::listen(OrderConfirmationRequested::class, ReserveInventoryForOrder::class);
         Event::listen(SearchIndexRequested::class, DispatchSearchIndexJob::class);
         Event::listen(SearchIndexDeletionRequested::class, DispatchSearchDeleteJob::class);
     }
