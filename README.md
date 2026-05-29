@@ -88,6 +88,7 @@ docker compose exec php php artisan migrate
 ## Локальные команды
 
 ```bash
+composer install-git-hooks
 composer test
 docker compose config
 docker compose ps
@@ -96,6 +97,17 @@ docker compose down
 ```
 
 `composer test` запускает локальный PHP, если есть подходящий PDO-драйвер. При наличии `pdo_sqlite` используется in-memory SQLite; если локально доступен только `pdo_pgsql`, тесты переключаются на PostgreSQL с дефолтными локальными кредами `stockflow / secret`. Если локальный PHP не подходит, wrapper запускает suite внутри `docker compose run php`.
+
+`composer install-git-hooks` включает проектные git hooks и шаблон commit message. Commit message обязан соответствовать conventional commits в формате `type(scope): subject`, где `scope` обязателен и пишется в kebab-case.
+
+Примеры:
+
+- `feat(order-matching): introduce async matching pipeline`
+- `refactor(cache): extract redis abstraction layer`
+- `perf(ws): reduce allocations in market broadcast loop`
+- `test(load): add k6 scenario for burst traffic`
+- `docs(adr): describe event-driven matching architecture`
+- `infra(observability): add prometheus and grafana stack`
 
 ## Runtime-настройки
 

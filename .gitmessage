@@ -1,0 +1,25 @@
+# feat(scope): short imperative subject
+
+# Формат обязателен:
+#   type(scope): subject
+#
+# Примеры:
+#   feat(order-matching): introduce async matching pipeline
+#   refactor(cache): extract redis abstraction layer
+#   perf(ws): reduce allocations in market broadcast loop
+#   test(load): add k6 scenario for burst traffic
+#   docs(adr): describe event-driven matching architecture
+#   infra(observability): add prometheus and grafana stack
+#
+# Разрешенные type:
+#   feat, fix, refactor, perf, test, docs, infra, build, ci, chore, revert
+#
+# Scope обязателен, kebab-case.
+# Subject начинается с маленькой латинской буквы или цифры, без точки в конце.
+#
+# Приоритет инженерной зрелости:
+#   backpressure, retries, timeout policy, circuit breakers,
+#   connection pooling, worker pools, batching,
+#   lock-free/low-lock sections, cache invalidation strategy,
+#   idempotent consumers, metrics, tracing, profiling,
+#   benchmark evidence.
