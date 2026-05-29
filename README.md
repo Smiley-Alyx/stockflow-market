@@ -121,7 +121,7 @@ docker compose down
 | `search.indexing` | очередь индексации, Redis dead-letter backend, requeue audit channel, batch size, max in-flight, timeout Elasticsearch |
 | `messaging.retry` | retry attempts, backoff и порог dead-letter |
 
-Эти настройки пока являются контрактом для ближайших этапов: Redis caching, Elasticsearch adapter, retries и backpressure. Очередь `search-indexing` уже используется job pipeline для поисковой индексации, а окончательно упавшие документы сохраняются в Redis-backed dead-letter storage с operational name `search-indexing-dead-letter`.
+Эти настройки задают операционные границы для кеша каталога, Elasticsearch adapter, retries и backpressure. Очередь `search-indexing` уже используется job pipeline для поисковой индексации, а окончательно упавшие документы сохраняются в Redis-backed dead-letter storage с operational name `search-indexing-dead-letter`.
 
 ## Search dead-letter операции
 
@@ -181,8 +181,9 @@ composer test
 
 ## Ближайший план
 
-1. Добавить Redis caching для чтения каталога и дерева категорий.
-2. Описать contract tests для первых gateway/catalog API сценариев.
+1. Реализовать backend-сценарий корзины и черновика заказа с ценовым snapshot и резервированием остатков.
+2. Связать lifecycle заказа с доменными событиями `orders.order.created`, `orders.order.paid` и `orders.order.cancelled`.
+3. Добавить операционную наблюдаемость для async pipeline: структурированные метрики, статусы очередей и алерты по dead-letter росту.
 
 ## Лицензия
 
