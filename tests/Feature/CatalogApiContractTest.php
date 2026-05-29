@@ -59,6 +59,24 @@ class CatalogApiContractTest extends TestCase
         }
     }
 
+    public function test_product_list_endpoint_matches_gateway_and_catalog_contracts(): void
+    {
+        $this->createProduct();
+
+        $payload = $this->getJson('/api/catalog/products?per_page=10')
+            ->assertOk()
+            ->assertHeader('content-type', 'application/json')
+            ->json();
+
+        foreach ($this->catalogContracts() as $contract) {
+            $this->assertContractDeclaresResponse($contract, '/api/catalog/products', '200', 'ProductListResponse');
+            $this->assertSchemaMatchesPayload($contract, 'ProductListResponse', $payload);
+            $this->assertSchemaMatchesPayload($contract, 'PaginationMeta', $payload['meta']);
+            $this->assertSchemaMatchesPayload($contract, 'Product', $payload['data'][0]);
+            $this->assertSchemaMatchesPayload($contract, 'ProductCategory', $payload['data'][0]['category']);
+        }
+    }
+
     public function test_category_tree_endpoint_matches_gateway_and_catalog_contracts(): void
     {
         $devices = Category::query()->create([

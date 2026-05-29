@@ -43,6 +43,113 @@ class CatalogReadApiTest extends TestCase
             ->assertJsonPath('data.attributes.0.value', 'black');
     }
 
+    public function test_products_endpoint_returns_paginated_published_products(): void
+    {
+        $devices = Category::query()->create([
+            'name' => 'Devices',
+            'slug' => 'devices',
+            'is_active' => true,
+        ]);
+
+        $archived = Category::query()->create([
+            'name' => 'Archived',
+            'slug' => 'archived',
+            'is_active' => false,
+        ]);
+
+        Product::query()->create([
+            'category_id' => $devices->id,
+            'name' => 'Barcode Printer',
+            'slug' => 'barcode-printer',
+            'sku' => 'PRN-001',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        Product::query()->create([
+            'category_id' => $devices->id,
+            'name' => 'Wireless Scanner',
+            'slug' => 'wireless-scanner',
+            'sku' => 'SCAN-001',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        Product::query()->create([
+            'category_id' => $devices->id,
+            'name' => 'Draft Terminal',
+            'slug' => 'draft-terminal',
+            'sku' => 'TERM-001',
+            'status' => 'draft',
+        ]);
+
+        Product::query()->create([
+            'category_id' => $archived->id,
+            'name' => 'Legacy Scanner',
+            'slug' => 'legacy-scanner',
+            'sku' => 'SCAN-LEGACY',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $this->getJson('/api/catalog/products?per_page=1')
+            ->assertOk()
+            ->assertJsonPath('data.0.slug', 'barcode-printer')
+            ->assertJsonPath('meta.current_page', 1)
+            ->assertJsonPath('meta.last_page', 2)
+            ->assertJsonPath('meta.per_page', 1)
+            ->assertJsonPath('meta.total', 2)
+            ->assertJsonMissing(['slug' => 'draft-terminal'])
+            ->assertJsonMissing(['slug' => 'legacy-scanner']);
+    }
+
+    public function test_products_endpoint_filters_by_category_slug(): void
+    {
+        $devices = Category::query()->create([
+            'name' => 'Devices',
+            'slug' => 'devices',
+            'is_active' => true,
+        ]);
+
+        $supplies = Category::query()->create([
+            'name' => 'Supplies',
+            'slug' => 'supplies',
+            'is_active' => true,
+        ]);
+
+        Product::query()->create([
+            'category_id' => $devices->id,
+            'name' => 'Wireless Scanner',
+            'slug' => 'wireless-scanner',
+            'sku' => 'SCAN-001',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        Product::query()->create([
+            'category_id' => $supplies->id,
+            'name' => 'Label Roll',
+            'slug' => 'label-roll',
+            'sku' => 'LBL-001',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $this->getJson('/api/catalog/products?category=supplies')
+            ->assertOk()
+            ->assertJsonPath('data.0.slug', 'label-roll')
+            ->assertJsonPath('data.0.category.slug', 'supplies')
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonMissing(['slug' => 'wireless-scanner']);
+    }
+
+    public function test_products_endpoint_rejects_invalid_pagination(): void
+    {
+        $this->getJson('/api/catalog/products?per_page=101')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['per_page']);
+    }
+
     public function test_product_endpoint_uses_cache_on_repeated_reads(): void
     {
         $product = $this->createProduct();
@@ -126,6 +233,28 @@ class CatalogReadApiTest extends TestCase
             ->andReturn([]);
 
         $this->app->make(CatalogReadService::class)->activeCategoryTree();
+    }
+
+    public function test_product_list_cache_ttl_is_read_from_config(): void
+    {
+        config(['stockflow.catalog.cache.product_ttl_seconds' => 789]);
+
+        Cache::shouldReceive('get')
+            ->once()
+            ->with('catalog:products:version', 1)
+            ->andReturn(1);
+
+        Cache::shouldReceive('remember')
+            ->once()
+            ->with('catalog:products:v1:list:category:devices:page:2:per-page:10', 789, \Mockery::type(Closure::class))
+            ->andReturn(['data' => [], 'meta' => [
+                'current_page' => 2,
+                'last_page' => 1,
+                'per_page' => 10,
+                'total' => 0,
+            ]]);
+
+        $this->app->make(CatalogReadService::class)->productList(2, 10, 'devices');
     }
 
     private function createProduct(): Product

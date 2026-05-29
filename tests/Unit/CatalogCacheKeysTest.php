@@ -22,11 +22,21 @@ class CatalogCacheKeysTest extends TestCase
             CatalogCacheKeys::productBySlug('wireless-scanner'),
         );
 
+        $this->assertSame(
+            'catalog:products:v1:list:category:devices:page:2:per-page:10',
+            CatalogCacheKeys::productList(2, 10, 'devices'),
+        );
+
         CatalogCacheKeys::invalidateProducts();
 
         $this->assertSame(
             'catalog:products:v2:slug:wireless-scanner',
             CatalogCacheKeys::productBySlug('wireless-scanner'),
+        );
+
+        $this->assertSame(
+            'catalog:products:v2:list:category:all:page:1:per-page:20',
+            CatalogCacheKeys::productList(1, 20, null),
         );
     }
 

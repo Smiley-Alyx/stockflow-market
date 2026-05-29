@@ -2,6 +2,15 @@ type ApiResource<T> = {
     data: T;
 };
 
+type ApiPaginatedResource<T> = ApiResource<T> & {
+    meta: {
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    };
+};
+
 export type CatalogCategory = {
     id: number;
     name: string;
@@ -27,6 +36,11 @@ export type CatalogProduct = {
         name: string;
         value: string;
     }>;
+};
+
+export type CatalogProductList = {
+    products: CatalogProduct[];
+    meta: ApiPaginatedResource<CatalogProduct[]>['meta'];
 };
 
 export const useCatalogApi = () => {
@@ -60,9 +74,22 @@ export const useCatalogApi = () => {
         }
     };
 
+    const fetchProducts = async (params: { category?: string; page?: number; per_page?: number } = {}) => {
+        const response = await $fetch<ApiPaginatedResource<CatalogProduct[]>>('/api/catalog/products', {
+            baseURL: apiBase,
+            query: params,
+        });
+
+        return {
+            products: response.data,
+            meta: response.meta,
+        };
+    };
+
     return {
         fetchCategoryTree,
         fetchProduct,
+        fetchProducts,
     };
 };
 

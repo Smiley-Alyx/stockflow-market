@@ -15,6 +15,17 @@ class CatalogCacheKeys
         return sprintf('catalog:products:v%d:slug:%s', self::version(self::PRODUCT_VERSION_KEY), $slug);
     }
 
+    public static function productList(int $page, int $perPage, ?string $categorySlug): string
+    {
+        return sprintf(
+            'catalog:products:v%d:list:category:%s:page:%d:per-page:%d',
+            self::version(self::PRODUCT_VERSION_KEY),
+            $categorySlug ?? 'all',
+            $page,
+            $perPage,
+        );
+    }
+
     public static function activeCategoryTree(): string
     {
         return sprintf('catalog:categories:tree:v%d:active', self::version(self::CATEGORY_TREE_VERSION_KEY));

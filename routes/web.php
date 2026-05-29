@@ -12,5 +12,6 @@ Route::get('/', function () {
 Route::get('/health/live', [HealthCheckController::class, 'live']);
 Route::get('/health/ready', [HealthCheckController::class, 'ready']);
 
+Route::get('/api/catalog/products', [ProductController::class, 'index']);
 Route::get('/api/catalog/products/{slug}', [ProductController::class, 'show']);
 Route::get('/api/catalog/categories/tree', [CategoryController::class, 'tree']);
