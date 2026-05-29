@@ -142,7 +142,7 @@ components:
         data:
           type: array
           items:
-            $ref: '#/components/schemas/Product'
+            $ref: '#/components/schemas/SearchProduct'
         meta:
           $ref: '#/components/schemas/SearchPaginationMeta'
     PaginationMeta:
@@ -240,6 +240,38 @@ components:
           type: string
         value:
           type: string
+    SearchProduct:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+        - sku
+        - status
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        sku:
+          type: string
+        description:
+          type:
+            - string
+            - 'null'
+        status:
+          type: string
+        category_id:
+          type:
+            - integer
+            - 'null'
+        published_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
     CategoryTreeResponse:
       type: object
       required:
