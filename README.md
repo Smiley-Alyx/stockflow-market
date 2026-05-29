@@ -17,6 +17,7 @@ StockFlow Market — инженерный pet-проект маркетплей�
 - добавлены Docker Compose worker-процессы для общей очереди и поисковой индексации;
 - добавлены `health/live` и `health/ready` probes для runtime и зависимостей;
 - подключён Elasticsearch adapter для записи поисковых документов;
+- добавлен первый search read endpoint поверх Elasticsearch для индексированных товаров;
 - добавлена операционная команда `search:dead-letter` для просмотра и ручного возврата документов поисковой индексации из отдельного dead-letter backend;
 - добавлен `config/stockflow.php` для runtime-настроек таймаутов, кеша, очередей, retry и backpressure limits;
 - описан первый ADR по переходной архитектуре Laravel gateway + service workspace;

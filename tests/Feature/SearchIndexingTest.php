@@ -11,6 +11,7 @@ use App\Domains\Search\Events\SearchIndexFailed;
 use App\Domains\Search\Events\SearchIndexRequested;
 use App\Domains\Search\Jobs\IndexSearchDocument;
 use App\Infrastructure\Search\DeadLetters\ArraySearchIndexDeadLetterStore;
+use App\Infrastructure\Search\ElasticsearchProductSearch;
 use App\Infrastructure\Search\ElasticsearchSearchIndexer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -356,5 +357,82 @@ class SearchIndexingTest extends TestCase
                 && $request['sku'] === 'SCAN-001'
                 && $request['name'] === 'Wireless Scanner';
         });
+    }
+
+    public function test_product_search_endpoint_reads_from_elasticsearch(): void
+    {
+        Http::fake([
+            'http://elasticsearch:9200/catalog_products/_search' => Http::response([
+                'hits' => [
+                    'total' => ['value' => 1],
+                    'hits' => [[
+                        '_source' => [
+                            'id' => 15,
+                            'name' => 'Wireless Scanner',
+                            'slug' => 'wireless-scanner',
+                            'sku' => 'SCAN-001',
+                            'status' => 'published',
+                        ],
+                    ]],
+                ],
+            ]),
+        ]);
+
+        $this->getJson('/api/search/products?q=scanner&per_page=10')
+            ->assertOk()
+            ->assertJsonPath('data.0.sku', 'SCAN-001')
+            ->assertJsonPath('meta.query', 'scanner')
+            ->assertJsonPath('meta.current_page', 1)
+            ->assertJsonPath('meta.per_page', 10)
+            ->assertJsonPath('meta.total', 1);
+
+        Http::assertSent(function ($request) {
+            return $request->method() === 'POST'
+                && $request->url() === 'http://elasticsearch:9200/catalog_products/_search'
+                && $request['from'] === 0
+                && $request['size'] === 10
+                && $request['query']['bool']['must'][0]['multi_match']['query'] === 'scanner'
+                && $request['query']['bool']['filter'][0]['term']['status'] === 'published';
+        });
+    }
+
+    public function test_product_search_endpoint_requires_query(): void
+    {
+        $this->getJson('/api/search/products')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['q']);
+    }
+
+    public function test_search_product_endpoint_is_declared_in_gateway_and_search_contracts(): void
+    {
+        foreach ([
+            base_path('services/gateway/contracts/openapi.yaml'),
+            base_path('services/search/contracts/openapi.yaml'),
+        ] as $contract) {
+            $contents = file_get_contents($contract);
+
+            $this->assertIsString($contents);
+            $this->assertStringContainsString('/api/search/products:', $contents);
+            $this->assertStringContainsString("\$ref: '#/components/schemas/SearchProductListResponse'", $contents);
+            $this->assertStringContainsString('SearchPaginationMeta:', $contents);
+        }
+    }
+
+    public function test_elasticsearch_product_search_supports_legacy_total_hits_shape(): void
+    {
+        Http::fake([
+            'http://elasticsearch:9200/catalog_products/_search' => Http::response([
+                'hits' => [
+                    'total' => 2,
+                    'hits' => [],
+                ],
+            ]),
+        ]);
+
+        $results = (new ElasticsearchProductSearch)->search('scanner', 2, 10);
+
+        $this->assertSame(2, $results['meta']['total']);
+
+        Http::assertSent(fn ($request): bool => $request['from'] === 10);
     }
 }
