@@ -14,6 +14,7 @@ class SearchIndexDeadLetter
         public readonly array $document,
         public readonly int $attempts,
         public readonly string $failure,
+        public readonly string $operation = 'index',
     ) {
         //
     }

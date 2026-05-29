@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Domains\Catalog\Events\ProductArchived;
 use App\Domains\Catalog\Events\ProductCreated;
+use App\Domains\Catalog\Events\ProductUpdated;
 use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Models\Product;
 use App\Domains\Catalog\Models\ProductAttribute;
@@ -53,5 +55,54 @@ class CatalogModelTest extends TestCase
                 && $event->payload()['event'] === ProductCreated::NAME
                 && $event->payload()['product']['sku'] === 'SCAN-001';
         });
+    }
+
+    public function test_it_dispatches_a_product_updated_event(): void
+    {
+        Event::fake([ProductUpdated::class]);
+
+        $product = new Product([
+            'category_id' => 7,
+            'name' => 'Wireless Scanner',
+            'slug' => 'wireless-scanner',
+            'sku' => 'SCAN-001',
+            'status' => 'published',
+        ]);
+        $product->id = 15;
+
+        $reflection = new ReflectionClass($product);
+        $method = $reflection->getMethod('fireModelEvent');
+        $method->invoke($product, 'updated', false);
+
+        Event::assertDispatched(ProductUpdated::class, function (ProductUpdated $event) use ($product) {
+            return $event->product->is($product)
+                && $event->payload()['event'] === ProductUpdated::NAME
+                && $event->payload()['product']['sku'] === 'SCAN-001';
+        });
+    }
+
+    public function test_it_dispatches_a_product_archived_event_for_archived_products(): void
+    {
+        Event::fake([ProductArchived::class, ProductUpdated::class]);
+
+        $product = new Product([
+            'category_id' => 7,
+            'name' => 'Wireless Scanner',
+            'slug' => 'wireless-scanner',
+            'sku' => 'SCAN-001',
+            'status' => 'archived',
+        ]);
+        $product->id = 15;
+
+        $reflection = new ReflectionClass($product);
+        $method = $reflection->getMethod('fireModelEvent');
+        $method->invoke($product, 'updated', false);
+
+        Event::assertDispatched(ProductArchived::class, function (ProductArchived $event) use ($product) {
+            return $event->product->is($product)
+                && $event->payload()['event'] === ProductArchived::NAME
+                && $event->payload()['product']['sku'] === 'SCAN-001';
+        });
+        Event::assertNotDispatched(ProductUpdated::class);
     }
 }

@@ -2,7 +2,9 @@
 
 namespace App\Domains\Catalog\Models;
 
+use App\Domains\Catalog\Events\ProductArchived;
 use App\Domains\Catalog\Events\ProductCreated;
+use App\Domains\Catalog\Events\ProductUpdated;
 use App\Domains\Catalog\Read\CatalogCacheKeys;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -18,6 +20,16 @@ class Product extends Model
     {
         static::created(function (Product $product): void {
             ProductCreated::dispatch($product);
+        });
+
+        static::updated(function (Product $product): void {
+            if ($product->status === 'archived') {
+                ProductArchived::dispatch($product);
+
+                return;
+            }
+
+            ProductUpdated::dispatch($product);
         });
 
         static::saved(function (): void {

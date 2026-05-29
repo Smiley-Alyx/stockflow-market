@@ -9,7 +9,7 @@ interface SearchIndexDeadLetterStore
     /**
      * @param  array<string, mixed>  $document
      */
-    public function put(string $index, string $documentId, array $document, int $attempts, string $failure): SearchIndexDeadLetter;
+    public function put(string $index, string $documentId, array $document, int $attempts, string $failure, string $operation = 'index'): SearchIndexDeadLetter;
 
     public function find(int $id): ?SearchIndexDeadLetter;
 

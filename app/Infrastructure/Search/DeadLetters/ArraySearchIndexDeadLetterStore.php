@@ -18,7 +18,7 @@ class ArraySearchIndexDeadLetterStore implements SearchIndexDeadLetterStore
     /**
      * @param  array<string, mixed>  $document
      */
-    public function put(string $index, string $documentId, array $document, int $attempts, string $failure): SearchIndexDeadLetter
+    public function put(string $index, string $documentId, array $document, int $attempts, string $failure, string $operation = 'index'): SearchIndexDeadLetter
     {
         $record = new SearchIndexDeadLetter(
             id: self::$nextId++,
@@ -27,6 +27,7 @@ class ArraySearchIndexDeadLetterStore implements SearchIndexDeadLetterStore
             document: $document,
             attempts: $attempts,
             failure: $failure,
+            operation: $operation,
         );
 
         self::$records[$record->id] = $record;

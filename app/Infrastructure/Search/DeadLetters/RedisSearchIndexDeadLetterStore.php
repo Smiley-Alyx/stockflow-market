@@ -12,10 +12,10 @@ class RedisSearchIndexDeadLetterStore implements SearchIndexDeadLetterStore
     /**
      * @param  array<string, mixed>  $document
      */
-    public function put(string $index, string $documentId, array $document, int $attempts, string $failure): SearchIndexDeadLetter
+    public function put(string $index, string $documentId, array $document, int $attempts, string $failure, string $operation = 'index'): SearchIndexDeadLetter
     {
         $id = (int) $this->redis()->incr($this->sequenceKey());
-        $record = new SearchIndexDeadLetter($id, $index, $documentId, $document, $attempts, $failure);
+        $record = new SearchIndexDeadLetter($id, $index, $documentId, $document, $attempts, $failure, $operation);
 
         $this->redis()->set($this->recordKey($id), json_encode($this->payloadFor($record), JSON_THROW_ON_ERROR));
         $this->redis()->zadd($this->indexKey(), $id, (string) $id);
@@ -114,6 +114,7 @@ class RedisSearchIndexDeadLetterStore implements SearchIndexDeadLetterStore
             'document' => $record->document,
             'attempts' => $record->attempts,
             'failure' => $record->failure,
+            'operation' => $record->operation,
         ];
     }
 
@@ -132,6 +133,7 @@ class RedisSearchIndexDeadLetterStore implements SearchIndexDeadLetterStore
             document: is_array($data['document']) ? $data['document'] : [],
             attempts: (int) $data['attempts'],
             failure: (string) $data['failure'],
+            operation: (string) ($data['operation'] ?? 'index'),
         );
     }
 }

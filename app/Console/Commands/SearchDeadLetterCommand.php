@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Domains\Search\DeadLetters\SearchIndexDeadLetter;
 use App\Domains\Search\DeadLetters\SearchIndexDeadLetterStore;
+use App\Domains\Search\Jobs\DeleteSearchDocument;
 use App\Domains\Search\Jobs\IndexSearchDocument;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
@@ -258,11 +259,18 @@ class SearchDeadLetterCommand extends Command
     {
         DB::transaction(function () use ($jobs): void {
             foreach ($jobs as $job) {
-                IndexSearchDocument::dispatch(
-                    index: $job->index,
-                    documentId: $job->documentId,
-                    document: $job->document,
-                );
+                if ($job->operation === 'delete') {
+                    DeleteSearchDocument::dispatch(
+                        index: $job->index,
+                        documentId: $job->documentId,
+                    );
+                } else {
+                    IndexSearchDocument::dispatch(
+                        index: $job->index,
+                        documentId: $job->documentId,
+                        document: $job->document,
+                    );
+                }
 
                 $this->deadLetters->delete($job->id);
 

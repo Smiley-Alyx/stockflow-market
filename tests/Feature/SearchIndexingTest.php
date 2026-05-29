@@ -2,18 +2,21 @@
 
 namespace Tests\Feature;
 
+use App\Domains\Catalog\Events\ProductArchived;
 use App\Domains\Catalog\Events\ProductCreated;
+use App\Domains\Catalog\Events\ProductUpdated;
 use App\Domains\Catalog\Models\Product;
 use App\Domains\Search\Contracts\SearchIndexer;
 use App\Domains\Search\DeadLetters\SearchIndexDeadLetterStore;
 use App\Domains\Search\Events\SearchIndexCompleted;
+use App\Domains\Search\Events\SearchIndexDeletionRequested;
 use App\Domains\Search\Events\SearchIndexFailed;
 use App\Domains\Search\Events\SearchIndexRequested;
+use App\Domains\Search\Jobs\DeleteSearchDocument;
 use App\Domains\Search\Jobs\IndexSearchDocument;
 use App\Infrastructure\Search\DeadLetters\ArraySearchIndexDeadLetterStore;
 use App\Infrastructure\Search\ElasticsearchProductSearch;
 use App\Infrastructure\Search\ElasticsearchSearchIndexer;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -54,6 +57,51 @@ class SearchIndexingTest extends TestCase
         });
     }
 
+    public function test_it_requests_product_indexing_when_a_product_is_updated(): void
+    {
+        Event::fake([SearchIndexRequested::class]);
+
+        $product = new Product([
+            'category_id' => 7,
+            'name' => 'Wireless Scanner Pro',
+            'slug' => 'wireless-scanner-pro',
+            'sku' => 'SCAN-001',
+            'status' => 'published',
+        ]);
+        $product->id = 15;
+
+        ProductUpdated::dispatch($product);
+
+        Event::assertDispatched(SearchIndexRequested::class, function (SearchIndexRequested $event) {
+            return $event->index === 'catalog_products'
+                && $event->documentId === '15'
+                && $event->payload()['event'] === SearchIndexRequested::NAME
+                && $event->payload()['document']['name'] === 'Wireless Scanner Pro';
+        });
+    }
+
+    public function test_it_requests_product_index_deletion_when_a_product_is_archived(): void
+    {
+        Event::fake([SearchIndexDeletionRequested::class]);
+
+        $product = new Product([
+            'category_id' => 7,
+            'name' => 'Wireless Scanner',
+            'slug' => 'wireless-scanner',
+            'sku' => 'SCAN-001',
+            'status' => 'archived',
+        ]);
+        $product->id = 15;
+
+        ProductArchived::dispatch($product);
+
+        Event::assertDispatched(SearchIndexDeletionRequested::class, function (SearchIndexDeletionRequested $event) {
+            return $event->index === 'catalog_products'
+                && $event->documentId === '15'
+                && $event->payload()['event'] === SearchIndexDeletionRequested::NAME;
+        });
+    }
+
     public function test_it_queues_product_indexing_on_the_search_indexing_queue(): void
     {
         Queue::fake();
@@ -74,6 +122,31 @@ class SearchIndexingTest extends TestCase
             return $job->index === 'catalog_products'
                 && $job->documentId === '15'
                 && $job->document['sku'] === 'SCAN-001'
+                && $job->tries === 5
+                && $job->timeout === 2
+                && $job->backoff() === 1;
+        });
+    }
+
+    public function test_it_queues_product_index_deletion_on_the_search_indexing_queue(): void
+    {
+        Queue::fake();
+
+        $product = new Product([
+            'category_id' => 7,
+            'name' => 'Wireless Scanner',
+            'slug' => 'wireless-scanner',
+            'sku' => 'SCAN-001',
+            'status' => 'archived',
+        ]);
+        $product->id = 15;
+
+        ProductArchived::dispatch($product);
+
+        Queue::assertPushedOn('search-indexing', DeleteSearchDocument::class);
+        Queue::assertPushed(DeleteSearchDocument::class, function (DeleteSearchDocument $job) {
+            return $job->index === 'catalog_products'
+                && $job->documentId === '15'
                 && $job->tries === 5
                 && $job->timeout === 2
                 && $job->backoff() === 1;
@@ -266,6 +339,11 @@ class SearchIndexingTest extends TestCase
 
                 throw new RuntimeException('Elasticsearch is unavailable.');
             }
+
+            public function delete(string $index, string $documentId): void
+            {
+                //
+            }
         };
 
         $this->app->instance(SearchIndexer::class, $indexer);
@@ -313,6 +391,11 @@ class SearchIndexingTest extends TestCase
                     'document' => $document,
                 ];
             }
+
+            public function delete(string $index, string $documentId): void
+            {
+                //
+            }
         };
 
         $job = new IndexSearchDocument(
@@ -328,6 +411,53 @@ class SearchIndexingTest extends TestCase
             'document_id' => '15',
             'document' => ['sku' => 'SCAN-001'],
         ], $indexer->indexed);
+
+        Event::assertDispatched(SearchIndexCompleted::class, function (SearchIndexCompleted $event) {
+            return $event->index === 'catalog_products'
+                && $event->documentId === '15'
+                && $event->payload()['event'] === SearchIndexCompleted::NAME;
+        });
+    }
+
+    public function test_delete_job_deletes_through_the_search_indexer_port(): void
+    {
+        Event::fake([SearchIndexCompleted::class]);
+
+        $indexer = new class implements SearchIndexer
+        {
+            /**
+             * @var array<string, string>
+             */
+            public array $deleted = [];
+
+            /**
+             * @param  array<string, mixed>  $document
+             */
+            public function index(string $index, string $documentId, array $document): void
+            {
+                //
+            }
+
+            public function delete(string $index, string $documentId): void
+            {
+                $this->deleted = [
+                    'index' => $index,
+                    'document_id' => $documentId,
+                ];
+            }
+        };
+
+        $job = new DeleteSearchDocument(
+            index: 'catalog_products',
+            documentId: '15',
+        );
+
+        $job->handle($indexer);
+
+        $this->assertSame([
+            'index' => 'catalog_products',
+            'document_id' => '15',
+        ], $indexer->deleted);
 
         Event::assertDispatched(SearchIndexCompleted::class, function (SearchIndexCompleted $event) {
             return $event->index === 'catalog_products'
@@ -356,6 +486,24 @@ class SearchIndexingTest extends TestCase
                 && $request->url() === 'http://elasticsearch:9200/catalog_products/_doc/15'
                 && $request['sku'] === 'SCAN-001'
                 && $request['name'] === 'Wireless Scanner';
+        });
+    }
+
+    public function test_elasticsearch_indexer_deletes_documents_from_the_configured_cluster(): void
+    {
+        Http::fake([
+            'http://elasticsearch:9200/catalog_products/_doc/15' => Http::response([
+                'result' => 'deleted',
+            ]),
+        ]);
+
+        $indexer = new ElasticsearchSearchIndexer;
+
+        $indexer->delete('catalog_products', '15');
+
+        Http::assertSent(function ($request) {
+            return $request->method() === 'DELETE'
+                && $request->url() === 'http://elasticsearch:9200/catalog_products/_doc/15';
         });
     }
 

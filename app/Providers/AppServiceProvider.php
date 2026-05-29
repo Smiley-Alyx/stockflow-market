@@ -2,12 +2,17 @@
 
 namespace App\Providers;
 
+use App\Domains\Catalog\Events\ProductArchived;
 use App\Domains\Catalog\Events\ProductCreated;
+use App\Domains\Catalog\Events\ProductUpdated;
 use App\Domains\Search\Contracts\ProductSearch;
 use App\Domains\Search\Contracts\SearchIndexer;
 use App\Domains\Search\DeadLetters\SearchIndexDeadLetterStore;
+use App\Domains\Search\Events\SearchIndexDeletionRequested;
 use App\Domains\Search\Events\SearchIndexRequested;
+use App\Domains\Search\Listeners\DispatchSearchDeleteJob;
 use App\Domains\Search\Listeners\DispatchSearchIndexJob;
+use App\Domains\Search\Listeners\RequestProductIndexDeletion;
 use App\Domains\Search\Listeners\RequestProductIndexing;
 use App\Infrastructure\Search\DeadLetters\ArraySearchIndexDeadLetterStore;
 use App\Infrastructure\Search\DeadLetters\RedisSearchIndexDeadLetterStore;
@@ -37,6 +42,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Event::listen(ProductCreated::class, RequestProductIndexing::class);
+        Event::listen(ProductUpdated::class, RequestProductIndexing::class);
+        Event::listen(ProductArchived::class, RequestProductIndexDeletion::class);
         Event::listen(SearchIndexRequested::class, DispatchSearchIndexJob::class);
+        Event::listen(SearchIndexDeletionRequested::class, DispatchSearchDeleteJob::class);
     }
 }
