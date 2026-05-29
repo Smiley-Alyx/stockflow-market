@@ -93,160 +93,116 @@ useHead({
 });
 </script>
 
-<template>
-    <main class="shell">
-        <section class="overview">
-            <header class="topbar">
-                <div class="brand-block">
-                    <div class="brand">
-                        <span class="brand-mark">SF</span>
-                        <span>StockFlow Market</span>
-                    </div>
-                    <p>Gateway shell</p>
-                </div>
+<template lang="pug">
+main.shell
+    section.overview
+        header.topbar
+            .brand-block
+                .brand
+                    span.brand-mark SF
+                    span StockFlow Market
+                p Gateway shell
 
-                <div class="topbar-actions">
-                    <a href="/api/catalog/products?per_page=10">Catalog API</a>
-                    <span class="status" :class="{ 'status-muted': categoriesError || productListError }">
-                        {{ catalogStatus }}
-                    </span>
-                </div>
-            </header>
+            .topbar-actions
+                a(href="/api/catalog/products?per_page=10") Catalog API
+                span.status(:class="{ 'status-muted': categoriesError || productListError }")
+                    | {{ catalogStatus }}
 
-            <div class="hero">
-                <div class="hero-copy">
-                    <p class="eyebrow">Marketplace operations</p>
-                    <h1>Каталог, остатки и поиск в одном рабочем контуре</h1>
-                    <p class="lede">
-                        Минимальный SSR-интерфейс для проверки публичного слоя StockFlow Market и будущих
-                        операционных сценариев.
-                    </p>
-                </div>
+        .hero
+            .hero-copy
+                p.eyebrow Marketplace operations
+                h1 Каталог, остатки и поиск в одном рабочем контуре
+                p.lede.
+                    Минимальный SSR-интерфейс для проверки публичного слоя StockFlow Market и будущих
+                    операционных сценариев.
 
-                <div class="metrics" aria-label="Состояние витрины">
-                    <article>
-                        <span>Каталог</span>
-                        <strong>{{ categoryCount }}</strong>
-                    </article>
-                    <article>
-                        <span>Опубликовано</span>
-                        <strong>{{ publishedCount }}</strong>
-                    </article>
-                    <article>
-                        <span>Товар</span>
-                        <strong>{{ productStatus }}</strong>
-                    </article>
-                    <article>
-                        <span>Rendering</span>
-                        <strong>SSR</strong>
-                    </article>
-                </div>
-            </div>
-        </section>
+            .metrics(aria-label="Состояние витрины")
+                article
+                    span Каталог
+                    strong {{ categoryCount }}
+                article
+                    span Опубликовано
+                    strong {{ publishedCount }}
+                article
+                    span Товар
+                    strong {{ productStatus }}
+                article
+                    span Rendering
+                    strong SSR
 
-        <section class="content-grid" aria-label="Операционные данные">
-            <article class="panel">
-                <div class="panel-heading">
-                    <h2>Категории</h2>
-                    <span>read API</span>
-                </div>
+    section.content-grid(aria-label="Операционные данные")
+        article.panel
+            .panel-heading
+                h2 Категории
+                span read API
 
-                <div class="filter-row" aria-label="Фильтр каталога">
-                    <button
-                        type="button"
-                        :class="{ active: selectedCategorySlug === '' }"
-                        @click="selectedCategorySlug = ''"
-                    >
-                        Все
-                    </button>
-                    <button
-                        v-for="category in categoryOptions.slice(0, 5)"
-                        :key="category.id"
-                        type="button"
-                        :class="{ active: selectedCategorySlug === category.slug }"
-                        @click="selectedCategorySlug = category.slug"
-                    >
-                        {{ category.name }}
-                    </button>
-                </div>
+            .filter-row(aria-label="Фильтр каталога")
+                button(
+                    type="button"
+                    :class="{ active: selectedCategorySlug === '' }"
+                    @click="selectedCategorySlug = ''"
+                ) Все
+                button(
+                    v-for="category in categoryOptions.slice(0, 5)"
+                    :key="category.id"
+                    type="button"
+                    :class="{ active: selectedCategorySlug === category.slug }"
+                    @click="selectedCategorySlug = category.slug"
+                ) {{ category.name }}
 
-                <ul v-if="visibleCategories.length" class="category-list">
-                    <li v-for="category in visibleCategories" :key="category.id">
-                        <div>
-                            <span>{{ category.name }}</span>
-                            <small>{{ category.children.length }} вложенных</small>
-                        </div>
-                        <code>{{ category.slug }}</code>
-                    </li>
-                </ul>
+            ul.category-list(v-if="visibleCategories.length")
+                li(v-for="category in visibleCategories" :key="category.id")
+                    div
+                        span {{ category.name }}
+                        small {{ category.children.length }} вложенных
+                    code {{ category.slug }}
 
-                <p v-else class="empty-state">
-                    Категории появятся после миграций, сидов и доступности backend API.
-                </p>
-            </article>
+            p.empty-state(v-else)
+                | Категории появятся после миграций, сидов и доступности backend API.
 
-            <article class="panel product-list-panel">
-                <div class="panel-heading">
-                    <h2>Витрина</h2>
-                    <span>{{ selectedCategory?.name ?? 'все категории' }}</span>
-                </div>
+        article.panel.product-list-panel
+            .panel-heading
+                h2 Витрина
+                span {{ selectedCategory?.name ?? 'все категории' }}
 
-                <ul v-if="products.length" class="product-list">
-                    <li v-for="item in products" :key="item.id">
-                        <button type="button" @click="productSlugInput = item.slug; productSlug = item.slug">
-                            <span>{{ item.category?.name ?? 'Без категории' }}</span>
-                            <strong>{{ item.name }}</strong>
-                            <code>{{ item.sku }}</code>
-                        </button>
-                    </li>
-                </ul>
+            ul.product-list(v-if="products.length")
+                li(v-for="item in products" :key="item.id")
+                    button(type="button" @click="productSlugInput = item.slug; productSlug = item.slug")
+                        span {{ item.category?.name ?? 'Без категории' }}
+                        strong {{ item.name }}
+                        code {{ item.sku }}
 
-                <p v-else-if="productListError" class="empty-state">
-                    Backend API недоступен для списка опубликованных товаров.
-                </p>
+            p.empty-state(v-else-if="productListError")
+                | Backend API недоступен для списка опубликованных товаров.
 
-                <p v-else class="empty-state">
-                    Опубликованные товары появятся после наполнения каталога.
-                </p>
-            </article>
+            p.empty-state(v-else)
+                | Опубликованные товары появятся после наполнения каталога.
 
-            <article class="panel">
-                <div class="panel-heading">
-                    <h2>Товар</h2>
-                    <span>read API</span>
-                </div>
+        article.panel
+            .panel-heading
+                h2 Товар
+                span read API
 
-                <form class="lookup-form" @submit.prevent="loadProduct">
-                    <label for="product-slug">Slug товара</label>
-                    <div>
-                        <input id="product-slug" v-model="productSlugInput" name="product-slug" autocomplete="off" />
-                        <button type="submit" :disabled="productPending">Найти</button>
-                    </div>
-                </form>
+            form.lookup-form(@submit.prevent="loadProduct")
+                label(for="product-slug") Slug товара
+                div
+                    input(id="product-slug" v-model="productSlugInput" name="product-slug" autocomplete="off")
+                    button(type="submit" :disabled="productPending") Найти
 
-                <div v-if="product" class="product-summary">
-                    <div>
-                        <span>{{ product.category?.name ?? 'Без категории' }}</span>
-                        <strong>{{ product.name }}</strong>
-                        <code>{{ product.sku }}</code>
-                    </div>
-                    <p>{{ product.description ?? 'Описание товара не заполнено.' }}</p>
-                    <dl v-if="product.attributes.length" class="attribute-list">
-                        <template v-for="attribute in product.attributes" :key="attribute.name">
-                            <dt>{{ attribute.name }}</dt>
-                            <dd>{{ attribute.value }}</dd>
-                        </template>
-                    </dl>
-                </div>
+            .product-summary(v-if="product")
+                div
+                    span {{ product.category?.name ?? 'Без категории' }}
+                    strong {{ product.name }}
+                    code {{ product.sku }}
+                p {{ product.description ?? 'Описание товара не заполнено.' }}
+                dl.attribute-list(v-if="product.attributes.length")
+                    template(v-for="attribute in product.attributes" :key="attribute.name")
+                        dt {{ attribute.name }}
+                        dd {{ attribute.value }}
 
-                <p v-else-if="productError" class="empty-state">
-                    Backend API недоступен для запроса выбранного товара.
-                </p>
+            p.empty-state(v-else-if="productError")
+                | Backend API недоступен для запроса выбранного товара.
 
-                <p v-else class="empty-state">
-                    Товар не найден или backend API пока недоступен для выбранного slug.
-                </p>
-            </article>
-        </section>
-    </main>
+            p.empty-state(v-else)
+                | Товар не найден или backend API пока недоступен для выбранного slug.
 </template>
