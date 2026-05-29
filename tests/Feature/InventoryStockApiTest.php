@@ -12,8 +12,8 @@ use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Services\IdempotencyConflict;
 use App\Domains\Inventory\Services\InsufficientStock;
 use App\Domains\Inventory\Services\InventoryService;
+use App\Infrastructure\Messaging\OutboxMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Tests\Support\AssertsOpenApiContracts;
 use Tests\TestCase;
@@ -154,8 +154,6 @@ class InventoryStockApiTest extends TestCase
 
     public function test_inventory_service_reserves_idempotently_deducts_and_returns_stock(): void
     {
-        Event::fake([StockChanged::class]);
-
         $stockItem = $this->createStockItem(onHand: 10);
         $inventory = $this->app->make(InventoryService::class);
 
@@ -187,12 +185,16 @@ class InventoryStockApiTest extends TestCase
         $this->assertSame(StockMovement::TYPE_RETURNED, $return->type);
         $this->assertSame(3, $stockItem->movements()->count());
 
-        Event::assertDispatchedTimes(StockChanged::class, 3);
-        Event::assertDispatched(StockChanged::class, function (StockChanged $event): bool {
-            return $event->payload()['event'] === StockChanged::NAME
-                && $event->payload()['stock']['sku'] === 'SCAN-001'
-                && $event->payload()['movement']['type'] === StockMovement::TYPE_RETURNED;
-        });
+        $this->assertSame(3, OutboxMessage::query()->where('event_name', StockChanged::NAME)->count());
+
+        /** @var OutboxMessage $stockChanged */
+        $stockChanged = OutboxMessage::query()
+            ->where('event_name', StockChanged::NAME)
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->assertSame('SCAN-001', $stockChanged->payload['stock']['sku']);
+        $this->assertSame(StockMovement::TYPE_RETURNED, $stockChanged->payload['movement']['type']);
     }
 
     public function test_inventory_service_rejects_reservation_over_available_stock(): void

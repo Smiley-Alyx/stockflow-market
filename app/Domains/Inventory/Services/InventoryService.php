@@ -6,6 +6,7 @@ use App\Domains\Inventory\Events\StockChanged;
 use App\Domains\Inventory\Models\Reservation;
 use App\Domains\Inventory\Models\StockItem;
 use App\Domains\Inventory\Models\StockMovement;
+use App\Infrastructure\Messaging\DomainEventRecorder;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,10 @@ use InvalidArgumentException;
 
 class InventoryService
 {
+    public function __construct(
+        private readonly DomainEventRecorder $events,
+    ) {}
+
     /**
      * @param  array<string, mixed>|null  $metadata
      */
@@ -196,7 +201,7 @@ class InventoryService
             /** @var StockItem $changed */
             $changed = $locked->fresh();
 
-            StockChanged::dispatch($changed, $movement);
+            $this->events->record(new StockChanged($changed, $movement), 'stock_item', (string) $changed->id);
 
             return $movement;
         });
@@ -294,7 +299,7 @@ class InventoryService
         /** @var StockItem $changed */
         $changed = StockItem::query()->findOrFail($reservation->stock_item_id);
 
-        StockChanged::dispatch($changed, $movement);
+        $this->events->record(new StockChanged($changed, $movement), 'stock_item', (string) $changed->id);
 
         return $movement;
     }

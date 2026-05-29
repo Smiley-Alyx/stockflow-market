@@ -14,9 +14,13 @@ use App\Domains\Search\Events\SearchIndexFailed;
 use App\Domains\Search\Events\SearchIndexRequested;
 use App\Domains\Search\Jobs\DeleteSearchDocument;
 use App\Domains\Search\Jobs\IndexSearchDocument;
+use App\Infrastructure\Messaging\DomainEventContext;
+use App\Infrastructure\Messaging\DomainEventPublisher;
+use App\Infrastructure\Messaging\OutboxMessage;
 use App\Infrastructure\Search\DeadLetters\ArraySearchIndexDeadLetterStore;
 use App\Infrastructure\Search\ElasticsearchProductSearch;
 use App\Infrastructure\Search\ElasticsearchSearchIndexer;
+use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -25,6 +29,8 @@ use Tests\TestCase;
 
 class SearchIndexingTest extends TestCase
 {
+    use DatabaseMigrations;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -36,8 +42,6 @@ class SearchIndexingTest extends TestCase
 
     public function test_it_requests_product_indexing_when_a_product_is_created(): void
     {
-        Event::fake([SearchIndexRequested::class]);
-
         $product = new Product([
             'category_id' => 7,
             'name' => 'Wireless Scanner',
@@ -49,18 +53,18 @@ class SearchIndexingTest extends TestCase
 
         ProductCreated::dispatch($product);
 
-        Event::assertDispatched(SearchIndexRequested::class, function (SearchIndexRequested $event) {
-            return $event->index === 'catalog_products'
-                && $event->documentId === '15'
-                && $event->payload()['event'] === SearchIndexRequested::NAME
-                && $event->payload()['document']['sku'] === 'SCAN-001';
-        });
+        /** @var OutboxMessage $message */
+        $message = OutboxMessage::query()
+            ->where('event_name', SearchIndexRequested::NAME)
+            ->firstOrFail();
+
+        $this->assertSame('search_document', $message->aggregate_type);
+        $this->assertSame('catalog_products:15', $message->aggregate_id);
+        $this->assertSame('SCAN-001', $message->payload['document']['sku']);
     }
 
     public function test_it_requests_product_indexing_when_a_product_is_updated(): void
     {
-        Event::fake([SearchIndexRequested::class]);
-
         $product = new Product([
             'category_id' => 7,
             'name' => 'Wireless Scanner Pro',
@@ -72,18 +76,17 @@ class SearchIndexingTest extends TestCase
 
         ProductUpdated::dispatch($product);
 
-        Event::assertDispatched(SearchIndexRequested::class, function (SearchIndexRequested $event) {
-            return $event->index === 'catalog_products'
-                && $event->documentId === '15'
-                && $event->payload()['event'] === SearchIndexRequested::NAME
-                && $event->payload()['document']['name'] === 'Wireless Scanner Pro';
-        });
+        /** @var OutboxMessage $message */
+        $message = OutboxMessage::query()
+            ->where('event_name', SearchIndexRequested::NAME)
+            ->firstOrFail();
+
+        $this->assertSame('15', $message->payload['document_id']);
+        $this->assertSame('Wireless Scanner Pro', $message->payload['document']['name']);
     }
 
     public function test_it_requests_product_index_deletion_when_a_product_is_archived(): void
     {
-        Event::fake([SearchIndexDeletionRequested::class]);
-
         $product = new Product([
             'category_id' => 7,
             'name' => 'Wireless Scanner',
@@ -95,11 +98,11 @@ class SearchIndexingTest extends TestCase
 
         ProductArchived::dispatch($product);
 
-        Event::assertDispatched(SearchIndexDeletionRequested::class, function (SearchIndexDeletionRequested $event) {
-            return $event->index === 'catalog_products'
-                && $event->documentId === '15'
-                && $event->payload()['event'] === SearchIndexDeletionRequested::NAME;
-        });
+        $this->assertDatabaseHas('messaging_outbox', [
+            'event_name' => SearchIndexDeletionRequested::NAME,
+            'aggregate_type' => 'search_document',
+            'aggregate_id' => 'catalog_products:15',
+        ]);
     }
 
     public function test_it_queues_product_indexing_on_the_search_indexing_queue(): void
@@ -116,6 +119,8 @@ class SearchIndexingTest extends TestCase
         $product->id = 15;
 
         ProductCreated::dispatch($product);
+
+        $this->app->make(DomainEventPublisher::class)->publishPending();
 
         Queue::assertPushedOn('search-indexing', IndexSearchDocument::class);
         Queue::assertPushed(IndexSearchDocument::class, function (IndexSearchDocument $job) {
@@ -143,6 +148,8 @@ class SearchIndexingTest extends TestCase
 
         ProductArchived::dispatch($product);
 
+        $this->app->make(DomainEventPublisher::class)->publishPending();
+
         Queue::assertPushedOn('search-indexing', DeleteSearchDocument::class);
         Queue::assertPushed(DeleteSearchDocument::class, function (DeleteSearchDocument $job) {
             return $job->index === 'catalog_products'
@@ -151,6 +158,35 @@ class SearchIndexingTest extends TestCase
                 && $job->timeout === 2
                 && $job->backoff() === 1;
         });
+    }
+
+    public function test_search_index_consumer_ignores_duplicate_message_delivery(): void
+    {
+        Queue::fake();
+
+        $event = new SearchIndexRequested(
+            index: 'catalog_products',
+            documentId: '15',
+            document: ['sku' => 'SCAN-001'],
+        );
+
+        DomainEventContext::withMessageId('outbox-1', fn () => SearchIndexRequested::dispatch(
+            index: $event->index,
+            documentId: $event->documentId,
+            document: $event->document,
+        ));
+        DomainEventContext::withMessageId('outbox-1', fn () => SearchIndexRequested::dispatch(
+            index: $event->index,
+            documentId: $event->documentId,
+            document: $event->document,
+        ));
+
+        Queue::assertPushed(IndexSearchDocument::class, 1);
+        $this->assertDatabaseHas('messaging_inbox', [
+            'message_id' => 'outbox-1',
+            'consumer' => 'App\Domains\Search\Listeners\DispatchSearchIndexJob',
+            'status' => 'processed',
+        ]);
     }
 
     public function test_failed_indexing_job_is_moved_to_the_dead_letter_queue(): void

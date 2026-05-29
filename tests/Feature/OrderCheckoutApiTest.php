@@ -12,8 +12,8 @@ use App\Domains\Orders\Events\InventoryReserveRequested;
 use App\Domains\Orders\Events\OrderCreated;
 use App\Domains\Orders\Models\Order;
 use App\Domains\Pricing\Models\ProductPrice;
+use App\Infrastructure\Messaging\OutboxMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Tests\Support\AssertsOpenApiContracts;
 use Tests\TestCase;
@@ -32,12 +32,6 @@ class OrderCheckoutApiTest extends TestCase
 
     public function test_cart_draft_and_confirm_reserve_stock_with_price_snapshot(): void
     {
-        Event::fake([
-            InventoryReserveRequested::class,
-            InventoryReserved::class,
-            OrderCreated::class,
-        ]);
-
         $product = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');
         $stockItem = $this->createStockItem($product, 10);
         $this->createPrice($product, 129900);
@@ -83,18 +77,25 @@ class OrderCheckoutApiTest extends TestCase
         $this->assertSame(2, $stockItem->reserved_quantity);
         $this->assertSame(8, $stockItem->availableQuantity());
 
-        Event::assertDispatched(InventoryReserveRequested::class, fn (InventoryReserveRequested $event): bool => $event->payload()['event'] === InventoryReserveRequested::NAME);
-        Event::assertDispatched(InventoryReserved::class, fn (InventoryReserved $event): bool => $event->payload()['event'] === InventoryReserved::NAME);
-        Event::assertDispatched(OrderCreated::class, fn (OrderCreated $event): bool => $event->payload()['event'] === OrderCreated::NAME);
+        $this->assertDatabaseHas('messaging_outbox', [
+            'event_name' => InventoryReserveRequested::NAME,
+            'aggregate_type' => 'order',
+            'aggregate_id' => (string) $order['id'],
+        ]);
+        $this->assertDatabaseHas('messaging_outbox', [
+            'event_name' => InventoryReserved::NAME,
+            'aggregate_type' => 'order',
+            'aggregate_id' => (string) $order['id'],
+        ]);
+        $this->assertDatabaseHas('messaging_outbox', [
+            'event_name' => OrderCreated::NAME,
+            'aggregate_type' => 'order',
+            'aggregate_id' => (string) $order['id'],
+        ]);
     }
 
     public function test_confirm_marks_order_failed_when_stock_is_not_available(): void
     {
-        Event::fake([
-            InventoryReservationFailed::class,
-            InventoryReserveRequested::class,
-        ]);
-
         $product = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');
         $stockItem = $this->createStockItem($product, 1);
         $this->createPrice($product, 129900);
@@ -120,11 +121,19 @@ class OrderCheckoutApiTest extends TestCase
             'status' => Order::STATUS_RESERVATION_FAILED,
         ]);
 
-        Event::assertDispatched(InventoryReserveRequested::class);
-        Event::assertDispatched(InventoryReservationFailed::class, function (InventoryReservationFailed $event): bool {
-            return $event->payload()['event'] === InventoryReservationFailed::NAME
-                && str_contains($event->payload()['reason'], 'Insufficient available stock');
-        });
+        $this->assertDatabaseHas('messaging_outbox', [
+            'event_name' => InventoryReserveRequested::NAME,
+            'aggregate_type' => 'order',
+            'aggregate_id' => (string) $order['id'],
+        ]);
+
+        /** @var OutboxMessage $failedEvent */
+        $failedEvent = OutboxMessage::query()
+            ->where('event_name', InventoryReservationFailed::NAME)
+            ->firstOrFail();
+
+        $this->assertSame((string) $order['id'], $failedEvent->aggregate_id);
+        $this->assertStringContainsString('Insufficient available stock', $failedEvent->payload['reason']);
     }
 
     public function test_draft_endpoint_rejects_cart_without_active_price(): void

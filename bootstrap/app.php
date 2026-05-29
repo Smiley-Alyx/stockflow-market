@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\PublishOutboxCommand;
 use App\Console\Commands\SearchDeadLetterCommand;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -13,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withCommands([
+        PublishOutboxCommand::class,
         SearchDeadLetterCommand::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {

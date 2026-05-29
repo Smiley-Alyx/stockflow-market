@@ -14,6 +14,7 @@ use App\Domains\Orders\Models\CartItem;
 use App\Domains\Orders\Models\Order;
 use App\Domains\Orders\Models\OrderItem;
 use App\Domains\Pricing\Models\ProductPrice;
+use App\Infrastructure\Messaging\DomainEventRecorder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -21,6 +22,7 @@ class OrderService
 {
     public function __construct(
         private readonly InventoryService $inventory,
+        private readonly DomainEventRecorder $events,
     ) {}
 
     public function createDraft(int $cartId): Order
@@ -85,7 +87,7 @@ class OrderService
         /** @var Order $order */
         $order = Order::query()->with('items')->findOrFail($orderId);
 
-        InventoryReserveRequested::dispatch($order);
+        $this->events->record(new InventoryReserveRequested($order), 'order', (string) $order->id);
 
         try {
             $confirmed = DB::transaction(function () use ($orderId): Order {
@@ -108,18 +110,18 @@ class OrderService
                 $locked->confirmed_at = now();
                 $locked->save();
 
-                return $locked->load('items');
+                $confirmed = $locked->load('items');
+
+                $this->events->record(new InventoryReserved($confirmed), 'order', (string) $confirmed->id);
+                $this->events->record(new OrderCreated($confirmed), 'order', (string) $confirmed->id);
+
+                return $confirmed;
             });
         } catch (InsufficientStock $exception) {
-            $failed = $this->markReservationFailed($orderId);
-
-            InventoryReservationFailed::dispatch($failed, $exception->getMessage());
+            $this->markReservationFailed($orderId, $exception->getMessage());
 
             throw $exception;
         }
-
-        InventoryReserved::dispatch($confirmed);
-        OrderCreated::dispatch($confirmed);
 
         return $confirmed;
     }
@@ -185,13 +187,22 @@ class OrderService
         throw InsufficientStock::available($item->sku, $item->quantity, $item->quantity - $remaining);
     }
 
-    private function markReservationFailed(int $orderId): Order
+    private function markReservationFailed(int $orderId, string $reason): Order
     {
-        /** @var Order $order */
-        $order = Order::query()->with('items')->findOrFail($orderId);
-        $order->status = Order::STATUS_RESERVATION_FAILED;
-        $order->save();
+        return DB::transaction(function () use ($orderId, $reason): Order {
+            /** @var Order $order */
+            $order = Order::query()
+                ->with('items')
+                ->whereKey($orderId)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        return $order;
+            $order->status = Order::STATUS_RESERVATION_FAILED;
+            $order->save();
+
+            $this->events->record(new InventoryReservationFailed($order, $reason), 'order', (string) $order->id);
+
+            return $order;
+        });
     }
 }

@@ -9,6 +9,7 @@ use App\Domains\Catalog\Read\CatalogReadService;
 use App\Domains\Inventory\Models\StockItem;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Services\InventoryService;
+use App\Infrastructure\Messaging\DomainEventPublisher;
 use Closure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -195,6 +196,7 @@ class CatalogReadApiTest extends TestCase
             ->assertJsonPath('data.availability.available_quantity', 0);
 
         $this->app->make(InventoryService::class)->receive($stockItem, 5, 'purchase_order', 'PO-1');
+        $this->app->make(DomainEventPublisher::class)->publishPending();
 
         $this->getJson('/api/catalog/products/wireless-scanner')
             ->assertOk()

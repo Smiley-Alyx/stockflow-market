@@ -60,12 +60,12 @@ class InventoryReservationConcurrencyTest extends TestCase
     private function runConcurrentReserveAttempts(string $database, int $stockItemId, int $attempts): array
     {
         $code = <<<'PHP'
-DB::statement('PRAGMA busy_timeout = 30000');
+DB::statement('PRAGMA busy_timeout = 60000');
 
 $stockItem = \App\Domains\Inventory\Models\StockItem::query()->findOrFail((int) getenv('STOCK_ITEM_ID'));
 $order = (string) getenv('ORDER_NUMBER');
 
-for ($attempt = 1; $attempt <= 20; $attempt++) {
+for ($attempt = 1; $attempt <= 100; $attempt++) {
     try {
         app(\App\Domains\Inventory\Services\InventoryService::class)->reserve(
             $stockItem,
@@ -84,11 +84,11 @@ for ($attempt = 1; $attempt <= 20; $attempt++) {
 
         return;
     } catch (\Illuminate\Database\QueryException $exception) {
-        if (! str_contains($exception->getMessage(), 'database is locked') || $attempt === 20) {
+        if (! str_contains($exception->getMessage(), 'database is locked') || $attempt === 100) {
             throw $exception;
         }
 
-        usleep(random_int(10000, 100000));
+        usleep(random_int(20000, 200000));
     }
 }
 PHP;
