@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Catalog\CategoryController;
 use App\Http\Controllers\Api\Catalog\ProductController;
 use App\Http\Controllers\Api\Inventory\StockController;
+use App\Http\Controllers\Api\Pricing\PriceController;
 use App\Http\Controllers\Api\Search\ProductSearchController;
 use App\Http\Controllers\HealthCheckController;
 use Illuminate\Support\Facades\Route;
@@ -18,4 +19,5 @@ Route::get('/api/catalog/products', [ProductController::class, 'index']);
 Route::get('/api/catalog/products/{slug}', [ProductController::class, 'show']);
 Route::get('/api/catalog/categories/tree', [CategoryController::class, 'tree']);
 Route::get('/api/inventory/stock', [StockController::class, 'show']);
+Route::get('/api/pricing/prices', [PriceController::class, 'index']);
 Route::get('/api/search/products', ProductSearchController::class);
