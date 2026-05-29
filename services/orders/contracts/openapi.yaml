@@ -2,4 +2,216 @@ openapi: 3.1.0
 info:
   title: StockFlow Orders API
   version: 0.1.0
-paths: {}
+paths:
+  /api/cart/items:
+    post:
+      summary: Add product to cart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCartItemRequest'
+      responses:
+        '201':
+          description: Cart item added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '422':
+          description: Invalid cart item payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/orders/draft:
+    post:
+      summary: Create draft order from cart with price snapshot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDraftOrderRequest'
+      responses:
+        '201':
+          description: Draft order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '409':
+          description: Draft order conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Invalid draft order payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/orders/{id}/confirm:
+    post:
+      summary: Confirm draft order and reserve inventory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Order confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '409':
+          description: Order confirmation conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+    CartResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/Cart'
+    OrderResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/Order'
+    AddCartItemRequest:
+      type: object
+      required:
+        - product_id
+        - quantity
+      properties:
+        cart_id:
+          type:
+            - integer
+            - 'null'
+        product_id:
+          type: integer
+        quantity:
+          type: integer
+    CreateDraftOrderRequest:
+      type: object
+      required:
+        - cart_id
+      properties:
+        cart_id:
+          type: integer
+    Cart:
+      type: object
+      required:
+        - id
+        - items
+      properties:
+        id:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+    CartItem:
+      type: object
+      required:
+        - product_id
+        - sku
+        - product_name
+        - quantity
+      properties:
+        product_id:
+          type: integer
+        sku:
+          type:
+            - string
+            - 'null'
+        product_name:
+          type:
+            - string
+            - 'null'
+        quantity:
+          type: integer
+    Order:
+      type: object
+      required:
+        - id
+        - cart_id
+        - status
+        - total_amount_minor
+        - currency
+        - confirmed_at
+        - items
+      properties:
+        id:
+          type: integer
+        cart_id:
+          type:
+            - integer
+            - 'null'
+        status:
+          type: string
+          enum:
+            - draft
+            - confirmed
+            - reservation_failed
+        total_amount_minor:
+          type: integer
+        currency:
+          type:
+            - string
+            - 'null'
+        confirmed_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+    OrderItem:
+      type: object
+      required:
+        - product_id
+        - sku
+        - product_name
+        - quantity
+        - unit_amount_minor
+        - currency
+        - line_amount_minor
+      properties:
+        product_id:
+          type: integer
+        sku:
+          type: string
+        product_name:
+          type: string
+        quantity:
+          type: integer
+        unit_amount_minor:
+          type: integer
+        currency:
+          type: string
+        line_amount_minor:
+          type: integer

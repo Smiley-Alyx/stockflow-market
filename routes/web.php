@@ -3,6 +3,9 @@
 use App\Http\Controllers\Api\Catalog\CategoryController;
 use App\Http\Controllers\Api\Catalog\ProductController;
 use App\Http\Controllers\Api\Inventory\StockController;
+use App\Http\Controllers\Api\Orders\CartItemController;
+use App\Http\Controllers\Api\Orders\DraftOrderController;
+use App\Http\Controllers\Api\Orders\OrderConfirmationController;
 use App\Http\Controllers\Api\Pricing\PriceController;
 use App\Http\Controllers\Api\Search\ProductSearchController;
 use App\Http\Controllers\HealthCheckController;
@@ -21,3 +24,6 @@ Route::get('/api/catalog/categories/tree', [CategoryController::class, 'tree']);
 Route::get('/api/inventory/stock', [StockController::class, 'show']);
 Route::get('/api/pricing/prices', [PriceController::class, 'index']);
 Route::get('/api/search/products', ProductSearchController::class);
+Route::post('/api/cart/items', [CartItemController::class, 'store']);
+Route::post('/api/orders/draft', [DraftOrderController::class, 'store']);
+Route::post('/api/orders/{id}/confirm', [OrderConfirmationController::class, 'store']);

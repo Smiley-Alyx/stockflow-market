@@ -18,6 +18,7 @@ StockFlow Market — инженерный pet-проект маркетплей�
 - добавлены `health/live` и `health/ready` probes для runtime и зависимостей;
 - подключён Elasticsearch adapter для записи поисковых документов;
 - добавлен первый search read endpoint поверх Elasticsearch для индексированных товаров;
+- реализован checkout-срез `cart → draft order → price snapshot → inventory reservation`;
 - добавлена операционная команда `search:dead-letter` для просмотра и ручного возврата документов поисковой индексации из отдельного dead-letter backend;
 - добавлен `config/stockflow.php` для runtime-настроек таймаутов, кеша, очередей, retry и backpressure limits;
 - описан первый ADR по переходной архитектуре Laravel gateway + service workspace;
@@ -166,7 +167,7 @@ php artisan search:dead-letter requeue --all --index=catalog_products --batch-si
 composer test
 ```
 
-Тесты страхуют базовый Laravel bootstrap, runtime-конфигурацию, сервисную структуру, модель каталога, OpenAPI-контракты, HTTP read API и поисковый indexing pipeline, включая retry/dead-letter поведение и ручной requeue.
+Тесты страхуют базовый Laravel bootstrap, runtime-конфигурацию, сервисную структуру, модель каталога, OpenAPI-контракты, HTTP read API, checkout-срез с резервированием остатков и поисковый indexing pipeline, включая retry/dead-letter поведение и ручной requeue.
 
 ## Инженерные решения
 
@@ -181,8 +182,8 @@ composer test
 
 ## Ближайший план
 
-1. Реализовать backend-сценарий корзины и черновика заказа с ценовым snapshot и резервированием остатков.
-2. Связать lifecycle заказа с доменными событиями `orders.order.created`, `orders.order.paid` и `orders.order.cancelled`.
+1. Связать дальнейший lifecycle заказа с доменными событиями `orders.order.paid` и `orders.order.cancelled`.
+2. Добавить async-проекцию статусов резервирования поверх брокера вместо текущего in-process gateway path.
 3. Добавить операционную наблюдаемость для async pipeline: структурированные метрики, статусы очередей и алерты по dead-letter росту.
 
 ## Лицензия
