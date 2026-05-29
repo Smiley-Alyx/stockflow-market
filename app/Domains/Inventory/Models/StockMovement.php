@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['stock_item_id', 'type', 'quantity', 'reference_type', 'reference_id', 'metadata', 'occurred_at'])]
+#[Fillable(['stock_item_id', 'reservation_id', 'type', 'quantity', 'reference_type', 'reference_id', 'metadata', 'occurred_at'])]
 class StockMovement extends Model
 {
     public const TYPE_RECEIVED = 'received';
@@ -14,6 +14,8 @@ class StockMovement extends Model
     public const TYPE_RESERVED = 'reserved';
 
     public const TYPE_RELEASED = 'released';
+
+    public const TYPE_EXPIRED = 'expired';
 
     public const TYPE_DEDUCTED = 'deducted';
 
@@ -27,6 +29,14 @@ class StockMovement extends Model
     public function stockItem(): BelongsTo
     {
         return $this->belongsTo(StockItem::class);
+    }
+
+    /**
+     * @return BelongsTo<Reservation, $this>
+     */
+    public function reservation(): BelongsTo
+    {
+        return $this->belongsTo(Reservation::class);
     }
 
     /**

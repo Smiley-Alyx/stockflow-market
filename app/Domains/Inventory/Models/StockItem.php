@@ -37,6 +37,14 @@ class StockItem extends Model
         return $this->hasMany(StockMovement::class);
     }
 
+    /**
+     * @return HasMany<Reservation, $this>
+     */
+    public function reservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class);
+    }
+
     public function availableQuantity(): int
     {
         return max(0, $this->on_hand_quantity - $this->reserved_quantity);

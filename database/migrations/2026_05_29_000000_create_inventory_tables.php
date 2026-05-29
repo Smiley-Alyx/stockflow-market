@@ -34,9 +34,25 @@ return new class extends Migration
             $table->index('sku');
         });
 
+        Schema::create('inventory_reservations', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('stock_item_id')->constrained('inventory_stock_items')->cascadeOnDelete();
+            $table->string('idempotency_key')->unique();
+            $table->unsignedBigInteger('quantity');
+            $table->string('status')->default('active');
+            $table->timestamp('reservation_expires_at');
+            $table->timestamp('canceled_at')->nullable();
+            $table->json('metadata')->nullable();
+            $table->timestamps();
+
+            $table->index(['status', 'reservation_expires_at']);
+            $table->index('stock_item_id');
+        });
+
         Schema::create('inventory_stock_movements', function (Blueprint $table) {
             $table->id();
             $table->foreignId('stock_item_id')->constrained('inventory_stock_items')->cascadeOnDelete();
+            $table->foreignId('reservation_id')->nullable()->constrained('inventory_reservations')->nullOnDelete();
             $table->string('type');
             $table->unsignedBigInteger('quantity');
             $table->string('reference_type')->nullable();
@@ -56,6 +72,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('inventory_stock_movements');
+        Schema::dropIfExists('inventory_reservations');
         Schema::dropIfExists('inventory_stock_items');
         Schema::dropIfExists('inventory_warehouses');
     }
