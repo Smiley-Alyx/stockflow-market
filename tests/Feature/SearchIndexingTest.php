@@ -6,6 +6,8 @@ use App\Domains\Catalog\Events\ProductCreated;
 use App\Domains\Catalog\Models\Product;
 use App\Domains\Search\Contracts\SearchIndexer;
 use App\Domains\Search\DeadLetters\SearchIndexDeadLetterStore;
+use App\Domains\Search\Events\SearchIndexCompleted;
+use App\Domains\Search\Events\SearchIndexFailed;
 use App\Domains\Search\Events\SearchIndexRequested;
 use App\Domains\Search\Jobs\IndexSearchDocument;
 use App\Infrastructure\Search\DeadLetters\ArraySearchIndexDeadLetterStore;
@@ -79,6 +81,8 @@ class SearchIndexingTest extends TestCase
 
     public function test_failed_indexing_job_is_moved_to_the_dead_letter_queue(): void
     {
+        Event::fake([SearchIndexFailed::class]);
+
         $job = new IndexSearchDocument(
             index: 'catalog_products',
             documentId: '15',
@@ -95,6 +99,14 @@ class SearchIndexingTest extends TestCase
         $this->assertSame('SCAN-001', $deadLetter->document['sku']);
         $this->assertSame(5, $deadLetter->attempts);
         $this->assertSame('Elasticsearch is unavailable.', $deadLetter->failure);
+
+        Event::assertDispatched(SearchIndexFailed::class, function (SearchIndexFailed $event) {
+            return $event->index === 'catalog_products'
+                && $event->documentId === '15'
+                && $event->attempts === 5
+                && $event->failure === 'Elasticsearch is unavailable.'
+                && $event->payload()['event'] === SearchIndexFailed::NAME;
+        });
     }
 
     public function test_dead_letter_command_lists_and_requeues_search_indexing_jobs(): void
@@ -280,6 +292,8 @@ class SearchIndexingTest extends TestCase
 
     public function test_indexing_job_writes_through_the_search_indexer_port(): void
     {
+        Event::fake([SearchIndexCompleted::class]);
+
         $indexer = new class implements SearchIndexer
         {
             /**
@@ -313,6 +327,12 @@ class SearchIndexingTest extends TestCase
             'document_id' => '15',
             'document' => ['sku' => 'SCAN-001'],
         ], $indexer->indexed);
+
+        Event::assertDispatched(SearchIndexCompleted::class, function (SearchIndexCompleted $event) {
+            return $event->index === 'catalog_products'
+                && $event->documentId === '15'
+                && $event->payload()['event'] === SearchIndexCompleted::NAME;
+        });
     }
 
     public function test_elasticsearch_indexer_writes_documents_to_the_configured_cluster(): void
