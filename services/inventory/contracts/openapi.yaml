@@ -2,4 +2,99 @@ openapi: 3.1.0
 info:
   title: StockFlow Inventory API
   version: 0.1.0
-paths: {}
+paths:
+  /api/inventory/stock:
+    get:
+      summary: Get aggregated stock by SKU or product id
+      parameters:
+        - name: sku
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: product_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Stock found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockResponse'
+        '404':
+          description: Stock not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Invalid stock query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+    StockResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/Stock'
+    Stock:
+      type: object
+      required:
+        - sku
+        - product_id
+        - on_hand_quantity
+        - reserved_quantity
+        - available_quantity
+        - warehouses
+      properties:
+        sku:
+          type: string
+        product_id:
+          type: integer
+        on_hand_quantity:
+          type: integer
+        reserved_quantity:
+          type: integer
+        available_quantity:
+          type: integer
+        warehouses:
+          type: array
+          items:
+            $ref: '#/components/schemas/WarehouseStock'
+    WarehouseStock:
+      type: object
+      required:
+        - warehouse_id
+        - warehouse_code
+        - on_hand_quantity
+        - reserved_quantity
+        - available_quantity
+      properties:
+        warehouse_id:
+          type: integer
+        warehouse_code:
+          type:
+            - string
+            - 'null'
+        on_hand_quantity:
+          type: integer
+        reserved_quantity:
+          type: integer
+        available_quantity:
+          type: integer
