@@ -41,4 +41,39 @@ class InventoryReadService
                 ->all(),
         ];
     }
+
+    /**
+     * @param  array<int, int>  $productIds
+     * @return array<int, array{in_stock: bool, available_quantity: int}>
+     */
+    public function availabilityForProductIds(array $productIds): array
+    {
+        $productIds = collect($productIds)
+            ->map(fn (mixed $productId): int => (int) $productId)
+            ->filter(fn (int $productId): bool => $productId > 0)
+            ->unique()
+            ->values();
+
+        if ($productIds->isEmpty()) {
+            return [];
+        }
+
+        return StockItem::query()
+            ->select('product_id')
+            ->selectRaw('SUM(CASE WHEN on_hand_quantity > reserved_quantity THEN on_hand_quantity - reserved_quantity ELSE 0 END) as available_quantity')
+            ->whereIn('product_id', $productIds)
+            ->groupBy('product_id')
+            ->get()
+            ->mapWithKeys(function (StockItem $item): array {
+                $availableQuantity = (int) $item->available_quantity;
+
+                return [
+                    $item->product_id => [
+                        'in_stock' => $availableQuantity > 0,
+                        'available_quantity' => $availableQuantity,
+                    ],
+                ];
+            })
+            ->all();
+    }
 }

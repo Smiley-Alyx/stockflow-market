@@ -4,12 +4,17 @@ namespace App\Domains\Catalog\Read;
 
 use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Models\Product;
+use App\Domains\Inventory\Read\InventoryReadService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 class CatalogReadService
 {
+    public function __construct(
+        private readonly InventoryReadService $inventory,
+    ) {}
+
     /**
      * @return array<string, mixed>|null
      */
@@ -60,7 +65,10 @@ class CatalogReadService
             return null;
         }
 
-        return $this->productPayload($product);
+        return $this->productPayload(
+            $product,
+            $this->inventory->availabilityForProductIds([$product->id])[$product->id] ?? $this->emptyAvailability(),
+        );
     }
 
     /**
@@ -81,10 +89,17 @@ class CatalogReadService
             ->orderBy('name')
             ->paginate(perPage: $perPage, page: $page);
 
+        $availability = $this->inventory->availabilityForProductIds(
+            $products->getCollection()->pluck('id')->all(),
+        );
+
         return [
             'data' => $products
                 ->getCollection()
-                ->map(fn (Product $product): array => $this->productPayload($product))
+                ->map(fn (Product $product): array => $this->productPayload(
+                    $product,
+                    $availability[$product->id] ?? $this->emptyAvailability(),
+                ))
                 ->values()
                 ->all(),
             'meta' => $this->paginationMeta($products),
@@ -124,9 +139,10 @@ class CatalogReadService
     }
 
     /**
+     * @param  array{in_stock: bool, available_quantity: int}  $availability
      * @return array<string, mixed>
      */
-    private function productPayload(Product $product): array
+    private function productPayload(Product $product, array $availability): array
     {
         return [
             'id' => $product->id,
@@ -135,6 +151,7 @@ class CatalogReadService
             'sku' => $product->sku,
             'description' => $product->description,
             'status' => $product->status,
+            'availability' => $availability,
             'published_at' => $product->published_at?->toJSON(),
             'category' => $product->category ? [
                 'id' => $product->category->id,
@@ -162,6 +179,17 @@ class CatalogReadService
             'last_page' => $products->lastPage(),
             'per_page' => $products->perPage(),
             'total' => $products->total(),
+        ];
+    }
+
+    /**
+     * @return array{in_stock: bool, available_quantity: int}
+     */
+    private function emptyAvailability(): array
+    {
+        return [
+            'in_stock' => false,
+            'available_quantity' => 0,
         ];
     }
 }

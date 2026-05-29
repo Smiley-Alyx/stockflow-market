@@ -26,6 +26,10 @@ export type CatalogProduct = {
     sku: string;
     description: string | null;
     status: 'draft' | 'published' | 'archived';
+    availability: {
+        in_stock: boolean;
+        available_quantity: number;
+    };
     published_at: string | null;
     category: {
         id: number;

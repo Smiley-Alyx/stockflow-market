@@ -6,6 +6,9 @@ use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Models\Product;
 use App\Domains\Catalog\Models\ProductAttribute;
 use App\Domains\Catalog\Read\CatalogReadService;
+use App\Domains\Inventory\Models\StockItem;
+use App\Domains\Inventory\Models\Warehouse;
+use App\Domains\Inventory\Services\InventoryService;
 use Closure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -38,9 +41,39 @@ class CatalogReadApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.name', 'Wireless Scanner')
             ->assertJsonPath('data.slug', 'wireless-scanner')
+            ->assertJsonPath('data.availability.in_stock', false)
+            ->assertJsonPath('data.availability.available_quantity', 0)
             ->assertJsonPath('data.category.slug', 'devices')
             ->assertJsonPath('data.attributes.0.name', 'color')
             ->assertJsonPath('data.attributes.0.value', 'black');
+    }
+
+    public function test_product_endpoint_returns_inventory_availability(): void
+    {
+        $product = $this->createProduct();
+        $primary = $this->createWarehouse('WAW');
+        $overflow = $this->createWarehouse('KRK');
+
+        StockItem::query()->create([
+            'warehouse_id' => $primary->id,
+            'product_id' => $product->id,
+            'sku' => 'SCAN-001',
+            'on_hand_quantity' => 10,
+            'reserved_quantity' => 3,
+        ]);
+
+        StockItem::query()->create([
+            'warehouse_id' => $overflow->id,
+            'product_id' => $product->id,
+            'sku' => 'SCAN-001',
+            'on_hand_quantity' => 5,
+            'reserved_quantity' => 1,
+        ]);
+
+        $this->getJson('/api/catalog/products/wireless-scanner')
+            ->assertOk()
+            ->assertJsonPath('data.availability.in_stock', true)
+            ->assertJsonPath('data.availability.available_quantity', 11);
     }
 
     public function test_products_endpoint_returns_paginated_published_products(): void
@@ -95,6 +128,8 @@ class CatalogReadApiTest extends TestCase
         $this->getJson('/api/catalog/products?per_page=1')
             ->assertOk()
             ->assertJsonPath('data.0.slug', 'barcode-printer')
+            ->assertJsonPath('data.0.availability.in_stock', false)
+            ->assertJsonPath('data.0.availability.available_quantity', 0)
             ->assertJsonPath('meta.current_page', 1)
             ->assertJsonPath('meta.last_page', 2)
             ->assertJsonPath('meta.per_page', 1)
@@ -141,6 +176,30 @@ class CatalogReadApiTest extends TestCase
             ->assertJsonPath('data.0.category.slug', 'supplies')
             ->assertJsonPath('meta.total', 1)
             ->assertJsonMissing(['slug' => 'wireless-scanner']);
+    }
+
+    public function test_product_endpoint_refreshes_availability_after_stock_change(): void
+    {
+        $product = $this->createProduct();
+        $stockItem = StockItem::query()->create([
+            'warehouse_id' => $this->createWarehouse('WAW')->id,
+            'product_id' => $product->id,
+            'sku' => 'SCAN-001',
+            'on_hand_quantity' => 0,
+            'reserved_quantity' => 0,
+        ]);
+
+        $this->getJson('/api/catalog/products/wireless-scanner')
+            ->assertOk()
+            ->assertJsonPath('data.availability.in_stock', false)
+            ->assertJsonPath('data.availability.available_quantity', 0);
+
+        $this->app->make(InventoryService::class)->receive($stockItem, 5, 'purchase_order', 'PO-1');
+
+        $this->getJson('/api/catalog/products/wireless-scanner')
+            ->assertOk()
+            ->assertJsonPath('data.availability.in_stock', true)
+            ->assertJsonPath('data.availability.available_quantity', 5);
     }
 
     public function test_products_endpoint_rejects_invalid_pagination(): void
@@ -273,6 +332,15 @@ class CatalogReadApiTest extends TestCase
             'description' => 'Compact scanner for warehouse teams.',
             'status' => 'published',
             'published_at' => now(),
+        ]);
+    }
+
+    private function createWarehouse(string $code): Warehouse
+    {
+        return Warehouse::query()->create([
+            'code' => $code,
+            'name' => $code.' Warehouse',
+            'is_active' => true,
         ]);
     }
 }

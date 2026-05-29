@@ -43,6 +43,7 @@ class CatalogApiContractTest extends TestCase
             $this->assertContractDeclaresResponse($contract, '/api/catalog/products/{slug}', '200', 'ProductResponse');
             $this->assertSchemaMatchesPayload($contract, 'ProductResponse', $payload);
             $this->assertSchemaMatchesPayload($contract, 'Product', $payload['data']);
+            $this->assertSchemaMatchesPayload($contract, 'ProductAvailability', $payload['data']['availability']);
             $this->assertSchemaMatchesPayload($contract, 'ProductCategory', $payload['data']['category']);
             $this->assertSchemaMatchesPayload($contract, 'ProductAttribute', $payload['data']['attributes'][0]);
         }
@@ -75,6 +76,7 @@ class CatalogApiContractTest extends TestCase
             $this->assertSchemaMatchesPayload($contract, 'ProductListResponse', $payload);
             $this->assertSchemaMatchesPayload($contract, 'PaginationMeta', $payload['meta']);
             $this->assertSchemaMatchesPayload($contract, 'Product', $payload['data'][0]);
+            $this->assertSchemaMatchesPayload($contract, 'ProductAvailability', $payload['data'][0]['availability']);
             $this->assertSchemaMatchesPayload($contract, 'ProductCategory', $payload['data'][0]['category']);
         }
     }

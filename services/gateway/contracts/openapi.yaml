@@ -271,6 +271,7 @@ components:
         - slug
         - sku
         - status
+        - availability
         - category
         - attributes
       properties:
@@ -292,6 +293,8 @@ components:
             - draft
             - published
             - archived
+        availability:
+          $ref: '#/components/schemas/ProductAvailability'
         published_at:
           type:
             - string
@@ -303,6 +306,17 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ProductAttribute'
+    ProductAvailability:
+      type: object
+      required:
+        - in_stock
+        - available_quantity
+      properties:
+        in_stock:
+          type: boolean
+        available_quantity:
+          type: integer
+          minimum: 0
     ProductCategory:
       type: object
       required:
