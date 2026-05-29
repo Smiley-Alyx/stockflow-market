@@ -2,7 +2,7 @@ export default defineNuxtConfig({
     ssr: true,
     compatibilityDate: '2026-05-29',
     telemetry: false,
-    css: ['~/assets/css/main.css'],
+    css: ['~/assets/css/main.styl'],
     runtimeConfig: {
         apiBase: process.env.NUXT_API_BASE || process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8080',
         public: {
