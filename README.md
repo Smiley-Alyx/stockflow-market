@@ -96,6 +96,8 @@ RABBITMQ_ENABLED=true CLICKHOUSE_ENABLED=true docker compose --profile extended 
 
 Backend использует in-process публикацию outbox-событий по умолчанию. Переменная `STOCKFLOW_EVENT_BUS=rabbitmq` пока включает только circuit-breaker границу для тестирования поведения outbox при недоступности будущего transport, но не отправляет сообщения в RabbitMQ.
 
+Воспроизводимый сценарий `создать товар → событие → индексация → поиск → dead-letter/requeue` описан в [`docs/demo.md`](docs/demo.md).
+
 Дефолтные локальные креды:
 
 ```text
