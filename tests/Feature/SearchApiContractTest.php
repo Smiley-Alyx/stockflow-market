@@ -47,6 +47,7 @@ class SearchApiContractTest extends TestCase
 
         foreach ($this->searchContracts() as $contract) {
             $this->assertContractDeclaresResponse($contract, '/api/search/products', '200', 'SearchProductListResponse');
+            $this->assertContractDeclaresResponse($contract, '/api/search/products', '429', 'ErrorResponse');
             $this->assertSchemaMatchesPayload($contract, 'SearchProductListResponse', $payload);
             $this->assertSchemaMatchesPayload($contract, 'SearchPaginationMeta', $payload['meta']);
             $this->assertSchemaMatchesPayload($contract, 'SearchProduct', $payload['data'][0]);

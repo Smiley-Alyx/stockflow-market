@@ -34,6 +34,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProductListResponse'
+        '429':
+          description: Catalog rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/catalog/products/{slug}:
     get:
       summary: Get catalog product by slug

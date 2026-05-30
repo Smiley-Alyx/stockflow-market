@@ -34,6 +34,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProductListResponse'
+        '429':
+          description: Catalog rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/catalog/products/{slug}:
     get:
       summary: Get catalog product by slug
@@ -101,6 +107,12 @@ paths:
                 $ref: '#/components/schemas/SearchProductListResponse'
         '422':
           description: Invalid search query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Search rate limit exceeded
           content:
             application/json:
               schema:
@@ -265,6 +277,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Checkout rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/orders/draft:
     post:
       summary: Create draft order from cart with price snapshot
@@ -293,6 +311,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Checkout rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/orders/{id}/confirm:
     post:
       summary: Request draft order confirmation and async inventory reservation
@@ -312,6 +336,12 @@ paths:
                 $ref: '#/components/schemas/OrderResponse'
         '409':
           description: Order confirmation conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Checkout rate limit exceeded
           content:
             application/json:
               schema:

@@ -22,7 +22,10 @@ use App\Infrastructure\Search\DeadLetters\ArraySearchIndexDeadLetterStore;
 use App\Infrastructure\Search\DeadLetters\RedisSearchIndexDeadLetterStore;
 use App\Infrastructure\Search\ElasticsearchProductSearch;
 use App\Infrastructure\Search\ElasticsearchSearchIndexer;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -45,6 +48,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->configureRateLimiters();
+
         Event::listen(ProductCreated::class, RequestProductIndexing::class);
         Event::listen(ProductUpdated::class, RequestProductIndexing::class);
         Event::listen(ProductArchived::class, RequestProductIndexDeletion::class);
@@ -52,5 +57,21 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(OrderConfirmationRequested::class, ReserveInventoryForOrder::class);
         Event::listen(SearchIndexRequested::class, DispatchSearchIndexJob::class);
         Event::listen(SearchIndexDeletionRequested::class, DispatchSearchDeleteJob::class);
+    }
+
+    private function configureRateLimiters(): void
+    {
+        foreach (['checkout', 'search', 'catalog'] as $bucket) {
+            RateLimiter::for('stockflow-'.$bucket, function (Request $request) use ($bucket): Limit {
+                return Limit::perSecond(
+                    max(1, (int) config('stockflow.rate_limits.'.$bucket.'.max_attempts')),
+                    max(1, (int) config('stockflow.rate_limits.'.$bucket.'.decay_seconds')),
+                )
+                    ->by($bucket.':'.$request->ip())
+                    ->response(fn (Request $request, array $headers) => response()->json([
+                        'message' => 'Too many requests. Please retry later.',
+                    ], 429, $headers));
+            });
+        }
     }
 }

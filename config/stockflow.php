@@ -8,6 +8,21 @@ return [
         'shutdown_timeout_seconds' => (int) env('STOCKFLOW_SHUTDOWN_TIMEOUT_SECONDS', 15),
     ],
 
+    'rate_limits' => [
+        'checkout' => [
+            'max_attempts' => (int) env('STOCKFLOW_CHECKOUT_RATE_LIMIT_ATTEMPTS', 30),
+            'decay_seconds' => (int) env('STOCKFLOW_CHECKOUT_RATE_LIMIT_DECAY_SECONDS', 60),
+        ],
+        'search' => [
+            'max_attempts' => (int) env('STOCKFLOW_SEARCH_RATE_LIMIT_ATTEMPTS', 120),
+            'decay_seconds' => (int) env('STOCKFLOW_SEARCH_RATE_LIMIT_DECAY_SECONDS', 60),
+        ],
+        'catalog' => [
+            'max_attempts' => (int) env('STOCKFLOW_CATALOG_RATE_LIMIT_ATTEMPTS', 300),
+            'decay_seconds' => (int) env('STOCKFLOW_CATALOG_RATE_LIMIT_DECAY_SECONDS', 60),
+        ],
+    ],
+
     'dependencies' => [
         'rabbitmq' => [
             'host' => env('RABBITMQ_HOST', 'rabbitmq'),

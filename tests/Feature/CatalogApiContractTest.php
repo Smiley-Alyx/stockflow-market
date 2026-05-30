@@ -73,6 +73,7 @@ class CatalogApiContractTest extends TestCase
 
         foreach ($this->catalogContracts() as $contract) {
             $this->assertContractDeclaresResponse($contract, '/api/catalog/products', '200', 'ProductListResponse');
+            $this->assertContractDeclaresResponse($contract, '/api/catalog/products', '429', 'ErrorResponse');
             $this->assertSchemaMatchesPayload($contract, 'ProductListResponse', $payload);
             $this->assertSchemaMatchesPayload($contract, 'PaginationMeta', $payload['meta']);
             $this->assertSchemaMatchesPayload($contract, 'Product', $payload['data'][0]);

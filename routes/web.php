@@ -20,17 +20,22 @@ Route::get('/', function () {
 Route::get('/health/live', [HealthCheckController::class, 'live']);
 Route::get('/health/ready', [HealthCheckController::class, 'ready']);
 
-Route::get('/api/catalog/products', [ProductController::class, 'index']);
+Route::get('/api/catalog/products', [ProductController::class, 'index'])
+    ->middleware('throttle:stockflow-catalog');
 Route::get('/api/catalog/products/{slug}', [ProductController::class, 'show']);
 Route::get('/api/catalog/categories/tree', [CategoryController::class, 'tree']);
 Route::get('/api/inventory/stock', [StockController::class, 'show']);
 Route::post('/api/inventory/reservations', [ReservationController::class, 'store']);
 Route::post('/api/inventory/reservations/cancel', [ReservationController::class, 'cancel']);
 Route::get('/api/pricing/prices', [PriceController::class, 'index']);
-Route::get('/api/search/products', ProductSearchController::class);
-Route::post('/api/cart/items', [CartItemController::class, 'store']);
-Route::post('/api/orders/draft', [DraftOrderController::class, 'store']);
-Route::post('/api/orders/{id}/confirm', [OrderConfirmationController::class, 'store']);
+Route::get('/api/search/products', ProductSearchController::class)
+    ->middleware('throttle:stockflow-search');
+Route::post('/api/cart/items', [CartItemController::class, 'store'])
+    ->middleware('throttle:stockflow-checkout');
+Route::post('/api/orders/draft', [DraftOrderController::class, 'store'])
+    ->middleware('throttle:stockflow-checkout');
+Route::post('/api/orders/{id}/confirm', [OrderConfirmationController::class, 'store'])
+    ->middleware('throttle:stockflow-checkout');
 Route::post('/api/orders/{id}/paid', [OrderLifecycleController::class, 'paid']);
 Route::post('/api/orders/{id}/cancelled', [OrderLifecycleController::class, 'cancelled']);
 Route::post('/api/orders/{id}/expired', [OrderLifecycleController::class, 'expired']);

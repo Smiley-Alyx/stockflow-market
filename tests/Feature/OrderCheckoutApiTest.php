@@ -278,9 +278,12 @@ class OrderCheckoutApiTest extends TestCase
 
         foreach ($this->orderContracts() as $contract) {
             $this->assertContractDeclaresResponse($contract, '/api/cart/items', '201', 'CartResponse');
+            $this->assertContractDeclaresResponse($contract, '/api/cart/items', '429', 'ErrorResponse');
             $this->assertContractDeclaresResponse($contract, '/api/orders/draft', '201', 'OrderResponse');
+            $this->assertContractDeclaresResponse($contract, '/api/orders/draft', '429', 'ErrorResponse');
             $this->assertContractDeclaresResponse($contract, '/api/orders/{id}/confirm', '200', 'OrderResponse');
             $this->assertContractDeclaresResponse($contract, '/api/orders/{id}/confirm', '409', 'ErrorResponse');
+            $this->assertContractDeclaresResponse($contract, '/api/orders/{id}/confirm', '429', 'ErrorResponse');
             $this->assertContractDeclaresResponse($contract, '/api/orders/{id}/paid', '200', 'OrderResponse');
             $this->assertContractDeclaresResponse($contract, '/api/orders/{id}/cancelled', '200', 'OrderResponse');
             $this->assertContractDeclaresResponse($contract, '/api/orders/{id}/expired', '200', 'OrderResponse');
