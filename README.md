@@ -153,6 +153,8 @@ Backend использует in-process публикацию outbox-событи
 
 Законченный бизнес-сценарий `корзина → price snapshot → reserve stock → order created` описан в [`docs/checkout-demo.md`](docs/checkout-demo.md).
 
+Минимальные примеры API через `curl` и `httpie` собраны в [`docs/api-examples.md`](docs/api-examples.md).
+
 Дефолтные локальные креды:
 
 ```text
