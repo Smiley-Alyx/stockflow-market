@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\ProductPrices\Tables;
+namespace App\Filament\Resources\Promotions\Tables;
 
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -12,46 +12,37 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
-class ProductPricesTable
+class PromotionsTable
 {
     public static function configure(Table $table): Table
     {
         return $table
             ->columns([
-                TextColumn::make('product.name')
+                TextColumn::make('code')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('price_type')
+                TextColumn::make('discount_type')
                     ->badge()
                     ->sortable(),
-                TextColumn::make('city_code')
-                    ->searchable()
-                    ->sortable(),
-                TextColumn::make('amount_minor')
-                    ->money(fn ($record): string => $record->currency, divideBy: 100)
-                    ->sortable(),
-                TextColumn::make('price_version')
+                TextColumn::make('discount_value')
                     ->numeric()
                     ->sortable(),
+                TextColumn::make('currency'),
                 IconColumn::make('is_active')
                     ->boolean()
                     ->sortable(),
-                TextColumn::make('active_from')
+                TextColumn::make('starts_at')
                     ->dateTime()
                     ->sortable(),
-                TextColumn::make('active_until')
+                TextColumn::make('ends_at')
                     ->dateTime()
                     ->sortable(),
             ])
             ->filters([
-                SelectFilter::make('product')
-                    ->relationship('product', 'name')
-                    ->searchable()
-                    ->preload(),
-                SelectFilter::make('price_type')
+                SelectFilter::make('discount_type')
                     ->options([
-                        'retail' => 'Retail',
-                        'wholesale' => 'Wholesale',
+                        'percent' => 'Percent',
+                        'fixed_amount' => 'Fixed amount',
                     ]),
                 TernaryFilter::make('is_active'),
             ])

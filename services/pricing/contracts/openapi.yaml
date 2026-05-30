@@ -27,6 +27,11 @@ paths:
             items:
               type: string
               maxLength: 64
+        - name: city_code
+          in: query
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: Product prices calculated
@@ -63,13 +68,22 @@ components:
       required:
         - product_id
         - price_type
+        - city_code
+        - price_version
         - amount_minor
         - currency
+        - active_from
       properties:
         product_id:
           type: integer
         price_type:
           type: string
+        city_code:
+          type:
+            - string
+            - 'null'
+        price_version:
+          type: integer
         amount_minor:
           type: integer
           minimum: 0
@@ -77,3 +91,8 @@ components:
           type: string
           minLength: 3
           maxLength: 3
+        active_from:
+          type:
+            - string
+            - 'null'
+          format: date-time

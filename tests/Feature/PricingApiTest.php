@@ -57,6 +57,8 @@ class PricingApiTest extends TestCase
             ->assertJsonCount(2, 'data')
             ->assertJsonPath('data.0.product_id', $scanner->id)
             ->assertJsonPath('data.0.price_type', 'retail')
+            ->assertJsonPath('data.0.city_code', null)
+            ->assertJsonPath('data.0.price_version', 1)
             ->assertJsonPath('data.0.amount_minor', 129900)
             ->assertJsonPath('data.0.currency', 'USD')
             ->assertJsonPath('data.1.product_id', $printer->id)
@@ -96,6 +98,56 @@ class PricingApiTest extends TestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.price_type', 'wholesale')
             ->assertJsonPath('data.0.amount_minor', 119900);
+    }
+
+    public function test_prices_endpoint_prefers_city_price_and_ignores_future_versions(): void
+    {
+        $product = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');
+
+        ProductPrice::query()->create([
+            'product_id' => $product->id,
+            'price_type' => 'retail',
+            'price_version' => 1,
+            'amount_minor' => 129900,
+            'currency' => 'USD',
+            'is_active' => true,
+            'active_from' => now()->subDay(),
+        ]);
+
+        ProductPrice::query()->create([
+            'product_id' => $product->id,
+            'price_type' => 'retail',
+            'city_code' => ' WAW ',
+            'price_version' => 2,
+            'amount_minor' => 119900,
+            'currency' => 'USD',
+            'is_active' => true,
+            'active_from' => now()->subHour(),
+        ]);
+
+        ProductPrice::query()->create([
+            'product_id' => $product->id,
+            'price_type' => 'retail',
+            'city_code' => 'waw',
+            'price_version' => 3,
+            'amount_minor' => 9900,
+            'currency' => 'USD',
+            'is_active' => true,
+            'active_from' => now()->addHour(),
+        ]);
+
+        $this->getJson('/api/pricing/prices?product_ids[]='.$product->id.'&city_code=WAW')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.city_code', 'waw')
+            ->assertJsonPath('data.0.price_version', 2)
+            ->assertJsonPath('data.0.amount_minor', 119900);
+
+        $this->getJson('/api/pricing/prices?product_ids[]='.$product->id.'&city_code=krk')
+            ->assertOk()
+            ->assertJsonPath('data.0.city_code', null)
+            ->assertJsonPath('data.0.price_version', 1)
+            ->assertJsonPath('data.0.amount_minor', 129900);
     }
 
     public function test_prices_endpoint_matches_gateway_and_pricing_contracts(): void

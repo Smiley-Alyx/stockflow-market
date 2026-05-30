@@ -21,13 +21,12 @@ class ProductPriceForm
                     ->required(),
                 Select::make('price_type')
                     ->options([
-                        'base' => 'Base',
-                        'sale' => 'Sale',
+                        'retail' => 'Retail',
+                        'wholesale' => 'Wholesale',
                     ])
-                    ->default('base')
+                    ->default('retail')
                     ->required(),
                 TextInput::make('city_code')
-                    ->required()
                     ->maxLength(255),
                 TextInput::make('price_version')
                     ->numeric()
@@ -45,8 +44,7 @@ class ProductPriceForm
                 Toggle::make('is_active')
                     ->default(true)
                     ->required(),
-                DateTimePicker::make('active_from')
-                    ->required(),
+                DateTimePicker::make('active_from'),
                 DateTimePicker::make('active_until'),
             ]);
     }
