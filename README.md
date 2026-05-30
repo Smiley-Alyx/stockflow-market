@@ -151,6 +151,8 @@ Backend использует in-process публикацию outbox-событи
 
 Воспроизводимый сценарий `создать товар → событие → индексация → поиск → dead-letter/requeue` описан в [`docs/demo.md`](docs/demo.md).
 
+Законченный бизнес-сценарий `корзина → price snapshot → reserve stock → order created` описан в [`docs/checkout-demo.md`](docs/checkout-demo.md).
+
 Дефолтные локальные креды:
 
 ```text
