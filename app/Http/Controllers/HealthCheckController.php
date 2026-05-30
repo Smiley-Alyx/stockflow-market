@@ -18,12 +18,15 @@ class HealthCheckController extends Controller
     public function ready(DependencyHealthChecker $health): JsonResponse
     {
         $checks = $health->readiness();
-        $ready = collect($checks)->every(fn (array $check): bool => $check['ok']);
+        $criticalFailure = collect($checks)->contains(
+            fn (array $check): bool => ($check['critical'] ?? true) && ! $check['ok']
+        );
+        $degraded = collect($checks)->contains(fn (array $check): bool => ! $check['ok']);
 
         return response()->json([
-            'status' => $ready ? 'ok' : 'degraded',
+            'status' => $criticalFailure ? 'unavailable' : ($degraded ? 'degraded' : 'ok'),
             'service' => config('stockflow.runtime.service_name'),
             'checks' => $checks,
-        ], $ready ? 200 : 503);
+        ], $criticalFailure ? 503 : 200);
     }
 }

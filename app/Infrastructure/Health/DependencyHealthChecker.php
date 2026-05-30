@@ -2,6 +2,7 @@
 
 namespace App\Infrastructure\Health;
 
+use App\Infrastructure\Resilience\CircuitBreaker;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Redis;
@@ -10,19 +11,19 @@ use Throwable;
 class DependencyHealthChecker
 {
     /**
-     * @return array<string, array{ok: bool, detail?: string}>
+     * @return array<string, array{ok: bool, critical: bool, status: string, detail?: string}>
      */
     public function readiness(): array
     {
         return [
-            'database' => $this->database(),
-            'redis' => $this->redis(),
-            'rabbitmq' => $this->tcpService(
+            'database' => $this->check('database', true, fn (): array => $this->database()),
+            'redis' => $this->check('redis', true, fn (): array => $this->redis()),
+            'rabbitmq' => $this->check('rabbitmq', (bool) config('stockflow.dependencies.rabbitmq.critical'), fn (): array => $this->tcpService(
                 (string) config('stockflow.dependencies.rabbitmq.host'),
                 (int) config('stockflow.dependencies.rabbitmq.port'),
-            ),
-            'elasticsearch' => $this->elasticsearch(),
-            'clickhouse' => $this->clickhouse(),
+            )),
+            'elasticsearch' => $this->check('elasticsearch', (bool) config('stockflow.dependencies.elasticsearch.critical'), fn (): array => $this->elasticsearch()),
+            'clickhouse' => $this->check('clickhouse', (bool) config('stockflow.dependencies.clickhouse.critical'), fn (): array => $this->clickhouse()),
         ];
     }
 
@@ -111,5 +112,26 @@ class DependencyHealthChecker
         fclose($socket);
 
         return ['ok' => true];
+    }
+
+    /**
+     * @return array{ok: bool, critical: bool, status: string, detail?: string}
+     */
+    private function check(string $dependency, bool $critical, callable $probe): array
+    {
+        /** @var array{ok: bool, detail?: string} $result */
+        $result = $probe();
+
+        if (in_array($dependency, ['elasticsearch', 'rabbitmq'], true)) {
+            $result['ok']
+                ? app(CircuitBreaker::class)->recordSuccess($dependency)
+                : app(CircuitBreaker::class)->recordFailure($dependency);
+        }
+
+        return [
+            ...$result,
+            'critical' => $critical,
+            'status' => $result['ok'] ? 'ok' : ($critical ? 'unavailable' : 'degraded'),
+        ];
     }
 }

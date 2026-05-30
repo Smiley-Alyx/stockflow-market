@@ -2,6 +2,7 @@
 
 namespace App\Infrastructure\Messaging;
 
+use App\Infrastructure\Resilience\CircuitBreaker;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -9,6 +10,10 @@ use Throwable;
 
 class DomainEventPublisher
 {
+    public function __construct(
+        private readonly CircuitBreaker $circuitBreaker,
+    ) {}
+
     public function publishPending(int $limit = 100): int
     {
         $published = 0;
@@ -24,6 +29,10 @@ class DomainEventPublisher
 
     public function publish(OutboxMessage $message): bool
     {
+        if ($this->usesRabbitMq() && ! $this->circuitBreaker->allows('rabbitmq')) {
+            return false;
+        }
+
         $claimed = DB::transaction(function () use ($message): ?OutboxMessage {
             /** @var OutboxMessage|null $locked */
             $locked = OutboxMessage::query()
@@ -57,8 +66,16 @@ class DomainEventPublisher
             $claimed->last_error = null;
             $claimed->save();
 
+            if ($this->usesRabbitMq()) {
+                $this->circuitBreaker->recordSuccess('rabbitmq');
+            }
+
             return true;
         } catch (Throwable $exception) {
+            if ($this->usesRabbitMq()) {
+                $this->circuitBreaker->recordFailure('rabbitmq');
+            }
+
             $claimed->status = OutboxMessage::STATUS_FAILED;
             $claimed->last_error = $exception->getMessage();
             $claimed->available_at = now()->addSeconds($this->backoffSeconds($claimed->attempts));
@@ -89,5 +106,10 @@ class DomainEventPublisher
         $base = max(1, (int) ceil(config('stockflow.messaging.retry.backoff_ms') / 1000));
 
         return min(300, $base * max(1, $attempts));
+    }
+
+    private function usesRabbitMq(): bool
+    {
+        return config('stockflow.messaging.event_bus') === 'rabbitmq';
     }
 }

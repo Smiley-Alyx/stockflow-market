@@ -27,9 +27,11 @@ return [
         'rabbitmq' => [
             'host' => env('RABBITMQ_HOST', 'rabbitmq'),
             'port' => (int) env('RABBITMQ_PORT', 5672),
+            'critical' => (bool) env('RABBITMQ_CRITICAL', false),
         ],
         'elasticsearch' => [
             'host' => env('ELASTICSEARCH_HOST', 'http://elasticsearch:9200'),
+            'critical' => (bool) env('ELASTICSEARCH_CRITICAL', false),
         ],
         'clickhouse' => [
             'host' => env('CLICKHOUSE_HOST', 'http://clickhouse:8123'),
@@ -37,6 +39,20 @@ return [
             'database' => env('CLICKHOUSE_DATABASE', 'stockflow'),
             'username' => env('CLICKHOUSE_USERNAME', 'stockflow'),
             'password' => env('CLICKHOUSE_PASSWORD', 'secret'),
+            'critical' => (bool) env('CLICKHOUSE_CRITICAL', false),
+        ],
+    ],
+
+    'circuit_breakers' => [
+        'rabbitmq' => [
+            'failure_threshold' => (int) env('RABBITMQ_CIRCUIT_BREAKER_FAILURE_THRESHOLD', 3),
+            'failure_window_seconds' => (int) env('RABBITMQ_CIRCUIT_BREAKER_FAILURE_WINDOW_SECONDS', 60),
+            'open_seconds' => (int) env('RABBITMQ_CIRCUIT_BREAKER_OPEN_SECONDS', 30),
+        ],
+        'elasticsearch' => [
+            'failure_threshold' => (int) env('ELASTICSEARCH_CIRCUIT_BREAKER_FAILURE_THRESHOLD', 3),
+            'failure_window_seconds' => (int) env('ELASTICSEARCH_CIRCUIT_BREAKER_FAILURE_WINDOW_SECONDS', 60),
+            'open_seconds' => (int) env('ELASTICSEARCH_CIRCUIT_BREAKER_OPEN_SECONDS', 30),
         ],
     ],
 

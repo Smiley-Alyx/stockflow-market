@@ -17,6 +17,7 @@ use App\Domains\Search\Jobs\IndexSearchDocument;
 use App\Infrastructure\Messaging\DomainEventContext;
 use App\Infrastructure\Messaging\DomainEventPublisher;
 use App\Infrastructure\Messaging\OutboxMessage;
+use App\Infrastructure\Resilience\CircuitBreaker;
 use App\Infrastructure\Search\DeadLetters\ArraySearchIndexDeadLetterStore;
 use App\Infrastructure\Search\ElasticsearchProductSearch;
 use App\Infrastructure\Search\ElasticsearchSearchIndexer;
@@ -158,6 +159,33 @@ class SearchIndexingTest extends TestCase
                 && $job->timeout === 2
                 && $job->backoff() === 1;
         });
+    }
+
+    public function test_open_rabbitmq_circuit_leaves_indexing_events_pending_in_outbox(): void
+    {
+        Queue::fake();
+
+        $product = new Product([
+            'category_id' => 7,
+            'name' => 'Wireless Scanner',
+            'slug' => 'wireless-scanner',
+            'sku' => 'SCAN-001',
+            'status' => 'draft',
+        ]);
+        $product->id = 15;
+
+        ProductCreated::dispatch($product);
+        $this->app->make(CircuitBreaker::class)->open('rabbitmq');
+
+        $published = $this->app->make(DomainEventPublisher::class)->publishPending();
+
+        $this->assertSame(0, $published);
+        Queue::assertNothingPushed();
+        $this->assertDatabaseHas('messaging_outbox', [
+            'event_name' => SearchIndexRequested::NAME,
+            'status' => OutboxMessage::STATUS_PENDING,
+            'attempts' => 0,
+        ]);
     }
 
     public function test_search_index_consumer_ignores_duplicate_message_delivery(): void
@@ -578,6 +606,42 @@ class SearchIndexingTest extends TestCase
                 && $request['query']['bool']['must'][0]['multi_match']['query'] === 'scanner'
                 && $request['query']['bool']['filter'][0]['term']['status'] === 'published';
         });
+    }
+
+    public function test_product_search_endpoint_returns_degraded_results_when_elasticsearch_circuit_is_open(): void
+    {
+        Http::fake();
+
+        $this->app->make(CircuitBreaker::class)->open('elasticsearch');
+
+        $this->getJson('/api/search/products?q=scanner&per_page=10')
+            ->assertOk()
+            ->assertJsonPath('data', [])
+            ->assertJsonPath('meta.query', 'scanner')
+            ->assertJsonPath('meta.total', 0)
+            ->assertJsonPath('meta.status', 'degraded')
+            ->assertJsonPath('meta.reason', 'elasticsearch_unavailable');
+
+        Http::assertNothingSent();
+    }
+
+    public function test_elasticsearch_indexer_fails_fast_when_circuit_is_open(): void
+    {
+        Http::fake();
+
+        $this->app->make(CircuitBreaker::class)->open('elasticsearch');
+
+        try {
+            (new ElasticsearchSearchIndexer)->index('catalog_products', '15', [
+                'sku' => 'SCAN-001',
+            ]);
+
+            $this->fail('Expected Elasticsearch circuit breaker exception.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Elasticsearch circuit breaker is open.', $exception->getMessage());
+        }
+
+        Http::assertNothingSent();
     }
 
     public function test_product_search_endpoint_requires_query(): void
