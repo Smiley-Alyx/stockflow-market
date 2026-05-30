@@ -1,6 +1,6 @@
 # StockFlow Market
 
-StockFlow Market — инженерный pet-проект маркетплейса с микросервисным контуром вокруг Laravel, PostgreSQL, Redis, RabbitMQ, Elasticsearch, ClickHouse и Nuxt SSR frontend. Проект развивается как реалистичный backend case: каталог, остатки, заказы, цены, поиск, асинхронные события и локальная инфраструктура без лишней имитации enterprise-слоя.
+StockFlow Market — инженерный pet-проект маркетплейса с микросервисным направлением вокруг Laravel, PostgreSQL, Redis, RabbitMQ, Elasticsearch, ClickHouse и заготовки Nuxt SSR frontend. Проект развивается как highload-oriented backend case: в нём последовательно прорабатываются каталог, остатки, заказы, цены, поиск, асинхронные события и локальная инфраструктура. Сейчас это фундамент и набор сквозных backend-срезов, а не завершённая production-система или готовый микросервисный маркетплейс.
 
 ## Текущий статус
 
@@ -10,7 +10,10 @@ StockFlow Market — инженерный pet-проект маркетплей�
 - добавлен Docker Compose для локального запуска инфраструктуры;
 - заведён `services/` workspace под будущие сервисы;
 - зафиксированы первые OpenAPI-заготовки и события по доменам;
-- реализована базовая модель Catalog: категории, товары и атрибуты;
+- реализована модель Catalog: категории, товары, атрибуты, кешируемая read-модель и команда перестроения проекций;
+- добавлена Filament-панель для управления каталогом, складами, остатками, ценами и промокодами;
+- добавлены настраиваемые блоки главной страницы: рекомендации, хиты, новинки, описание, города и баннеры с управляемым порядком;
+- склады дополнены координатами для списка городов и точек на карте;
 - добавлена внутренняя публикация `catalog.product.created`;
 - добавлен обработчик, который превращает создание товара в `search.index.requested`;
 - добавлен первый async job pipeline для индексации поисковых документов;
@@ -19,9 +22,12 @@ StockFlow Market — инженерный pet-проект маркетплей�
 - подключён Elasticsearch adapter для записи поисковых документов;
 - добавлен первый search read endpoint поверх Elasticsearch для индексированных товаров;
 - добавлен локальный ClickHouse для будущих аналитических read-моделей и событийных витрин;
-- реализован checkout-срез `cart → draft order → price snapshot → async inventory reservation`;
+- реализован checkout-срез `cart → draft order → price snapshot → async inventory reservation → paid / cancelled / expired`;
+- добавлены маршрутизация резервов по складам, архивирование складских движений и географический фильтр остатков;
+- цены поддерживают городские переопределения, версии, интервалы активности и промокоды; заказ сохраняет снимок выбранной цены и скидки;
 - добавлена scheduled-команда истечения активных inventory-резервов с метрикой количества истёкших резервов;
 - добавлена операционная команда `search:dead-letter` для просмотра и ручного возврата документов поисковой индексации из отдельного dead-letter backend;
+- поиск умеет возвращать деградированный ответ при недоступности Elasticsearch;
 - добавлен Prometheus-compatible `/metrics` endpoint и локальный Prometheus/Grafana стек для latency, очередей, dead-letter, reservation conflicts и ошибок индексации;
 - добавлен `config/stockflow.php` для runtime-настроек таймаутов, кеша, очередей, retry и backpressure limits;
 - описан первый ADR по переходной архитектуре Laravel gateway + service workspace;
@@ -122,7 +128,7 @@ docker compose down
 
 ## Runtime-настройки
 
-Проектные highload-настройки собраны в `config/stockflow.php`, чтобы прикладной код не хардкодил операционные лимиты. Значения переопределяются через `STOCKFLOW_*` переменные в `.env`.
+Проектные highload-oriented настройки собраны в `config/stockflow.php`, чтобы прикладной код не хардкодил операционные лимиты. Значения переопределяются через `STOCKFLOW_*` переменные в `.env`.
 
 | Группа | Назначение |
 | --- | --- |
@@ -158,7 +164,7 @@ Dashboard содержит панели для p95 latency по endpoint, глу
 
 ## Search dead-letter операции
 
-Документы, которые не удалось проиндексировать после retry-порога, сохраняются в production-совместимое dead-letter хранилище. По умолчанию используется Redis backend с ключом `stockflow:search:dead-letter`; CLI-контракт остаётся прежним: оператор работает с числовым `ID`, фильтрами и теми же action `list` / `requeue`.
+Документы, которые не удалось проиндексировать после retry-порога, сохраняются в Redis-backed dead-letter хранилище. Это приближает локальный контур к production-подобному операционному сценарию, но не заменяет проверку под реальной нагрузкой и отказами. По умолчанию используется ключ `stockflow:search:dead-letter`; CLI-контракт остаётся прежним: оператор работает с числовым `ID`, фильтрами и теми же action `list` / `requeue`.
 
 ```bash
 php artisan search:dead-letter list
@@ -172,7 +178,7 @@ php artisan search:dead-letter list --index=catalog_products --document-id=15
 php artisan search:dead-letter requeue --id=123
 ```
 
-Безопасный bulk requeue для production-сценариев:
+Защищённый bulk requeue для production-подобных сценариев:
 
 ```bash
 php artisan search:dead-letter requeue --all --index=catalog_products --dry-run
@@ -209,7 +215,7 @@ php artisan inventory:reservations:expire
 composer test
 ```
 
-Тесты страхуют базовый Laravel bootstrap, runtime-конфигурацию, сервисную структуру, модель каталога, OpenAPI-контракты, HTTP read API, checkout-срез с резервированием остатков и поисковый indexing pipeline, включая retry/dead-letter поведение и ручной requeue.
+Тесты страхуют базовый Laravel bootstrap, runtime-конфигурацию, сервисную структуру, модель и проекции каталога, OpenAPI-контракты, HTTP read API, блоки главной страницы, цены и промокоды, checkout-срез с резервированием остатков и поисковый indexing pipeline, включая retry/dead-letter поведение и ручной requeue.
 
 ## Нагрузочные сценарии
 
@@ -235,8 +241,8 @@ k6 run tests/load/k6/stockflow.js
 
 ## Ближайший план
 
-1. Связать дальнейший lifecycle заказа с доменными событиями `orders.order.paid` и `orders.order.cancelled`.
-2. Добавить async-проекцию статусов резервирования поверх брокера вместо текущего in-process gateway path.
+1. Добавить async-проекцию статусов резервирования поверх брокера вместо текущего in-process gateway path.
+2. Подключить RabbitMQ transport для межсервисных событий и проверить сценарии повторной доставки.
 3. Добавить alert rules для Prometheus по росту dead-letter, очередей и latency.
 
 ## Лицензия
