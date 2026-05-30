@@ -28,6 +28,8 @@ class WarehousesTable
                     ->sortable(),
                 TextColumn::make('city_name')
                     ->searchable(),
+                TextColumn::make('latitude'),
+                TextColumn::make('longitude'),
                 IconColumn::make('is_active')
                     ->boolean()
                     ->sortable(),

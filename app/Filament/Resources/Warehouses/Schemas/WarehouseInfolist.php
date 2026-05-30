@@ -16,6 +16,8 @@ class WarehouseInfolist
                 TextEntry::make('name'),
                 TextEntry::make('city_code'),
                 TextEntry::make('city_name'),
+                TextEntry::make('latitude'),
+                TextEntry::make('longitude'),
                 IconEntry::make('is_active')
                     ->boolean(),
                 TextEntry::make('created_at')

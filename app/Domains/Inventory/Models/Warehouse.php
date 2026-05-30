@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['code', 'name', 'city_code', 'city_name', 'is_active'])]
+#[Fillable(['code', 'name', 'city_code', 'city_name', 'latitude', 'longitude', 'is_active'])]
 class Warehouse extends Model
 {
     protected $table = 'inventory_warehouses';
@@ -27,6 +27,8 @@ class Warehouse extends Model
     protected function casts(): array
     {
         return [
+            'latitude' => 'decimal:7',
+            'longitude' => 'decimal:7',
             'is_active' => 'boolean',
         ];
     }

@@ -25,6 +25,16 @@ class WarehouseForm
                 TextInput::make('city_name')
                     ->required()
                     ->maxLength(255),
+                TextInput::make('latitude')
+                    ->required()
+                    ->numeric()
+                    ->minValue(-90)
+                    ->maxValue(90),
+                TextInput::make('longitude')
+                    ->required()
+                    ->numeric()
+                    ->minValue(-180)
+                    ->maxValue(180),
                 Toggle::make('is_active')
                     ->default(true)
                     ->required(),
