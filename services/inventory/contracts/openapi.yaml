@@ -136,6 +136,9 @@ components:
         stock_item_id:
           type: integer
           minimum: 1
+        warehouse_id:
+          type: integer
+          minimum: 1
         product_id:
           type: integer
           minimum: 1
@@ -143,6 +146,12 @@ components:
           type: string
         city_code:
           type: string
+        routing_strategy:
+          type: string
+          enum:
+            - nearest_warehouse
+            - fallback
+            - split_shipment
         quantity:
           type: integer
           minimum: 1
@@ -159,6 +168,65 @@ components:
         idempotency_key:
           type: string
     Reservation:
+      type: object
+      required:
+        - id
+        - stock_item_id
+        - warehouse_id
+        - warehouse_code
+        - city_code
+        - idempotency_key
+        - quantity
+        - status
+        - reservation_expires_at
+        - canceled_at
+      properties:
+        id:
+          type: integer
+        stock_item_id:
+          type: integer
+        warehouse_id:
+          type:
+            - integer
+            - 'null'
+        warehouse_code:
+          type:
+            - string
+            - 'null'
+        city_code:
+          type:
+            - string
+            - 'null'
+        idempotency_key:
+          type: string
+        quantity:
+          type: integer
+        status:
+          type: string
+          enum:
+            - active
+            - canceled
+            - expired
+            - consumed
+        reservation_expires_at:
+          type: string
+          format: date-time
+        canceled_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        routing_strategy:
+          type: string
+          enum:
+            - nearest_warehouse
+            - fallback
+            - split_shipment
+        shipments:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReservationShipment'
+    ReservationShipment:
       type: object
       required:
         - id

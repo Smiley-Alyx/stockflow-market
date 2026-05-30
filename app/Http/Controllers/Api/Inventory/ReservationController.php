@@ -3,26 +3,28 @@
 namespace App\Http\Controllers\Api\Inventory;
 
 use App\Domains\Inventory\Models\Reservation;
-use App\Domains\Inventory\Models\StockItem;
 use App\Domains\Inventory\Services\IdempotencyConflict;
 use App\Domains\Inventory\Services\InsufficientStock;
 use App\Domains\Inventory\Services\InventoryService;
+use App\Domains\Inventory\Services\InventoryRoutingService;
 use App\Http\Controllers\Controller;
 use App\Infrastructure\Observability\MetricsCollector;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 class ReservationController extends Controller
 {
-    public function store(Request $request, InventoryService $inventory, MetricsCollector $metrics): JsonResponse
+    public function store(Request $request, InventoryRoutingService $routing, MetricsCollector $metrics): JsonResponse
     {
         $payload = $request->validate([
             'stock_item_id' => ['required_without_all:product_id,sku', 'integer', 'min:1', 'exists:inventory_stock_items,id'],
+            'warehouse_id' => ['sometimes', 'integer', 'min:1', 'exists:inventory_warehouses,id'],
             'product_id' => ['required_without_all:stock_item_id,sku', 'integer', 'min:1', 'exists:catalog_products,id'],
             'sku' => ['required_without_all:stock_item_id,product_id', 'string', 'max:255'],
             'city_code' => ['sometimes', 'string', 'max:255'],
+            'routing_strategy' => ['sometimes', 'string', 'in:nearest_warehouse,fallback,split_shipment'],
             'quantity' => ['required', 'integer', 'min:1'],
             'reservation_expires_at' => ['required', 'date', 'after:now'],
             'idempotency_key' => ['nullable', 'string', 'max:255'],
@@ -34,18 +36,13 @@ class ReservationController extends Controller
             return response()->json(['message' => 'Idempotency-Key header is required.'], 422);
         }
 
-        $stockItem = $this->resolveStockItem($payload);
-
-        if ($stockItem === null) {
-            return response()->json(['message' => 'Stock not found'], 404);
-        }
-
         try {
-            $reservation = $inventory->reserve(
-                $stockItem,
+            $reservations = $routing->reserve(
+                $payload,
                 (int) $payload['quantity'],
                 $idempotencyKey,
                 Carbon::parse($payload['reservation_expires_at']),
+                $payload['routing_strategy'] ?? InventoryRoutingService::STRATEGY_NEAREST,
                 'api',
                 $idempotencyKey,
             );
@@ -57,7 +54,11 @@ class ReservationController extends Controller
             return response()->json(['message' => $exception->getMessage()], 409);
         }
 
-        return response()->json(['data' => $this->reservationPayload($reservation)], 201);
+        if ($reservations->isEmpty()) {
+            return response()->json(['message' => 'Stock not found'], 404);
+        }
+
+        return response()->json(['data' => $this->routePayload($reservations, $payload['routing_strategy'] ?? InventoryRoutingService::STRATEGY_NEAREST)], 201);
     }
 
     public function cancel(Request $request, InventoryService $inventory): JsonResponse
@@ -93,27 +94,20 @@ class ReservationController extends Controller
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  Collection<int, Reservation>  $reservations
+     * @return array<string, mixed>
      */
-    private function resolveStockItem(array $payload): ?StockItem
+    private function routePayload(Collection $reservations, string $strategy): array
     {
-        if (isset($payload['stock_item_id'])) {
-            return StockItem::query()->findOrFail($payload['stock_item_id']);
-        }
+        /** @var Reservation $primary */
+        $primary = $reservations->first();
+        $payload = $this->reservationPayload($primary);
+        $payload['routing_strategy'] = $strategy;
+        $payload['shipments'] = $reservations
+            ->values()
+            ->map(fn (Reservation $reservation): array => $this->reservationPayload($reservation))
+            ->all();
 
-        /** @var StockItem|null $stockItem */
-        $stockItem = StockItem::query()
-            ->select('inventory_stock_items.*')
-            ->join('inventory_warehouses', 'inventory_warehouses.id', '=', 'inventory_stock_items.warehouse_id')
-            ->when(isset($payload['product_id']), fn (Builder $query): Builder => $query->where('product_id', (int) $payload['product_id']))
-            ->when(isset($payload['sku']), fn (Builder $query): Builder => $query->where('sku', $payload['sku']))
-            ->when(isset($payload['city_code']), fn (Builder $query): Builder => $query->where('inventory_warehouses.city_code', $payload['city_code']))
-            ->where('inventory_warehouses.is_active', true)
-            ->whereRaw('on_hand_quantity - reserved_quantity >= ?', [(int) $payload['quantity']])
-            ->orderByRaw('on_hand_quantity - reserved_quantity DESC')
-            ->orderBy('inventory_stock_items.id')
-            ->first();
-
-        return $stockItem;
+        return $payload;
     }
 }

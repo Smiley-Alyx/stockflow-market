@@ -358,6 +358,102 @@ class InventoryStockApiTest extends TestCase
         $this->assertSame(3, $krakowStock->fresh()->reserved_quantity);
     }
 
+    public function test_reservation_api_falls_back_to_another_city_when_nearest_lacks_stock(): void
+    {
+        $product = $this->createProduct();
+        $warsaw = $this->createWarehouse('WAW', 'waw', 'Warsaw');
+        $krakow = $this->createWarehouse('KRK', 'krk', 'Krakow');
+        $expiresAt = now()->addMinutes(10)->toJSON();
+
+        StockItem::query()->create([
+            'warehouse_id' => $warsaw->id,
+            'product_id' => $product->id,
+            'sku' => 'SCAN-001',
+            'on_hand_quantity' => 1,
+            'reserved_quantity' => 0,
+        ]);
+
+        $fallbackStock = StockItem::query()->create([
+            'warehouse_id' => $krakow->id,
+            'product_id' => $product->id,
+            'sku' => 'SCAN-001',
+            'on_hand_quantity' => 5,
+            'reserved_quantity' => 0,
+        ]);
+
+        $this->withHeader('Idempotency-Key', 'api-reserve-fallback')
+            ->postJson('/api/inventory/reservations', [
+                'product_id' => $product->id,
+                'city_code' => 'waw',
+                'routing_strategy' => 'fallback',
+                'quantity' => 3,
+                'reservation_expires_at' => $expiresAt,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.stock_item_id', $fallbackStock->id)
+            ->assertJsonPath('data.routing_strategy', 'fallback')
+            ->assertJsonPath('data.shipments.0.warehouse_code', 'KRK');
+
+        $this->assertSame(3, $fallbackStock->fresh()->reserved_quantity);
+    }
+
+    public function test_reservation_api_splits_shipments_across_warehouses(): void
+    {
+        $product = $this->createProduct();
+        $warsaw = $this->createWarehouse('WAW', 'waw', 'Warsaw');
+        $krakow = $this->createWarehouse('KRK', 'krk', 'Krakow');
+        $expiresAt = now()->addMinutes(10)->toJSON();
+
+        $nearestStock = StockItem::query()->create([
+            'warehouse_id' => $warsaw->id,
+            'product_id' => $product->id,
+            'sku' => 'SCAN-001',
+            'on_hand_quantity' => 2,
+            'reserved_quantity' => 0,
+        ]);
+
+        $fallbackStock = StockItem::query()->create([
+            'warehouse_id' => $krakow->id,
+            'product_id' => $product->id,
+            'sku' => 'SCAN-001',
+            'on_hand_quantity' => 5,
+            'reserved_quantity' => 0,
+        ]);
+
+        $payload = $this->withHeader('Idempotency-Key', 'api-reserve-split')
+            ->postJson('/api/inventory/reservations', [
+                'product_id' => $product->id,
+                'city_code' => 'waw',
+                'routing_strategy' => 'split_shipment',
+                'quantity' => 5,
+                'reservation_expires_at' => $expiresAt,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.routing_strategy', 'split_shipment')
+            ->assertJsonCount(2, 'data.shipments')
+            ->json('data');
+
+        $this->assertSame([2, 3], array_column($payload['shipments'], 'quantity'));
+        $this->assertSame(['WAW', 'KRK'], array_column($payload['shipments'], 'warehouse_code'));
+        $this->assertSame(2, $nearestStock->fresh()->reserved_quantity);
+        $this->assertSame(3, $fallbackStock->fresh()->reserved_quantity);
+
+        $repeat = $this->withHeader('Idempotency-Key', 'api-reserve-split')
+            ->postJson('/api/inventory/reservations', [
+                'product_id' => $product->id,
+                'city_code' => 'waw',
+                'routing_strategy' => 'split_shipment',
+                'quantity' => 5,
+                'reservation_expires_at' => $expiresAt,
+            ])
+            ->assertCreated()
+            ->json('data');
+
+        $this->assertSame(array_column($payload['shipments'], 'id'), array_column($repeat['shipments'], 'id'));
+        $this->assertSame(2, $nearestStock->fresh()->reserved_quantity);
+        $this->assertSame(3, $fallbackStock->fresh()->reserved_quantity);
+    }
+
     /**
      * @return array<string, string>
      */
