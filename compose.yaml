@@ -153,6 +153,37 @@ services:
     depends_on:
       - php
 
+  prometheus:
+    image: prom/prometheus:v3.8.0
+    container_name: stockflow-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      php:
+        condition: service_started
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+
+  grafana:
+    image: grafana/grafana:12.3.0
+    container_name: stockflow-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: stockflow
+      GF_SECURITY_ADMIN_PASSWORD: stockflow
+      GF_USERS_DEFAULT_THEME: light
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
   postgres:
     image: postgres:18-alpine
     container_name: stockflow-postgres
@@ -229,3 +260,5 @@ volumes:
   redis-data:
   rabbitmq-data:
   elasticsearch-data:
+  prometheus-data:
+  grafana-data:

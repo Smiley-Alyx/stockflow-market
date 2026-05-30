@@ -21,6 +21,7 @@ StockFlow Market — инженерный pet-проект маркетплей�
 - реализован checkout-срез `cart → draft order → price snapshot → async inventory reservation`;
 - добавлена scheduled-команда истечения активных inventory-резервов с метрикой количества истёкших резервов;
 - добавлена операционная команда `search:dead-letter` для просмотра и ручного возврата документов поисковой индексации из отдельного dead-letter backend;
+- добавлен Prometheus-compatible `/metrics` endpoint и локальный Prometheus/Grafana стек для latency, очередей, dead-letter, reservation conflicts и ошибок индексации;
 - добавлен `config/stockflow.php` для runtime-настроек таймаутов, кеша, очередей, retry и backpressure limits;
 - описан первый ADR по переходной архитектуре Laravel gateway + service workspace;
 - добавлен архитектурный тест, который проверяет наличие сервисной структуры.
@@ -64,6 +65,8 @@ Docker Compose поднимает:
 | `redis` | кеш, сессии, очереди | `localhost:6379` |
 | `rabbitmq` | брокер доменных событий | `localhost:5672`, UI `http://localhost:15672` |
 | `elasticsearch` | поисковый движок | `http://localhost:9200` |
+| `prometheus` | сбор метрик gateway | `http://localhost:9090` |
+| `grafana` | дашборды наблюдаемости | `http://localhost:3001` |
 
 Дефолтные локальные креды:
 
@@ -86,7 +89,9 @@ docker compose exec php php artisan migrate
 
 - backend доступен на `http://localhost:8080`;
 - frontend доступен на `http://localhost:3000`;
-- RabbitMQ Management UI доступен на `http://localhost:15672`.
+- RabbitMQ Management UI доступен на `http://localhost:15672`;
+- Prometheus доступен на `http://localhost:9090`;
+- Grafana доступна на `http://localhost:3001` с кредами `stockflow / stockflow`.
 
 ## Локальные команды
 
@@ -124,6 +129,28 @@ docker compose down
 | `messaging.retry` | retry attempts, backoff и порог dead-letter |
 
 Эти настройки задают операционные границы для кеша каталога, Elasticsearch adapter, retries и backpressure. Очередь `search-indexing` уже используется job pipeline для поисковой индексации, а окончательно упавшие документы сохраняются в Redis-backed dead-letter storage с operational name `search-indexing-dead-letter`.
+
+## Наблюдаемость
+
+Gateway отдаёт Prometheus text exposition на:
+
+```bash
+curl http://localhost:8080/metrics
+```
+
+Локальный Prometheus scrape-ит endpoint `php:8000/metrics` каждые 15 секунд. Grafana автоматически подхватывает datasource `Prometheus` и dashboard `StockFlow Observability`.
+
+Экспортируемые метрики:
+
+| Метрика | Тип | Назначение |
+| --- | --- | --- |
+| `stockflow_http_request_duration_seconds` | histogram | latency по HTTP method, route endpoint и status |
+| `stockflow_queue_depth` | gauge | глубина очередей `default` и `search-indexing` |
+| `stockflow_search_dead_letter_count` | gauge | количество документов в search indexing dead-letter |
+| `stockflow_inventory_reservation_conflicts_total` | counter | конфликты резервирования по причине `idempotency` / `insufficient_stock` |
+| `stockflow_search_indexing_failures_total` | counter | окончательные ошибки Elasticsearch indexing/delete по index и operation |
+
+Dashboard содержит панели для p95 latency по endpoint, глубины очередей, dead-letter count, reservation conflicts rate и Elasticsearch indexing failures rate. Эти метрики покрывают текущий async pipeline и дают базу для будущих alert rules по росту dead-letter, очередей и latency.
 
 ## Search dead-letter операции
 
@@ -205,7 +232,7 @@ k6 run tests/load/k6/stockflow.js
 
 1. Связать дальнейший lifecycle заказа с доменными событиями `orders.order.paid` и `orders.order.cancelled`.
 2. Добавить async-проекцию статусов резервирования поверх брокера вместо текущего in-process gateway path.
-3. Добавить операционную наблюдаемость для async pipeline: структурированные метрики, статусы очередей и алерты по dead-letter росту.
+3. Добавить alert rules для Prometheus по росту dead-letter, очередей и latency.
 
 ## Лицензия
 
