@@ -15,16 +15,24 @@ class DependencyHealthChecker
      */
     public function readiness(): array
     {
-        return [
+        $checks = [
             'database' => $this->check('database', true, fn (): array => $this->database()),
             'redis' => $this->check('redis', true, fn (): array => $this->redis()),
-            'rabbitmq' => $this->check('rabbitmq', (bool) config('stockflow.dependencies.rabbitmq.critical'), fn (): array => $this->tcpService(
+            'elasticsearch' => $this->check('elasticsearch', (bool) config('stockflow.dependencies.elasticsearch.critical'), fn (): array => $this->elasticsearch()),
+        ];
+
+        if (config('stockflow.dependencies.rabbitmq.enabled')) {
+            $checks['rabbitmq'] = $this->check('rabbitmq', (bool) config('stockflow.dependencies.rabbitmq.critical'), fn (): array => $this->tcpService(
                 (string) config('stockflow.dependencies.rabbitmq.host'),
                 (int) config('stockflow.dependencies.rabbitmq.port'),
-            )),
-            'elasticsearch' => $this->check('elasticsearch', (bool) config('stockflow.dependencies.elasticsearch.critical'), fn (): array => $this->elasticsearch()),
-            'clickhouse' => $this->check('clickhouse', (bool) config('stockflow.dependencies.clickhouse.critical'), fn (): array => $this->clickhouse()),
-        ];
+            ));
+        }
+
+        if (config('stockflow.dependencies.clickhouse.enabled')) {
+            $checks['clickhouse'] = $this->check('clickhouse', (bool) config('stockflow.dependencies.clickhouse.critical'), fn (): array => $this->clickhouse());
+        }
+
+        return $checks;
     }
 
     /**

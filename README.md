@@ -62,19 +62,39 @@ stockflow-market/
 
 ## Локальная инфраструктура
 
-Docker Compose поднимает:
+Базовый `docker compose up` поднимает только компоненты, для которых уже есть демонстрируемые сценарии. RabbitMQ и ClickHouse вынесены в опциональный профиль `extended`: они нужны для дальнейшего развития межсервисных событий и аналитических витрин, но пока не являются обязательными зависимостями рабочего backend-среза.
 
-| Сервис | Назначение | Локальный адрес |
+| Сервис | Назначение | Режим запуска | Локальный адрес |
+| --- | --- | --- | --- |
+| `php` | Laravel backend shell | базовый | `http://localhost:8080` |
+| `frontend` | Nuxt SSR dev server | базовый | `http://localhost:3000` |
+| `postgres` | основная реляционная БД | базовый | `localhost:5432` |
+| `redis` | кеш, сессии, очереди | базовый | `localhost:6379` |
+| `elasticsearch` | поисковый движок | базовый | `http://localhost:9200` |
+| `prometheus` | сбор метрик gateway | базовый | `http://localhost:9090` |
+| `grafana` | дашборды наблюдаемости | базовый | `http://localhost:3001` |
+| `rabbitmq` | будущий transport доменных событий | `extended` | `localhost:5672`, UI `http://localhost:15672` |
+| `clickhouse` | будущие аналитические витрины | `extended` | HTTP `http://localhost:8123`, native `localhost:9000` |
+
+## Сценарии инфраструктуры
+
+| Компонент | Демонстрируемый сценарий | Статус |
 | --- | --- | --- |
-| `php` | Laravel backend shell | `http://localhost:8080` |
-| `frontend` | Nuxt SSR dev server | `http://localhost:3000` |
-| `postgres` | основная реляционная БД | `localhost:5432` |
-| `redis` | кеш, сессии, очереди | `localhost:6379` |
-| `rabbitmq` | брокер доменных событий | `localhost:5672`, UI `http://localhost:15672` |
-| `elasticsearch` | поисковый движок | `http://localhost:9200` |
-| `clickhouse` | аналитическое хранилище | HTTP `http://localhost:8123`, native `localhost:9000` |
-| `prometheus` | сбор метрик gateway | `http://localhost:9090` |
-| `grafana` | дашборды наблюдаемости | `http://localhost:3001` |
+| PostgreSQL | транзакционные данные каталога, складов, цен, корзин, заказов, outbox и inbox | используется |
+| Redis | кеш каталога, Laravel queues, сессии и search dead-letter storage | используется |
+| Elasticsearch | индексация каталога, поисковый read endpoint и деградированный ответ при недоступности | используется |
+| Prometheus | scrape `/metrics` с latency, очередями, конфликтами резервов и ошибками индексации | используется |
+| Grafana | автоматически provisioned dashboard `StockFlow Observability` поверх Prometheus | используется |
+| RabbitMQ | опциональная readiness и circuit-breaker граница для будущего event transport; открытый circuit оставляет события в outbox | профиль `extended`, transport ещё не подключён |
+| ClickHouse | опциональная readiness-проверка и локальное хранилище для будущих аналитических read-моделей | профиль `extended`, проекция ещё не реализована |
+
+Расширенный профиль запускается явно:
+
+```bash
+RABBITMQ_ENABLED=true CLICKHOUSE_ENABLED=true docker compose --profile extended up -d
+```
+
+Backend использует in-process публикацию outbox-событий по умолчанию. Переменная `STOCKFLOW_EVENT_BUS=rabbitmq` пока включает только circuit-breaker границу для тестирования поведения outbox при недоступности будущего transport, но не отправляет сообщения в RabbitMQ.
 
 Дефолтные локальные креды:
 
@@ -94,13 +114,14 @@ docker compose exec php php artisan key:generate
 docker compose exec php php artisan migrate
 ```
 
-После запуска:
+После базового запуска:
 
 - backend доступен на `http://localhost:8080`;
 - frontend доступен на `http://localhost:3000`;
-- RabbitMQ Management UI доступен на `http://localhost:15672`;
 - Prometheus доступен на `http://localhost:9090`;
 - Grafana доступна на `http://localhost:3001` с кредами `stockflow / stockflow`.
+
+После запуска профиля `extended` RabbitMQ Management UI доступен на `http://localhost:15672`.
 
 ## Локальные команды
 

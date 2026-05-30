@@ -25,6 +25,7 @@ return [
 
     'dependencies' => [
         'rabbitmq' => [
+            'enabled' => (bool) env('RABBITMQ_ENABLED', false),
             'host' => env('RABBITMQ_HOST', 'rabbitmq'),
             'port' => (int) env('RABBITMQ_PORT', 5672),
             'critical' => (bool) env('RABBITMQ_CRITICAL', false),
@@ -34,6 +35,7 @@ return [
             'critical' => (bool) env('ELASTICSEARCH_CRITICAL', false),
         ],
         'clickhouse' => [
+            'enabled' => (bool) env('CLICKHOUSE_ENABLED', false),
             'host' => env('CLICKHOUSE_HOST', 'http://clickhouse:8123'),
             'native_port' => (int) env('CLICKHOUSE_NATIVE_PORT', 9000),
             'database' => env('CLICKHOUSE_DATABASE', 'stockflow'),
@@ -87,7 +89,7 @@ return [
     ],
 
     'messaging' => [
-        'event_bus' => env('STOCKFLOW_EVENT_BUS', 'rabbitmq'),
+        'event_bus' => env('STOCKFLOW_EVENT_BUS', 'in_process'),
         'retry' => [
             'max_attempts' => (int) env('STOCKFLOW_MESSAGE_RETRY_ATTEMPTS', 5),
             'backoff_ms' => (int) env('STOCKFLOW_MESSAGE_RETRY_BACKOFF_MS', 250),

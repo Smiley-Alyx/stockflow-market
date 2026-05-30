@@ -24,8 +24,10 @@ services:
       SESSION_DRIVER: redis
       REDIS_HOST: redis
       RABBITMQ_HOST: rabbitmq
+      RABBITMQ_ENABLED: ${RABBITMQ_ENABLED:-false}
       ELASTICSEARCH_HOST: http://elasticsearch:9200
       CLICKHOUSE_HOST: http://clickhouse:8123
+      CLICKHOUSE_ENABLED: ${CLICKHOUSE_ENABLED:-false}
       CLICKHOUSE_DATABASE: stockflow
       CLICKHOUSE_USERNAME: stockflow
       CLICKHOUSE_PASSWORD: secret
@@ -34,11 +36,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
       elasticsearch:
-        condition: service_healthy
-      clickhouse:
         condition: service_healthy
     command: php artisan serve --host=0.0.0.0 --port=8000
     healthcheck:
@@ -236,6 +234,7 @@ services:
   rabbitmq:
     image: rabbitmq:4-management-alpine
     container_name: stockflow-rabbitmq
+    profiles: ["extended"]
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -274,6 +273,7 @@ services:
   clickhouse:
     image: clickhouse/clickhouse-server:25.11-alpine
     container_name: stockflow-clickhouse
+    profiles: ["extended"]
     ports:
       - "8123:8123"
       - "9000:9000"

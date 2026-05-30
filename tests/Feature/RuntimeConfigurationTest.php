@@ -12,9 +12,11 @@ class RuntimeConfigurationTest extends TestCase
         $this->assertSame(2500, config('stockflow.runtime.request_timeout_ms'));
         $this->assertSame(2, config('stockflow.runtime.dependency_timeout_seconds'));
         $this->assertSame(15, config('stockflow.runtime.shutdown_timeout_seconds'));
+        $this->assertFalse(config('stockflow.dependencies.rabbitmq.enabled'));
         $this->assertSame('rabbitmq', config('stockflow.dependencies.rabbitmq.host'));
         $this->assertSame('http://elasticsearch:9200', config('stockflow.dependencies.elasticsearch.host'));
         $this->assertSame('http://clickhouse:8123', config('stockflow.dependencies.clickhouse.host'));
+        $this->assertFalse(config('stockflow.dependencies.clickhouse.enabled'));
         $this->assertSame(9000, config('stockflow.dependencies.clickhouse.native_port'));
         $this->assertSame('stockflow', config('stockflow.dependencies.clickhouse.database'));
         $this->assertSame(300, config('stockflow.catalog.cache.product_ttl_seconds'));
@@ -26,7 +28,7 @@ class RuntimeConfigurationTest extends TestCase
         $this->assertSame(500, config('stockflow.search.indexing.max_requeue_batch_size'));
         $this->assertSame(100, config('stockflow.search.indexing.batch_size'));
         $this->assertSame(500, config('stockflow.search.indexing.max_in_flight'));
-        $this->assertSame('rabbitmq', config('stockflow.messaging.event_bus'));
+        $this->assertSame('in_process', config('stockflow.messaging.event_bus'));
         $this->assertSame(5, config('stockflow.messaging.retry.max_attempts'));
     }
 
@@ -36,7 +38,9 @@ class RuntimeConfigurationTest extends TestCase
 
         $this->assertStringContainsString('STOCKFLOW_REQUEST_TIMEOUT_MS=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_DEPENDENCY_TIMEOUT_SECONDS=', $envExample);
+        $this->assertStringContainsString('RABBITMQ_ENABLED=false', $envExample);
         $this->assertStringContainsString('CLICKHOUSE_HOST=', $envExample);
+        $this->assertStringContainsString('CLICKHOUSE_ENABLED=false', $envExample);
         $this->assertStringContainsString('CLICKHOUSE_NATIVE_PORT=', $envExample);
         $this->assertStringContainsString('CLICKHOUSE_DATABASE=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_SEARCH_INDEX_MAX_IN_FLIGHT=', $envExample);
@@ -44,6 +48,7 @@ class RuntimeConfigurationTest extends TestCase
         $this->assertStringContainsString('STOCKFLOW_SEARCH_INDEX_DEAD_LETTER_BACKEND=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_SEARCH_REQUEUE_AUDIT_CHANNEL=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_SEARCH_REQUEUE_BATCH_SIZE=', $envExample);
+        $this->assertStringContainsString('STOCKFLOW_EVENT_BUS=in_process', $envExample);
         $this->assertStringContainsString('STOCKFLOW_MESSAGE_RETRY_ATTEMPTS=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_MESSAGE_DEAD_LETTER_AFTER=', $envExample);
     }

@@ -66,6 +66,8 @@ class ArchitectureStructureTest extends TestCase
 
         $this->assertStringContainsString('clickhouse:', $compose);
         $this->assertStringContainsString('clickhouse/clickhouse-server:', $compose);
+        $this->assertStringContainsString('profiles: ["extended"]', $compose);
+        $this->assertSame(2, substr_count($compose, 'profiles: ["extended"]'));
         $this->assertStringContainsString('CLICKHOUSE_DB: stockflow', $compose);
         $this->assertStringContainsString('clickhouse-data:', $compose);
     }

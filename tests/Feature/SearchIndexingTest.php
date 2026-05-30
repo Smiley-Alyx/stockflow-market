@@ -164,6 +164,7 @@ class SearchIndexingTest extends TestCase
     public function test_open_rabbitmq_circuit_leaves_indexing_events_pending_in_outbox(): void
     {
         Queue::fake();
+        config(['stockflow.messaging.event_bus' => 'rabbitmq']);
 
         $product = new Product([
             'category_id' => 7,
