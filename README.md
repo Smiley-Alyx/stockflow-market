@@ -1,6 +1,6 @@
 # StockFlow Market
 
-StockFlow Market — инженерный pet-проект маркетплейса с микросервисным контуром вокруг Laravel, PostgreSQL, Redis, RabbitMQ, Elasticsearch и Nuxt SSR frontend. Проект развивается как реалистичный backend case: каталог, остатки, заказы, цены, поиск, асинхронные события и локальная инфраструктура без лишней имитации enterprise-слоя.
+StockFlow Market — инженерный pet-проект маркетплейса с микросервисным контуром вокруг Laravel, PostgreSQL, Redis, RabbitMQ, Elasticsearch, ClickHouse и Nuxt SSR frontend. Проект развивается как реалистичный backend case: каталог, остатки, заказы, цены, поиск, асинхронные события и локальная инфраструктура без лишней имитации enterprise-слоя.
 
 ## Текущий статус
 
@@ -18,6 +18,7 @@ StockFlow Market — инженерный pet-проект маркетплей�
 - добавлены `health/live` и `health/ready` probes для runtime и зависимостей;
 - подключён Elasticsearch adapter для записи поисковых документов;
 - добавлен первый search read endpoint поверх Elasticsearch для индексированных товаров;
+- добавлен локальный ClickHouse для будущих аналитических read-моделей и событийных витрин;
 - реализован checkout-срез `cart → draft order → price snapshot → async inventory reservation`;
 - добавлена scheduled-команда истечения активных inventory-резервов с метрикой количества истёкших резервов;
 - добавлена операционная команда `search:dead-letter` для просмотра и ручного возврата документов поисковой индексации из отдельного dead-letter backend;
@@ -65,6 +66,7 @@ Docker Compose поднимает:
 | `redis` | кеш, сессии, очереди | `localhost:6379` |
 | `rabbitmq` | брокер доменных событий | `localhost:5672`, UI `http://localhost:15672` |
 | `elasticsearch` | поисковый движок | `http://localhost:9200` |
+| `clickhouse` | аналитическое хранилище | HTTP `http://localhost:8123`, native `localhost:9000` |
 | `prometheus` | сбор метрик gateway | `http://localhost:9090` |
 | `grafana` | дашборды наблюдаемости | `http://localhost:3001` |
 
@@ -73,6 +75,7 @@ Docker Compose поднимает:
 ```text
 PostgreSQL: stockflow / secret
 RabbitMQ:   stockflow / secret
+ClickHouse: stockflow / secret
 ```
 
 ## Быстрый старт
@@ -124,6 +127,7 @@ docker compose down
 | Группа | Назначение |
 | --- | --- |
 | `runtime` | имя сервиса, общий request timeout, graceful shutdown budget |
+| `dependencies` | адреса RabbitMQ, Elasticsearch и ClickHouse для health checks и адаптеров |
 | `catalog.cache` | TTL кеша товаров и дерева категорий |
 | `search.indexing` | очередь индексации, Redis dead-letter backend, requeue audit channel, batch size, max in-flight, timeout Elasticsearch |
 | `messaging.retry` | retry attempts, backoff и порог dead-letter |
@@ -226,6 +230,7 @@ k6 run tests/load/k6/stockflow.js
 - Redis используется для кеша, сессий и быстрых очередей локального контура.
 - RabbitMQ зарезервирован под доменные события между сервисами.
 - Elasticsearch выделен под поисковые read-модели и индексацию каталога.
+- ClickHouse выделен под будущие аналитические read-модели и событийные витрины.
 - Контракты сервисов описываются до реализации публичных API.
 
 ## Ближайший план

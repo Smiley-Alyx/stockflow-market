@@ -59,4 +59,14 @@ class ArchitectureStructureTest extends TestCase
         $this->assertStringContainsString('php artisan queue:work redis --queue=default', $compose);
         $this->assertStringContainsString('php artisan queue:work redis --queue=search-indexing', $compose);
     }
+
+    public function test_compose_defines_clickhouse_storage(): void
+    {
+        $compose = (string) file_get_contents(base_path('compose.yaml'));
+
+        $this->assertStringContainsString('clickhouse:', $compose);
+        $this->assertStringContainsString('clickhouse/clickhouse-server:', $compose);
+        $this->assertStringContainsString('CLICKHOUSE_DB: stockflow', $compose);
+        $this->assertStringContainsString('clickhouse-data:', $compose);
+    }
 }

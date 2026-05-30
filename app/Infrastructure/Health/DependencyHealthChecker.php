@@ -22,6 +22,7 @@ class DependencyHealthChecker
                 (int) config('stockflow.dependencies.rabbitmq.port'),
             ),
             'elasticsearch' => $this->elasticsearch(),
+            'clickhouse' => $this->clickhouse(),
         ];
     }
 
@@ -61,6 +62,27 @@ class DependencyHealthChecker
         try {
             $response = Http::timeout((int) ceil(config('stockflow.search.indexing.timeout_ms') / 1000))
                 ->get(rtrim((string) config('stockflow.dependencies.elasticsearch.host'), '/').'/_cluster/health');
+
+            return $response->successful()
+                ? ['ok' => true]
+                : ['ok' => false, 'detail' => 'HTTP '.$response->status()];
+        } catch (Throwable $exception) {
+            return ['ok' => false, 'detail' => $exception->getMessage()];
+        }
+    }
+
+    /**
+     * @return array{ok: bool, detail?: string}
+     */
+    private function clickhouse(): array
+    {
+        try {
+            $response = Http::timeout((float) config('stockflow.runtime.dependency_timeout_seconds'))
+                ->withBasicAuth(
+                    (string) config('stockflow.dependencies.clickhouse.username'),
+                    (string) config('stockflow.dependencies.clickhouse.password'),
+                )
+                ->get(rtrim((string) config('stockflow.dependencies.clickhouse.host'), '/').'/ping');
 
             return $response->successful()
                 ? ['ok' => true]

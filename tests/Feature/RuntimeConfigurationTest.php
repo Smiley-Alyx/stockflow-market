@@ -14,6 +14,9 @@ class RuntimeConfigurationTest extends TestCase
         $this->assertSame(15, config('stockflow.runtime.shutdown_timeout_seconds'));
         $this->assertSame('rabbitmq', config('stockflow.dependencies.rabbitmq.host'));
         $this->assertSame('http://elasticsearch:9200', config('stockflow.dependencies.elasticsearch.host'));
+        $this->assertSame('http://clickhouse:8123', config('stockflow.dependencies.clickhouse.host'));
+        $this->assertSame(9000, config('stockflow.dependencies.clickhouse.native_port'));
+        $this->assertSame('stockflow', config('stockflow.dependencies.clickhouse.database'));
         $this->assertSame(300, config('stockflow.catalog.cache.product_ttl_seconds'));
         $this->assertSame('search-indexing', config('stockflow.search.indexing.queue'));
         $this->assertSame('search-indexing-dead-letter', config('stockflow.search.indexing.dead_letter_queue'));
@@ -33,6 +36,9 @@ class RuntimeConfigurationTest extends TestCase
 
         $this->assertStringContainsString('STOCKFLOW_REQUEST_TIMEOUT_MS=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_DEPENDENCY_TIMEOUT_SECONDS=', $envExample);
+        $this->assertStringContainsString('CLICKHOUSE_HOST=', $envExample);
+        $this->assertStringContainsString('CLICKHOUSE_NATIVE_PORT=', $envExample);
+        $this->assertStringContainsString('CLICKHOUSE_DATABASE=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_SEARCH_INDEX_MAX_IN_FLIGHT=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_SEARCH_INDEX_DEAD_LETTER_QUEUE=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_SEARCH_INDEX_DEAD_LETTER_BACKEND=', $envExample);

@@ -31,6 +31,13 @@ return [
         'elasticsearch' => [
             'host' => env('ELASTICSEARCH_HOST', 'http://elasticsearch:9200'),
         ],
+        'clickhouse' => [
+            'host' => env('CLICKHOUSE_HOST', 'http://clickhouse:8123'),
+            'native_port' => (int) env('CLICKHOUSE_NATIVE_PORT', 9000),
+            'database' => env('CLICKHOUSE_DATABASE', 'stockflow'),
+            'username' => env('CLICKHOUSE_USERNAME', 'stockflow'),
+            'password' => env('CLICKHOUSE_PASSWORD', 'secret'),
+        ],
     ],
 
     'catalog' => [

@@ -31,6 +31,7 @@ class HealthCheckTest extends TestCase
                     'redis' => ['ok' => true],
                     'rabbitmq' => ['ok' => true],
                     'elasticsearch' => ['ok' => true],
+                    'clickhouse' => ['ok' => true],
                 ];
             }
         });
@@ -38,7 +39,8 @@ class HealthCheckTest extends TestCase
         $this->getJson('/health/ready')
             ->assertOk()
             ->assertJsonPath('status', 'ok')
-            ->assertJsonPath('checks.elasticsearch.ok', true);
+            ->assertJsonPath('checks.elasticsearch.ok', true)
+            ->assertJsonPath('checks.clickhouse.ok', true);
     }
 
     public function test_readiness_probe_returns_unavailable_when_dependency_fails(): void
@@ -55,6 +57,7 @@ class HealthCheckTest extends TestCase
                     'redis' => ['ok' => false, 'detail' => 'connection refused'],
                     'rabbitmq' => ['ok' => true],
                     'elasticsearch' => ['ok' => true],
+                    'clickhouse' => ['ok' => true],
                 ];
             }
         });
