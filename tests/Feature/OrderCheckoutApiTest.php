@@ -17,6 +17,7 @@ use App\Domains\Orders\Events\OrderReservationFailed;
 use App\Domains\Orders\Events\OrderReservationSucceeded;
 use App\Domains\Orders\Models\Order;
 use App\Domains\Pricing\Models\ProductPrice;
+use App\Domains\Pricing\Models\Promotion;
 use App\Infrastructure\Messaging\DomainEventPublisher;
 use App\Infrastructure\Messaging\OutboxMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -63,7 +64,11 @@ class OrderCheckoutApiTest extends TestCase
         ])
             ->assertCreated()
             ->assertJsonPath('data.status', Order::STATUS_DRAFT)
+            ->assertJsonPath('data.subtotal_amount_minor', 259800)
+            ->assertJsonPath('data.discount_amount_minor', 0)
             ->assertJsonPath('data.total_amount_minor', 259800)
+            ->assertJsonPath('data.items.0.price_type', 'retail')
+            ->assertJsonPath('data.items.0.price_version', 1)
             ->assertJsonPath('data.items.0.unit_amount_minor', 129900)
             ->json('data');
 
@@ -75,6 +80,7 @@ class OrderCheckoutApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.status', Order::STATUS_RESERVATION_PENDING)
             ->assertJsonPath('data.total_amount_minor', 259800)
+            ->assertJsonPath('data.items.0.price_version', 1)
             ->assertJsonPath('data.items.0.unit_amount_minor', 129900);
 
         $stockItem->refresh();
@@ -248,6 +254,107 @@ class OrderCheckoutApiTest extends TestCase
         ])
             ->assertStatus(409)
             ->assertJsonPath('message', 'Active price not found for product '.$product->id.'.');
+    }
+
+    public function test_draft_order_snapshots_city_price_version_and_ignores_future_activation(): void
+    {
+        $product = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');
+
+        $this->createPrice($product, 129900);
+        ProductPrice::query()->create([
+            'product_id' => $product->id,
+            'price_type' => 'retail',
+            'city_code' => ' WAW ',
+            'price_version' => 2,
+            'amount_minor' => 119900,
+            'currency' => 'USD',
+            'is_active' => true,
+            'active_from' => now()->subHour(),
+        ]);
+        ProductPrice::query()->create([
+            'product_id' => $product->id,
+            'price_type' => 'retail',
+            'city_code' => ' WAW ',
+            'price_version' => 3,
+            'amount_minor' => 9900,
+            'currency' => 'USD',
+            'is_active' => true,
+            'active_from' => now()->addHour(),
+        ]);
+
+        $cart = $this->postJson('/api/cart/items', [
+            'product_id' => $product->id,
+            'quantity' => 1,
+        ])->json('data');
+
+        $this->postJson('/api/orders/draft', [
+            'cart_id' => $cart['id'],
+            'city_code' => 'waw',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.city_code', 'waw')
+            ->assertJsonPath('data.total_amount_minor', 119900)
+            ->assertJsonPath('data.items.0.price_city_code', 'waw')
+            ->assertJsonPath('data.items.0.price_version', 2)
+            ->assertJsonPath('data.items.0.unit_amount_minor', 119900);
+    }
+
+    public function test_draft_order_applies_active_promotion_and_snapshots_discount(): void
+    {
+        $product = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');
+        $this->createPrice($product, 129900);
+
+        Promotion::query()->create([
+            'code' => ' save10 ',
+            'discount_type' => Promotion::TYPE_PERCENT,
+            'discount_value' => 10,
+            'currency' => 'USD',
+            'is_active' => true,
+            'starts_at' => now()->subDay(),
+            'ends_at' => now()->addDay(),
+        ]);
+
+        $cart = $this->postJson('/api/cart/items', [
+            'product_id' => $product->id,
+            'quantity' => 2,
+        ])->json('data');
+
+        $this->postJson('/api/orders/draft', [
+            'cart_id' => $cart['id'],
+            'promo_code' => 'save10',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.promo_code', 'SAVE10')
+            ->assertJsonPath('data.subtotal_amount_minor', 259800)
+            ->assertJsonPath('data.discount_amount_minor', 25980)
+            ->assertJsonPath('data.total_amount_minor', 233820);
+    }
+
+    public function test_draft_order_rejects_inactive_promotion(): void
+    {
+        $product = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');
+        $this->createPrice($product, 129900);
+
+        Promotion::query()->create([
+            'code' => 'LATER',
+            'discount_type' => Promotion::TYPE_FIXED_AMOUNT,
+            'discount_value' => 1000,
+            'currency' => 'USD',
+            'is_active' => true,
+            'starts_at' => now()->addDay(),
+        ]);
+
+        $cart = $this->postJson('/api/cart/items', [
+            'product_id' => $product->id,
+            'quantity' => 1,
+        ])->json('data');
+
+        $this->postJson('/api/orders/draft', [
+            'cart_id' => $cart['id'],
+            'promo_code' => 'later',
+        ])
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'Promotion LATER is not active.');
     }
 
     public function test_order_endpoints_match_gateway_and_orders_contracts(): void

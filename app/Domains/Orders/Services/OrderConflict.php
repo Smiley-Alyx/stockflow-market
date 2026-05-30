@@ -16,6 +16,11 @@ class OrderConflict extends RuntimeException
         return new self("Active price not found for product {$productId}.");
     }
 
+    public static function invalidPromotion(string $code): self
+    {
+        return new self("Promotion {$code} is not active.");
+    }
+
     public static function mixedCurrencies(): self
     {
         return new self('Cart contains prices in multiple currencies.');

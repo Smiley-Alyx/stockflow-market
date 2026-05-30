@@ -15,10 +15,16 @@ class DraftOrderController extends Controller
     {
         $payload = $request->validate([
             'cart_id' => ['required', 'integer', 'min:1', 'exists:orders_carts,id'],
+            'city_code' => ['sometimes', 'string', 'max:255'],
+            'promo_code' => ['sometimes', 'string', 'max:255'],
         ]);
 
         try {
-            $order = $orders->createDraft((int) $payload['cart_id']);
+            $order = $orders->createDraft(
+                (int) $payload['cart_id'],
+                $payload['city_code'] ?? null,
+                $payload['promo_code'] ?? null,
+            );
         } catch (OrderConflict $exception) {
             return response()->json(['message' => $exception->getMessage()], 409);
         }
@@ -35,6 +41,10 @@ class DraftOrderController extends Controller
             'id' => $order->id,
             'cart_id' => $order->cart_id,
             'status' => $order->status,
+            'city_code' => $order->city_code,
+            'promo_code' => $order->promo_code,
+            'subtotal_amount_minor' => $order->subtotal_amount_minor,
+            'discount_amount_minor' => $order->discount_amount_minor,
             'total_amount_minor' => $order->total_amount_minor,
             'currency' => $order->currency,
             'confirmed_at' => $order->confirmed_at?->toJSON(),
@@ -47,6 +57,11 @@ class DraftOrderController extends Controller
                     'sku' => $item->sku,
                     'product_name' => $item->product_name,
                     'quantity' => $item->quantity,
+                    'pricing_product_price_id' => $item->pricing_product_price_id,
+                    'price_type' => $item->price_type,
+                    'price_city_code' => $item->price_city_code,
+                    'price_version' => $item->price_version,
+                    'price_active_from' => $item->price_active_from?->toJSON(),
                     'unit_amount_minor' => $item->unit_amount_minor,
                     'currency' => $item->currency,
                     'line_amount_minor' => $item->line_amount_minor,

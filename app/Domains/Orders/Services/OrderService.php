@@ -18,7 +18,9 @@ use App\Domains\Orders\Models\CartItem;
 use App\Domains\Orders\Models\Order;
 use App\Domains\Orders\Models\OrderItem;
 use App\Domains\Pricing\Models\ProductPrice;
+use App\Domains\Pricing\Models\Promotion;
 use App\Infrastructure\Messaging\DomainEventRecorder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -29,9 +31,12 @@ class OrderService
         private readonly DomainEventRecorder $events,
     ) {}
 
-    public function createDraft(int $cartId): Order
+    public function createDraft(int $cartId, ?string $cityCode = null, ?string $promoCode = null): Order
     {
-        return DB::transaction(function () use ($cartId): Order {
+        $cityCode = $this->normalizeOptionalCode($cityCode, lowercase: true);
+        $promoCode = $this->normalizeOptionalCode($promoCode);
+
+        return DB::transaction(function () use ($cartId, $cityCode, $promoCode): Order {
             /** @var Cart $cart */
             $cart = Cart::query()
                 ->with('items.product')
@@ -42,44 +47,52 @@ class OrderService
                 throw OrderConflict::emptyCart();
             }
 
-            $prices = ProductPrice::query()
-                ->whereIn('product_id', $cart->items->pluck('product_id'))
-                ->where('price_type', 'retail')
-                ->where('is_active', true)
-                ->lockForUpdate()
-                ->get()
-                ->keyBy('product_id');
+            $prices = $this->activeRetailPrices($cart->items->pluck('product_id')->all(), $cityCode);
 
             $currency = $this->resolveCurrency($cart->items, $prices);
+            $promotion = $promoCode === null ? null : $this->activePromotion($promoCode);
 
             /** @var Order $order */
             $order = Order::query()->create([
                 'cart_id' => $cart->id,
                 'status' => Order::STATUS_DRAFT,
+                'city_code' => $cityCode,
+                'promo_code' => $promotion?->code,
                 'currency' => $currency,
+                'subtotal_amount_minor' => 0,
+                'discount_amount_minor' => 0,
                 'total_amount_minor' => 0,
             ]);
 
-            $total = 0;
+            $subtotal = 0;
 
             foreach ($cart->items as $cartItem) {
                 /** @var ProductPrice $price */
                 $price = $prices->get($cartItem->product_id);
                 $lineAmount = $price->amount_minor * $cartItem->quantity;
-                $total += $lineAmount;
+                $subtotal += $lineAmount;
 
                 $order->items()->create([
                     'product_id' => $cartItem->product_id,
+                    'pricing_product_price_id' => $price->id,
                     'sku' => $cartItem->product->sku,
                     'product_name' => $cartItem->product->name,
                     'quantity' => $cartItem->quantity,
+                    'price_type' => $price->price_type,
+                    'price_city_code' => $price->city_code,
+                    'price_version' => $price->price_version,
+                    'price_active_from' => $price->active_from,
                     'unit_amount_minor' => $price->amount_minor,
                     'currency' => $price->currency,
                     'line_amount_minor' => $lineAmount,
                 ]);
             }
 
-            $order->total_amount_minor = $total;
+            $discount = $this->discountAmount($promotion, $subtotal, $currency);
+
+            $order->subtotal_amount_minor = $subtotal;
+            $order->discount_amount_minor = $discount;
+            $order->total_amount_minor = $subtotal - $discount;
             $order->save();
 
             return $order->load('items');
@@ -285,6 +298,100 @@ class OrderService
         }
 
         return array_key_first($currencies);
+    }
+
+    /**
+     * @param  array<int, int>  $productIds
+     * @return Collection<int, ProductPrice>
+     */
+    private function activeRetailPrices(array $productIds, ?string $cityCode): Collection
+    {
+        $now = now();
+
+        return ProductPrice::query()
+            ->whereIn('product_id', $productIds)
+            ->where('price_type', 'retail')
+            ->when(
+                $cityCode !== null,
+                fn (Builder $query): Builder => $query->where(fn (Builder $query): Builder => $query
+                    ->whereNull('city_code')
+                    ->orWhere('city_code', $cityCode)
+                ),
+                fn (Builder $query): Builder => $query->whereNull('city_code'),
+            )
+            ->where('is_active', true)
+            ->where(fn (Builder $query): Builder => $query
+                ->whereNull('active_from')
+                ->orWhere('active_from', '<=', $now)
+            )
+            ->where(fn (Builder $query): Builder => $query
+                ->whereNull('active_until')
+                ->orWhere('active_until', '>', $now)
+            )
+            ->orderBy('product_id')
+            ->orderByRaw('case when city_code is null then 1 else 0 end')
+            ->orderByDesc('active_from')
+            ->orderByDesc('id')
+            ->lockForUpdate()
+            ->get()
+            ->unique('product_id')
+            ->keyBy('product_id');
+    }
+
+    private function activePromotion(string $promoCode): Promotion
+    {
+        $now = now();
+
+        /** @var Promotion|null $promotion */
+        $promotion = Promotion::query()
+            ->whereRaw('upper(code) = ?', [strtoupper($promoCode)])
+            ->where('is_active', true)
+            ->where(fn (Builder $query): Builder => $query
+                ->whereNull('starts_at')
+                ->orWhere('starts_at', '<=', $now)
+            )
+            ->where(fn (Builder $query): Builder => $query
+                ->whereNull('ends_at')
+                ->orWhere('ends_at', '>', $now)
+            )
+            ->lockForUpdate()
+            ->first();
+
+        if ($promotion === null) {
+            throw OrderConflict::invalidPromotion(strtoupper($promoCode));
+        }
+
+        return $promotion;
+    }
+
+    private function discountAmount(?Promotion $promotion, int $subtotal, string $currency): int
+    {
+        if ($promotion === null || $subtotal === 0) {
+            return 0;
+        }
+
+        if ($promotion->currency !== null && $promotion->currency !== $currency) {
+            throw OrderConflict::invalidPromotion($promotion->code);
+        }
+
+        $discount = match ($promotion->discount_type) {
+            Promotion::TYPE_FIXED_AMOUNT => $promotion->discount_value,
+            Promotion::TYPE_PERCENT => intdiv($subtotal * min($promotion->discount_value, 100), 100),
+            default => throw OrderConflict::invalidPromotion($promotion->code),
+        };
+
+        return min($discount, $subtotal);
+    }
+
+    private function normalizeOptionalCode(?string $code, bool $lowercase = false): ?string
+    {
+        $code = trim((string) $code);
+
+        if ($code === '') {
+            return null;
+        }
+
+        return $lowercase ? strtolower($code) : $code;
     }
 
     private function reserveOrderItem(Order $order, OrderItem $item): void

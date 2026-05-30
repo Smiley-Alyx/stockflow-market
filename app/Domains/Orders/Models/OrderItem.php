@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['order_id', 'product_id', 'sku', 'product_name', 'quantity', 'unit_amount_minor', 'currency', 'line_amount_minor'])]
+#[Fillable(['order_id', 'product_id', 'pricing_product_price_id', 'sku', 'product_name', 'quantity', 'price_type', 'price_city_code', 'price_version', 'price_active_from', 'unit_amount_minor', 'currency', 'line_amount_minor'])]
 class OrderItem extends Model
 {
     protected $table = 'orders_order_items';
@@ -37,6 +37,8 @@ class OrderItem extends Model
     {
         return [
             'quantity' => 'integer',
+            'price_version' => 'integer',
+            'price_active_from' => 'datetime',
             'unit_amount_minor' => 'integer',
             'line_amount_minor' => 'integer',
         ];

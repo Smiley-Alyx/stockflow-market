@@ -207,6 +207,10 @@ components:
       properties:
         cart_id:
           type: integer
+        city_code:
+          type: string
+        promo_code:
+          type: string
     Cart:
       type: object
       required:
@@ -245,6 +249,10 @@ components:
         - id
         - cart_id
         - status
+        - city_code
+        - promo_code
+        - subtotal_amount_minor
+        - discount_amount_minor
         - total_amount_minor
         - currency
         - confirmed_at
@@ -269,6 +277,18 @@ components:
             - paid
             - cancelled
             - expired
+        city_code:
+          type:
+            - string
+            - 'null'
+        promo_code:
+          type:
+            - string
+            - 'null'
+        subtotal_amount_minor:
+          type: integer
+        discount_amount_minor:
+          type: integer
         total_amount_minor:
           type: integer
         currency:
@@ -306,6 +326,11 @@ components:
         - sku
         - product_name
         - quantity
+        - pricing_product_price_id
+        - price_type
+        - price_city_code
+        - price_version
+        - price_active_from
         - unit_amount_minor
         - currency
         - line_amount_minor
@@ -318,6 +343,23 @@ components:
           type: string
         quantity:
           type: integer
+        pricing_product_price_id:
+          type:
+            - integer
+            - 'null'
+        price_type:
+          type: string
+        price_city_code:
+          type:
+            - string
+            - 'null'
+        price_version:
+          type: integer
+        price_active_from:
+          type:
+            - string
+            - 'null'
+          format: date-time
         unit_amount_minor:
           type: integer
         currency:
