@@ -14,6 +14,7 @@ use App\Domains\Inventory\Services\InsufficientStock;
 use App\Domains\Inventory\Services\InventoryService;
 use App\Infrastructure\Messaging\OutboxMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Tests\Support\AssertsOpenApiContracts;
 use Tests\TestCase;
@@ -250,6 +251,39 @@ class InventoryStockApiTest extends TestCase
             'idempotency_key' => 'order-ORD-1',
             'status' => Reservation::STATUS_EXPIRED,
         ]);
+    }
+
+    public function test_expire_reservations_command_releases_stock_and_logs_metric(): void
+    {
+        Log::spy();
+
+        $stockItem = $this->createStockItem(onHand: 10);
+        $inventory = $this->app->make(InventoryService::class);
+
+        $inventory->reserve($stockItem, 4, 'order-ORD-1', now()->addSecond());
+        $this->travel(2)->seconds();
+
+        $this->artisan('inventory:reservations:expire')
+            ->expectsOutput('Expired 1 inventory reservation(s).')
+            ->assertExitCode(0);
+
+        $stockItem->refresh();
+
+        $this->assertSame(0, $stockItem->reserved_quantity);
+        $this->assertDatabaseHas('inventory_reservations', [
+            'idempotency_key' => 'order-ORD-1',
+            'status' => Reservation::STATUS_EXPIRED,
+        ]);
+        Log::shouldHaveReceived('info')
+            ->once()
+            ->with('inventory.reservations.expired', ['expired_count' => 1]);
+    }
+
+    public function test_expire_reservations_command_is_scheduled(): void
+    {
+        $this->artisan('schedule:list')
+            ->expectsOutputToContain('inventory:reservations:expire')
+            ->assertExitCode(0);
     }
 
     public function test_reservation_api_requires_idempotency_and_reuses_successful_response(): void

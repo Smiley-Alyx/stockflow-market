@@ -1,7 +1,9 @@
 <?php
 
+use App\Console\Commands\ExpireInventoryReservationsCommand;
 use App\Console\Commands\PublishOutboxCommand;
 use App\Console\Commands\SearchDeadLetterCommand;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -14,9 +16,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withCommands([
+        ExpireInventoryReservationsCommand::class,
         PublishOutboxCommand::class,
         SearchDeadLetterCommand::class,
     ])
+    ->withSchedule(function (Schedule $schedule): void {
+        $schedule->command('inventory:reservations:expire')
+            ->everyMinute()
+            ->withoutOverlapping();
+    })
     ->withMiddleware(function (Middleware $middleware): void {
         //
     })

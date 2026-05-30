@@ -14,11 +14,12 @@ StockFlow Market — инженерный pet-проект маркетплей�
 - добавлена внутренняя публикация `catalog.product.created`;
 - добавлен обработчик, который превращает создание товара в `search.index.requested`;
 - добавлен первый async job pipeline для индексации поисковых документов;
-- добавлены Docker Compose worker-процессы для общей очереди и поисковой индексации;
+- добавлены Docker Compose worker-процессы для общей очереди, поисковой индексации и scheduler;
 - добавлены `health/live` и `health/ready` probes для runtime и зависимостей;
 - подключён Elasticsearch adapter для записи поисковых документов;
 - добавлен первый search read endpoint поверх Elasticsearch для индексированных товаров;
 - реализован checkout-срез `cart → draft order → price snapshot → async inventory reservation`;
+- добавлена scheduled-команда истечения активных inventory-резервов с метрикой количества истёкших резервов;
 - добавлена операционная команда `search:dead-letter` для просмотра и ручного возврата документов поисковой индексации из отдельного dead-letter backend;
 - добавлен `config/stockflow.php` для runtime-настроек таймаутов, кеша, очередей, retry и backpressure limits;
 - описан первый ADR по переходной архитектуре Laravel gateway + service workspace;
@@ -158,6 +159,16 @@ php artisan search:dead-letter requeue --all --index=catalog_products --batch-si
 - bulk requeue обрабатывает документы страницами по `ID` и чанками не больше `STOCKFLOW_SEARCH_MAX_REQUEUE_BATCH_SIZE`;
 - `--index` и `--document-id` сужают выборку перед requeue;
 - каждый реально возвращённый документ пишет структурированное audit-событие `search.dead_letter.requeued` в канал `STOCKFLOW_SEARCH_REQUEUE_AUDIT_CHANNEL`, чтобы его можно было отдельно направлять в SIEM.
+
+## Inventory reservation expiry
+
+Активные резервы остатков истекают через scheduled job. В локальном Docker Compose за это отвечает сервис `scheduler`, который запускает Laravel scheduler через `php artisan schedule:work`. Scheduler каждую минуту выполняет:
+
+```bash
+php artisan inventory:reservations:expire
+```
+
+Команду можно запускать вручную для операционной проверки или разовой очистки. После каждого запуска она пишет структурированное log-событие `inventory.reservations.expired` с полем `expired_count`, чтобы количество истёкших резервов можно было собирать как метрику.
 
 ## Проверки
 
