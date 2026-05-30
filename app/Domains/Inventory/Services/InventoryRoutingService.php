@@ -172,7 +172,7 @@ class InventoryRoutingService
             return '0';
         }
 
-        return "CASE WHEN inventory_warehouses.city_code = ".DB::getPdo()->quote((string) $criteria['city_code']).' THEN 0 ELSE 1 END';
+        return 'CASE WHEN inventory_warehouses.city_code = '.DB::getPdo()->quote((string) $criteria['city_code']).' THEN 0 ELSE 1 END';
     }
 
     /**

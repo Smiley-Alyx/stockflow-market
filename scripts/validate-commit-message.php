@@ -81,7 +81,7 @@ function firstMessageLine(array $lines): ?string
 function invalidMessage(string $subject, array $allowedTypes): string
 {
     return implode("\n", [
-        "Commit message не соответствует project policy.",
+        'Commit message не соответствует project policy.',
         '',
         "Получено: {$subject}",
         '',
