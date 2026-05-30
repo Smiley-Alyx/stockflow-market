@@ -8,6 +8,7 @@ use App\Domains\Inventory\Services\IdempotencyConflict;
 use App\Domains\Inventory\Services\InsufficientStock;
 use App\Domains\Inventory\Services\InventoryService;
 use App\Http\Controllers\Controller;
+use App\Infrastructure\Observability\MetricsCollector;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,7 +16,7 @@ use Illuminate\Support\Carbon;
 
 class ReservationController extends Controller
 {
-    public function store(Request $request, InventoryService $inventory): JsonResponse
+    public function store(Request $request, InventoryService $inventory, MetricsCollector $metrics): JsonResponse
     {
         $payload = $request->validate([
             'stock_item_id' => ['required_without_all:product_id,sku', 'integer', 'min:1', 'exists:inventory_stock_items,id'],
@@ -49,6 +50,10 @@ class ReservationController extends Controller
                 $idempotencyKey,
             );
         } catch (IdempotencyConflict|InsufficientStock $exception) {
+            $metrics->increment('stockflow_inventory_reservation_conflicts_total', [
+                'reason' => $exception instanceof IdempotencyConflict ? 'idempotency' : 'insufficient_stock',
+            ]);
+
             return response()->json(['message' => $exception->getMessage()], 409);
         }
 

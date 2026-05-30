@@ -77,6 +77,11 @@ class RedisSearchIndexDeadLetterStore implements SearchIndexDeadLetterStore
         $this->redis()->zrem($this->indexKey(), (string) $id);
     }
 
+    public function count(): int
+    {
+        return (int) $this->redis()->zcard($this->indexKey());
+    }
+
     private function redis(): mixed
     {
         return Redis::connection(config('stockflow.search.indexing.dead_letter_redis_connection'));

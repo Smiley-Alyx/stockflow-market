@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\Orders\OrderLifecycleController;
 use App\Http\Controllers\Api\Pricing\PriceController;
 use App\Http\Controllers\Api\Search\ProductSearchController;
 use App\Http\Controllers\HealthCheckController;
+use App\Http\Controllers\MetricsController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -19,6 +20,7 @@ Route::get('/', function () {
 
 Route::get('/health/live', [HealthCheckController::class, 'live']);
 Route::get('/health/ready', [HealthCheckController::class, 'ready']);
+Route::get('/metrics', MetricsController::class);
 
 Route::get('/api/catalog/products', [ProductController::class, 'index'])
     ->middleware('throttle:stockflow-catalog');

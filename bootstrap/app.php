@@ -3,6 +3,7 @@
 use App\Console\Commands\ExpireInventoryReservationsCommand;
 use App\Console\Commands\PublishOutboxCommand;
 use App\Console\Commands\SearchDeadLetterCommand;
+use App\Http\Middleware\RecordHttpMetrics;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -26,7 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping();
     })
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->append(RecordHttpMetrics::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

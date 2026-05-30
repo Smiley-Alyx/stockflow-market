@@ -6,6 +6,7 @@ use App\Domains\Search\Contracts\SearchIndexer;
 use App\Domains\Search\DeadLetters\SearchIndexDeadLetterStore;
 use App\Domains\Search\Events\SearchIndexCompleted;
 use App\Domains\Search\Events\SearchIndexFailed;
+use App\Infrastructure\Observability\MetricsCollector;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\App;
@@ -45,6 +46,11 @@ class DeleteSearchDocument implements ShouldQueue
     {
         $attempts = max($this->attempts(), (int) config('stockflow.messaging.retry.dead_letter_after_attempts'));
         $failure = $exception?->getMessage() ?? 'Search index deletion failed.';
+
+        App::make(MetricsCollector::class)->increment('stockflow_search_indexing_failures_total', [
+            'index' => $this->index,
+            'operation' => 'delete',
+        ]);
 
         App::make(SearchIndexDeadLetterStore::class)->put(
             index: $this->index,

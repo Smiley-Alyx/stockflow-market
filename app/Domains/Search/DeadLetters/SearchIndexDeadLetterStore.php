@@ -18,5 +18,7 @@ interface SearchIndexDeadLetterStore
      */
     public function list(?string $index = null, ?string $documentId = null, int $limit = 10, int $afterId = 0): Collection;
 
+    public function count(): int;
+
     public function delete(int $id): void;
 }

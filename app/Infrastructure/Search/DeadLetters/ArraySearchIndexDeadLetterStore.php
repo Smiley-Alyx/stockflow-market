@@ -59,6 +59,11 @@ class ArraySearchIndexDeadLetterStore implements SearchIndexDeadLetterStore
         unset(self::$records[$id]);
     }
 
+    public function count(): int
+    {
+        return count(self::$records);
+    }
+
     public static function reset(): void
     {
         self::$records = [];
