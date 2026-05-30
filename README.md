@@ -291,6 +291,8 @@ php artisan inventory:reservations:expire
 composer test
 ```
 
+GitHub Actions workflow `.github/workflows/ci.yml` запускает `composer test`, `vendor/bin/pint --test` и `docker compose config --quiet` для каждого push и pull request.
+
 Тесты страхуют базовый Laravel bootstrap, runtime-конфигурацию, сервисную структуру, модель и проекции каталога, OpenAPI-контракты, HTTP read API, блоки главной страницы, цены и промокоды, checkout-срез с резервированием остатков и поисковый indexing pipeline, включая retry/dead-letter поведение и ручной requeue.
 
 ## Нагрузочные сценарии
