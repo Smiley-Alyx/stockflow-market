@@ -3,6 +3,7 @@
 namespace App\Domains\Catalog\Models;
 
 use App\Domains\Catalog\Read\CatalogCacheKeys;
+use App\Domains\Catalog\Read\CatalogProjectionService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,8 +19,13 @@ class ProductAttribute extends Model
             CatalogCacheKeys::invalidateProducts();
         });
 
-        static::deleted(function (): void {
+        static::saved(function (ProductAttribute $attribute): void {
+            app(CatalogProjectionService::class)->syncAttribute($attribute);
+        });
+
+        static::deleted(function (ProductAttribute $attribute): void {
             CatalogCacheKeys::invalidateProducts();
+            app(CatalogProjectionService::class)->syncAttribute($attribute);
         });
     }
 

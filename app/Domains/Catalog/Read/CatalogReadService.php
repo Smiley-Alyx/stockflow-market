@@ -2,19 +2,14 @@
 
 namespace App\Domains\Catalog\Read;
 
+use App\Domains\Catalog\Models\CatalogProductProjection;
 use App\Domains\Catalog\Models\Category;
-use App\Domains\Catalog\Models\Product;
-use App\Domains\Inventory\Read\InventoryReadService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 class CatalogReadService
 {
-    public function __construct(
-        private readonly InventoryReadService $inventory,
-    ) {}
-
     /**
      * @return array<string, mixed>|null
      */
@@ -56,19 +51,12 @@ class CatalogReadService
      */
     private function fetchProductBySlug(string $slug): ?array
     {
-        $product = Product::query()
-            ->with(['category', 'attributes'])
+        /** @var CatalogProductProjection|null $projection */
+        $projection = CatalogProductProjection::query()
             ->where('slug', $slug)
             ->first();
 
-        if (! $product instanceof Product) {
-            return null;
-        }
-
-        return $this->productPayload(
-            $product,
-            $this->inventory->availabilityForProductIds([$product->id])[$product->id] ?? $this->emptyAvailability(),
-        );
+        return $projection?->payload;
     }
 
     /**
@@ -76,30 +64,17 @@ class CatalogReadService
      */
     private function fetchProductList(int $page, int $perPage, ?string $categorySlug): array
     {
-        $products = Product::query()
-            ->with(['category', 'attributes'])
+        $products = CatalogProductProjection::query()
             ->where('status', 'published')
-            ->whereHas('category', function ($query) use ($categorySlug): void {
-                $query->where('is_active', true);
-
-                if ($categorySlug !== null) {
-                    $query->where('slug', $categorySlug);
-                }
-            })
+            ->where('category_is_active', true)
+            ->when($categorySlug !== null, fn ($query) => $query->where('category_slug', $categorySlug))
             ->orderBy('name')
             ->paginate(perPage: $perPage, page: $page);
-
-        $availability = $this->inventory->availabilityForProductIds(
-            $products->getCollection()->pluck('id')->all(),
-        );
 
         return [
             'data' => $products
                 ->getCollection()
-                ->map(fn (Product $product): array => $this->productPayload(
-                    $product,
-                    $availability[$product->id] ?? $this->emptyAvailability(),
-                ))
+                ->map(fn (CatalogProductProjection $projection): array => $projection->payload)
                 ->values()
                 ->all(),
             'meta' => $this->paginationMeta($products),
@@ -139,37 +114,6 @@ class CatalogReadService
     }
 
     /**
-     * @param  array{in_stock: bool, available_quantity: int}  $availability
-     * @return array<string, mixed>
-     */
-    private function productPayload(Product $product, array $availability): array
-    {
-        return [
-            'id' => $product->id,
-            'name' => $product->name,
-            'slug' => $product->slug,
-            'sku' => $product->sku,
-            'description' => $product->description,
-            'status' => $product->status,
-            'availability' => $availability,
-            'published_at' => $product->published_at?->toJSON(),
-            'category' => $product->category ? [
-                'id' => $product->category->id,
-                'name' => $product->category->name,
-                'slug' => $product->category->slug,
-            ] : null,
-            'attributes' => $product->attributes
-                ->sortBy('name')
-                ->map(fn ($attribute): array => [
-                    'name' => $attribute->name,
-                    'value' => $attribute->value,
-                ])
-                ->values()
-                ->all(),
-        ];
-    }
-
-    /**
      * @return array<string, int>
      */
     private function paginationMeta(LengthAwarePaginator $products): array
@@ -179,17 +123,6 @@ class CatalogReadService
             'last_page' => $products->lastPage(),
             'per_page' => $products->perPage(),
             'total' => $products->total(),
-        ];
-    }
-
-    /**
-     * @return array{in_stock: bool, available_quantity: int}
-     */
-    private function emptyAvailability(): array
-    {
-        return [
-            'in_stock' => false,
-            'available_quantity' => 0,
         ];
     }
 }

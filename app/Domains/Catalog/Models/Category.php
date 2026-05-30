@@ -3,6 +3,7 @@
 namespace App\Domains\Catalog\Models;
 
 use App\Domains\Catalog\Read\CatalogCacheKeys;
+use App\Domains\Catalog\Read\CatalogProjectionService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,6 +19,10 @@ class Category extends Model
         static::saved(function (): void {
             CatalogCacheKeys::invalidateCategoryTree();
             CatalogCacheKeys::invalidateProducts();
+        });
+
+        static::saved(function (Category $category): void {
+            app(CatalogProjectionService::class)->syncCategoryProducts($category);
         });
 
         static::deleted(function (): void {

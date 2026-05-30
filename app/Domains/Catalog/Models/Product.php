@@ -6,6 +6,7 @@ use App\Domains\Catalog\Events\ProductArchived;
 use App\Domains\Catalog\Events\ProductCreated;
 use App\Domains\Catalog\Events\ProductUpdated;
 use App\Domains\Catalog\Read\CatalogCacheKeys;
+use App\Domains\Catalog\Read\CatalogProjectionService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -36,8 +37,13 @@ class Product extends Model
             CatalogCacheKeys::invalidateProducts();
         });
 
-        static::deleted(function (): void {
+        static::saved(function (Product $product): void {
+            app(CatalogProjectionService::class)->syncProduct($product);
+        });
+
+        static::deleted(function (Product $product): void {
             CatalogCacheKeys::invalidateProducts();
+            app(CatalogProjectionService::class)->deleteProduct($product);
         });
     }
 

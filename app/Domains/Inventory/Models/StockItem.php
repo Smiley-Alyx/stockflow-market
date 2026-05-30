@@ -3,6 +3,8 @@
 namespace App\Domains\Inventory\Models;
 
 use App\Domains\Catalog\Models\Product;
+use App\Domains\Catalog\Read\CatalogCacheKeys;
+use App\Domains\Catalog\Read\CatalogProjectionService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,6 +14,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class StockItem extends Model
 {
     protected $table = 'inventory_stock_items';
+
+    protected static function booted(): void
+    {
+        static::saved(function (StockItem $stockItem): void {
+            CatalogCacheKeys::invalidateProducts();
+            app(CatalogProjectionService::class)->syncAvailability($stockItem->product_id);
+        });
+
+        static::deleted(function (StockItem $stockItem): void {
+            CatalogCacheKeys::invalidateProducts();
+            app(CatalogProjectionService::class)->syncAvailability($stockItem->product_id);
+        });
+    }
 
     /**
      * @return BelongsTo<Warehouse, $this>

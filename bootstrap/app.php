@@ -2,6 +2,7 @@
 
 use App\Console\Commands\ExpireInventoryReservationsCommand;
 use App\Console\Commands\PublishOutboxCommand;
+use App\Console\Commands\RebuildCatalogProjectionsCommand;
 use App\Console\Commands\SearchDeadLetterCommand;
 use App\Http\Middleware\RecordHttpMetrics;
 use Illuminate\Console\Scheduling\Schedule;
@@ -19,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withCommands([
         ExpireInventoryReservationsCommand::class,
         PublishOutboxCommand::class,
+        RebuildCatalogProjectionsCommand::class,
         SearchDeadLetterCommand::class,
     ])
     ->withSchedule(function (Schedule $schedule): void {

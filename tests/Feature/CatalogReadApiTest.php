@@ -13,6 +13,7 @@ use App\Infrastructure\Messaging\DomainEventPublisher;
 use Closure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -224,6 +225,42 @@ class CatalogReadApiTest extends TestCase
         $this->getJson('/api/catalog/products/wireless-scanner')
             ->assertOk()
             ->assertJsonPath('data.sku', 'SCAN-001');
+    }
+
+    public function test_product_endpoint_reads_from_catalog_projection(): void
+    {
+        $product = $this->createProduct();
+
+        DB::table('catalog_products')
+            ->where('id', $product->id)
+            ->update(['name' => 'Changed Source Name']);
+
+        Cache::flush();
+
+        $this->getJson('/api/catalog/products/wireless-scanner')
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Wireless Scanner');
+    }
+
+    public function test_catalog_projection_rebuild_command_backfills_products(): void
+    {
+        $product = $this->createProduct();
+
+        DB::table('catalog_product_projections')
+            ->where('product_id', $product->id)
+            ->delete();
+
+        Cache::flush();
+
+        $this->getJson('/api/catalog/products/wireless-scanner')
+            ->assertNotFound();
+
+        $this->artisan('catalog:projections:rebuild')
+            ->assertSuccessful();
+
+        $this->getJson('/api/catalog/products/wireless-scanner')
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Wireless Scanner');
     }
 
     public function test_category_tree_endpoint_returns_only_active_categories(): void
