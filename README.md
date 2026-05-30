@@ -37,6 +37,59 @@ StockFlow Market — инженерный pet-проект маркетплей�
 
 Целевое направление — микросервисный marketplace, где каждый сервис владеет своей моделью, контрактами и схемой данных. На раннем этапе реализация остаётся в одном репозитории, чтобы быстрее развивать сценарии и не платить стоимость распределённой системы до появления реальной доменной нагрузки.
 
+```mermaid
+flowchart LR
+    client["Nuxt frontend / API client"] --> gateway["Laravel backend shell<br/>API gateway + modular monolith"]
+    admin["Filament admin"] --> gateway
+
+    subgraph domains["Текущие домены внутри app/"]
+        catalog["Catalog"]
+        inventory["Inventory"]
+        pricing["Pricing"]
+        orders["Orders"]
+        homepage["Homepage"]
+        search["Search"]
+    end
+
+    gateway --> catalog
+    gateway --> inventory
+    gateway --> pricing
+    gateway --> orders
+    gateway --> homepage
+    gateway --> search
+
+    postgres[("PostgreSQL")]
+    redis[("Redis<br/>cache / queues / dead-letter")]
+    elasticsearch[("Elasticsearch")]
+
+    catalog --> postgres
+    inventory --> postgres
+    pricing --> postgres
+    orders --> postgres
+    homepage --> postgres
+    catalog --> outbox["Transactional outbox"]
+    inventory --> outbox
+    orders --> outbox
+    outbox --> postgres
+    outbox --> publisher["In-process publisher"]
+    publisher --> redis
+    redis --> worker["Search index worker"]
+    worker --> elasticsearch
+    worker -. "dead-letter при сбое" .-> redis
+    search --> elasticsearch
+
+    prometheus["Prometheus"] -->|"scrape /metrics"| gateway
+    grafana["Grafana"] --> prometheus
+
+    subgraph extended["Опциональный профиль extended"]
+        rabbitmq["RabbitMQ<br/>будущий event transport"]
+        clickhouse[("ClickHouse<br/>будущие аналитические витрины")]
+    end
+
+    outbox -. "планируемый transport" .-> rabbitmq
+    rabbitmq -. "планируемые аналитические события" .-> clickhouse
+```
+
 ```text
 stockflow-market/
   app/                    # Laravel backend shell / gateway на текущем этапе
