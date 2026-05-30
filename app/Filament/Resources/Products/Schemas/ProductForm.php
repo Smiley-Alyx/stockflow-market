@@ -1,0 +1,46 @@
+<?php
+
+namespace App\Filament\Resources\Products\Schemas;
+
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Schema;
+
+class ProductForm
+{
+    public static function configure(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Select::make('category_id')
+                    ->relationship('category', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->required(),
+                TextInput::make('name')
+                    ->required()
+                    ->maxLength(255),
+                TextInput::make('slug')
+                    ->required()
+                    ->maxLength(255)
+                    ->unique(ignoreRecord: true),
+                TextInput::make('sku')
+                    ->required()
+                    ->maxLength(255)
+                    ->unique(ignoreRecord: true),
+                Select::make('status')
+                    ->options([
+                        'draft' => 'Draft',
+                        'published' => 'Published',
+                        'archived' => 'Archived',
+                    ])
+                    ->default('draft')
+                    ->required(),
+                DateTimePicker::make('published_at'),
+                Textarea::make('description')
+                    ->columnSpanFull(),
+            ]);
+    }
+}

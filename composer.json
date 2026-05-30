@@ -3,10 +3,16 @@
     "name": "smiley-alyx/stockflow-market",
     "type": "project",
     "description": "Pet highload marketplace case built as a Laravel modular monolith.",
-    "keywords": ["laravel", "marketplace", "ddd", "highload"],
+    "keywords": [
+        "laravel",
+        "marketplace",
+        "ddd",
+        "highload"
+    ],
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "filament/filament": "^5.6",
         "laravel/framework": "^13.8",
         "laravel/tinker": "^3.0"
     },
@@ -54,7 +60,8 @@
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
-            "@php artisan package:discover --ansi"
+            "@php artisan package:discover --ansi",
+            "@php artisan filament:upgrade"
         ],
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
