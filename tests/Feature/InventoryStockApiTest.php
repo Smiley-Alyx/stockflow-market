@@ -14,6 +14,7 @@ use App\Domains\Inventory\Services\InsufficientStock;
 use App\Domains\Inventory\Services\InventoryService;
 use App\Infrastructure\Messaging\OutboxMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Tests\Support\AssertsOpenApiContracts;
@@ -143,6 +144,55 @@ class InventoryStockApiTest extends TestCase
             $this->assertSchemaMatchesPayload($contract, 'StockResponse', $payload);
             $this->assertSchemaMatchesPayload($contract, 'Stock', $payload['data']);
             $this->assertSchemaMatchesPayload($contract, 'WarehouseStock', $payload['data']['warehouses'][0]);
+        }
+    }
+
+    public function test_stock_movements_endpoint_uses_cursor_pagination(): void
+    {
+        $stockItem = $this->createStockItem(onHand: 10);
+
+        $first = $this->createMovement($stockItem, StockMovement::TYPE_RECEIVED, now()->subMinutes(1));
+        $second = $this->createMovement($stockItem, StockMovement::TYPE_RESERVED, now()->subMinutes(2));
+        $third = $this->createMovement($stockItem, StockMovement::TYPE_DEDUCTED, now()->subMinutes(3));
+
+        $page = $this->getJson('/api/inventory/stock-movements?stock_item_id='.$stockItem->id.'&per_page=2')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $first->id)
+            ->assertJsonPath('data.1.id', $second->id)
+            ->assertJsonPath('meta.per_page', 2)
+            ->json();
+
+        $this->assertNotNull($page['meta']['next_cursor']);
+
+        $this->getJson('/api/inventory/stock-movements?stock_item_id='.$stockItem->id.'&per_page=2&cursor='.urlencode($page['meta']['next_cursor']))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $third->id)
+            ->assertJsonPath('meta.next_cursor', null);
+    }
+
+    public function test_stock_movements_endpoint_rejects_invalid_cursor(): void
+    {
+        $this->getJson('/api/inventory/stock-movements?cursor=not-a-cursor')
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'Invalid movement cursor.');
+    }
+
+    public function test_stock_movements_endpoint_matches_gateway_and_inventory_contracts(): void
+    {
+        $stockItem = $this->createStockItem(onHand: 10);
+        $this->createMovement($stockItem, StockMovement::TYPE_RECEIVED, now());
+
+        $payload = $this->getJson('/api/inventory/stock-movements?stock_item_id='.$stockItem->id)
+            ->assertOk()
+            ->assertHeader('content-type', 'application/json')
+            ->json();
+
+        foreach ($this->inventoryContracts() as $contract) {
+            $this->assertContractDeclaresResponse($contract, '/api/inventory/stock-movements', '200', 'StockMovementPage');
+            $this->assertContractDeclaresResponse($contract, '/api/inventory/stock-movements', '422', 'ErrorResponse');
+            $this->assertSchemaMatchesPayload($contract, 'StockMovementPage', $payload);
+            $this->assertSchemaMatchesPayload($contract, 'StockMovement', $payload['data'][0]);
         }
     }
 
@@ -283,6 +333,45 @@ class InventoryStockApiTest extends TestCase
     {
         $this->artisan('schedule:list')
             ->expectsOutputToContain('inventory:reservations:expire')
+            ->assertExitCode(0);
+    }
+
+    public function test_stock_movement_archive_command_moves_old_movements(): void
+    {
+        $stockItem = $this->createStockItem(onHand: 10);
+        $old = $this->createMovement($stockItem, StockMovement::TYPE_RECEIVED, now()->subDays(200));
+        $recent = $this->createMovement($stockItem, StockMovement::TYPE_RESERVED, now()->subDays(5));
+
+        $this->artisan('inventory:stock-movements:archive --days=180 --batch-size=1')
+            ->expectsOutput('Archived 1 inventory stock movement(s).')
+            ->assertExitCode(0);
+
+        $this->assertDatabaseMissing('inventory_stock_movements', ['id' => $old->id]);
+        $this->assertDatabaseHas('inventory_stock_movements', ['id' => $recent->id]);
+        $this->assertDatabaseHas('inventory_stock_movement_archives', [
+            'original_id' => $old->id,
+            'stock_item_id' => $stockItem->id,
+            'type' => StockMovement::TYPE_RECEIVED,
+        ]);
+    }
+
+    public function test_stock_movement_archive_command_can_dry_run(): void
+    {
+        $stockItem = $this->createStockItem(onHand: 10);
+        $old = $this->createMovement($stockItem, StockMovement::TYPE_RECEIVED, now()->subDays(200));
+
+        $this->artisan('inventory:stock-movements:archive --days=180 --dry-run')
+            ->expectsOutputToContain('Dry run: 1 inventory stock movement(s)')
+            ->assertExitCode(0);
+
+        $this->assertDatabaseHas('inventory_stock_movements', ['id' => $old->id]);
+        $this->assertSame(0, DB::table('inventory_stock_movement_archives')->count());
+    }
+
+    public function test_stock_movement_archive_command_is_scheduled(): void
+    {
+        $this->artisan('schedule:list')
+            ->expectsOutputToContain('inventory:stock-movements:archive')
             ->assertExitCode(0);
     }
 
@@ -473,6 +562,16 @@ class InventoryStockApiTest extends TestCase
             'sku' => 'SCAN-001',
             'on_hand_quantity' => $onHand,
             'reserved_quantity' => 0,
+        ]);
+    }
+
+    private function createMovement(StockItem $stockItem, string $type, mixed $occurredAt): StockMovement
+    {
+        return StockMovement::query()->create([
+            'stock_item_id' => $stockItem->id,
+            'type' => $type,
+            'quantity' => 1,
+            'occurred_at' => $occurredAt,
         ]);
     }
 

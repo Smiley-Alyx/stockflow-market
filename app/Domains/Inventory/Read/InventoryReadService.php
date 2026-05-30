@@ -3,7 +3,11 @@
 namespace App\Domains\Inventory\Read;
 
 use App\Domains\Inventory\Models\StockItem;
+use App\Domains\Inventory\Models\StockMovement;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
+use InvalidArgumentException;
 
 class InventoryReadService
 {
@@ -82,5 +86,88 @@ class InventoryReadService
                 ];
             })
             ->all();
+    }
+
+    /**
+     * @return array{data: array<int, array<string, mixed>>, meta: array{next_cursor: string|null, per_page: int}}
+     */
+    public function movements(?int $stockItemId = null, ?string $type = null, ?string $cursor = null, int $perPage = 50): array
+    {
+        $perPage = max(1, min($perPage, 100));
+        $decodedCursor = $cursor === null ? null : $this->decodeCursor($cursor);
+
+        $movements = StockMovement::query()
+            ->when($stockItemId !== null, fn (Builder $query): Builder => $query->where('stock_item_id', $stockItemId))
+            ->when($type !== null, fn (Builder $query): Builder => $query->where('type', $type))
+            ->when($decodedCursor !== null, function (Builder $query) use ($decodedCursor): Builder {
+                return $query->where(function (Builder $query) use ($decodedCursor): void {
+                    $query
+                        ->where('occurred_at', '<', $decodedCursor['occurred_at'])
+                        ->orWhere(function (Builder $query) use ($decodedCursor): void {
+                            $query
+                                ->where('occurred_at', $decodedCursor['occurred_at'])
+                                ->where('id', '<', $decodedCursor['id']);
+                        });
+                });
+            })
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id')
+            ->limit($perPage + 1)
+            ->get();
+
+        $hasMore = $movements->count() > $perPage;
+        $page = $movements->take($perPage)->values();
+        $last = $page->last();
+
+        return [
+            'data' => $page
+                ->map(fn (StockMovement $movement): array => [
+                    'id' => $movement->id,
+                    'stock_item_id' => $movement->stock_item_id,
+                    'reservation_id' => $movement->reservation_id,
+                    'type' => $movement->type,
+                    'quantity' => $movement->quantity,
+                    'reference_type' => $movement->reference_type,
+                    'reference_id' => $movement->reference_id,
+                    'metadata' => $movement->metadata,
+                    'occurred_at' => $movement->occurred_at?->toJSON(),
+                ])
+                ->all(),
+            'meta' => [
+                'next_cursor' => $hasMore && $last instanceof StockMovement ? $this->encodeCursor($last) : null,
+                'per_page' => $perPage,
+            ],
+        ];
+    }
+
+    /**
+     * @return array{occurred_at: CarbonImmutable, id: int}
+     */
+    private function decodeCursor(string $cursor): array
+    {
+        $decoded = base64_decode($cursor, true);
+
+        if ($decoded === false) {
+            throw new InvalidArgumentException('Invalid movement cursor.');
+        }
+
+        $payload = json_decode($decoded, true);
+
+        if (! is_array($payload) || ! isset($payload['occurred_at'], $payload['id'])) {
+            throw new InvalidArgumentException('Invalid movement cursor.');
+        }
+
+        return [
+            'occurred_at' => CarbonImmutable::parse((string) $payload['occurred_at']),
+            'id' => (int) $payload['id'],
+        ];
+    }
+
+    private function encodeCursor(StockMovement $movement): string
+    {
+        return base64_encode(json_encode([
+            'occurred_at' => $movement->occurred_at instanceof Carbon ? $movement->occurred_at->toJSON() : (string) $movement->occurred_at,
+            'id' => $movement->id,
+        ], JSON_THROW_ON_ERROR));
     }
 }

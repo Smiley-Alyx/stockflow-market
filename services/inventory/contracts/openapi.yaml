@@ -42,6 +42,53 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/inventory/stock-movements:
+    get:
+      summary: List recent stock movements with cursor pagination
+      parameters:
+        - name: stock_item_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - received
+              - reserved
+              - released
+              - expired
+              - deducted
+              - returned
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: per_page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Stock movements page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockMovementPage'
+        '422':
+          description: Invalid movement query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/inventory/reservations:
     post:
       summary: Reserve stock with idempotency and TTL
@@ -127,6 +174,77 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/Reservation'
+    StockMovementPage:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockMovement'
+        meta:
+          $ref: '#/components/schemas/CursorPaginationMeta'
+    CursorPaginationMeta:
+      type: object
+      required:
+        - next_cursor
+        - per_page
+      properties:
+        next_cursor:
+          type:
+            - string
+            - 'null'
+        per_page:
+          type: integer
+    StockMovement:
+      type: object
+      required:
+        - id
+        - stock_item_id
+        - reservation_id
+        - type
+        - quantity
+        - reference_type
+        - reference_id
+        - metadata
+        - occurred_at
+      properties:
+        id:
+          type: integer
+        stock_item_id:
+          type: integer
+        reservation_id:
+          type:
+            - integer
+            - 'null'
+        type:
+          type: string
+          enum:
+            - received
+            - reserved
+            - released
+            - expired
+            - deducted
+            - returned
+        quantity:
+          type: integer
+        reference_type:
+          type:
+            - string
+            - 'null'
+        reference_id:
+          type:
+            - string
+            - 'null'
+        metadata:
+          type:
+            - object
+            - 'null'
+        occurred_at:
+          type: string
+          format: date-time
     CreateReservationRequest:
       type: object
       required:

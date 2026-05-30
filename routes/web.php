@@ -27,6 +27,7 @@ Route::get('/api/catalog/products', [ProductController::class, 'index'])
 Route::get('/api/catalog/products/{slug}', [ProductController::class, 'show']);
 Route::get('/api/catalog/categories/tree', [CategoryController::class, 'tree']);
 Route::get('/api/inventory/stock', [StockController::class, 'show']);
+Route::get('/api/inventory/stock-movements', [StockController::class, 'movements']);
 Route::post('/api/inventory/reservations', [ReservationController::class, 'store']);
 Route::post('/api/inventory/reservations/cancel', [ReservationController::class, 'cancel']);
 Route::get('/api/pricing/prices', [PriceController::class, 'index']);

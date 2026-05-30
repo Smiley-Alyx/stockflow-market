@@ -63,6 +63,13 @@ return [
         ],
     ],
 
+    'inventory' => [
+        'stock_movements' => [
+            'retention_days' => (int) env('STOCKFLOW_STOCK_MOVEMENT_RETENTION_DAYS', 180),
+            'archive_batch_size' => (int) env('STOCKFLOW_STOCK_MOVEMENT_ARCHIVE_BATCH_SIZE', 500),
+        ],
+    ],
+
     'search' => [
         'indexing' => [
             'queue' => env('STOCKFLOW_SEARCH_INDEX_QUEUE', 'search-indexing'),

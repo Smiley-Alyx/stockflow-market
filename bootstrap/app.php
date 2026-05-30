@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\ArchiveStockMovementsCommand;
 use App\Console\Commands\ExpireInventoryReservationsCommand;
 use App\Console\Commands\PublishOutboxCommand;
 use App\Console\Commands\RebuildCatalogProjectionsCommand;
@@ -18,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withCommands([
+        ArchiveStockMovementsCommand::class,
         ExpireInventoryReservationsCommand::class,
         PublishOutboxCommand::class,
         RebuildCatalogProjectionsCommand::class,
@@ -26,6 +28,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('inventory:reservations:expire')
             ->everyMinute()
+            ->withoutOverlapping();
+        $schedule->command('inventory:stock-movements:archive')
+            ->dailyAt('02:15')
             ->withoutOverlapping();
     })
     ->withMiddleware(function (Middleware $middleware): void {
