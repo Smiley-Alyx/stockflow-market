@@ -180,6 +180,16 @@ composer test
 
 Тесты страхуют базовый Laravel bootstrap, runtime-конфигурацию, сервисную структуру, модель каталога, OpenAPI-контракты, HTTP read API, checkout-срез с резервированием остатков и поисковый indexing pipeline, включая retry/dead-letter поведение и ручной requeue.
 
+## Нагрузочные сценарии
+
+k6-сценарии лежат в `tests/load/k6` и покрывают массовый просмотр каталога, конкурентное резервирование одного SKU, поисковые запросы и checkout burst:
+
+```bash
+k6 run tests/load/k6/stockflow.js
+```
+
+Сценарии используют `BASE_URL=http://localhost:8080` по умолчанию. Для стабильного прогона на подготовленной базе можно явно передать `RESERVATION_SKU`, `CHECKOUT_PRODUCT_ID` и `SEARCH_QUERIES`; полный список параметров описан в `tests/load/k6/README.md`.
+
 ## Инженерные решения
 
 - Репозиторий остаётся monorepo, пока сервисы находятся в активной фазе проектирования.
