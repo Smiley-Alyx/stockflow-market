@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Catalog\CategoryController;
 use App\Http\Controllers\Api\Catalog\ProductController;
+use App\Http\Controllers\Api\Homepage\HomepageController;
 use App\Http\Controllers\Api\Inventory\ReservationController;
 use App\Http\Controllers\Api\Inventory\StockController;
 use App\Http\Controllers\Api\Orders\CartItemController;
@@ -26,6 +27,7 @@ Route::get('/api/catalog/products', [ProductController::class, 'index'])
     ->middleware('throttle:stockflow-catalog');
 Route::get('/api/catalog/products/{slug}', [ProductController::class, 'show']);
 Route::get('/api/catalog/categories/tree', [CategoryController::class, 'tree']);
+Route::get('/api/homepage', HomepageController::class);
 Route::get('/api/inventory/stock', [StockController::class, 'show']);
 Route::get('/api/inventory/stock-movements', [StockController::class, 'movements']);
 Route::post('/api/inventory/reservations', [ReservationController::class, 'store']);

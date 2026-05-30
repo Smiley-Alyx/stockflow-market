@@ -72,6 +72,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CategoryTreeResponse'
+  /api/homepage:
+    get:
+      summary: Get ordered active homepage blocks
+      responses:
+        '200':
+          description: Homepage blocks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomepageResponse'
   /api/search/products:
     get:
       summary: Search indexed catalog products
@@ -471,6 +481,43 @@ components:
       properties:
         message:
           type: string
+    HomepageResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/HomepageBlock'
+    HomepageBlock:
+      type: object
+      required:
+        - id
+        - type
+        - title
+        - position
+        - content
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum:
+            - recommended_products
+            - bestseller_products
+            - new_products
+            - description
+            - cities
+            - banner
+        title:
+          type:
+            - string
+            - 'null'
+        position:
+          type: integer
+        content:
+          type: object
     ProductResponse:
       type: object
       required:
