@@ -111,6 +111,16 @@ select {
     white-space: nowrap;
 }
 
+.counter {
+    flex: 0 0 auto;
+    border-radius: 999px;
+    padding: 6px 10px;
+    color: #174c39;
+    background: #edf6f1;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
 .status {
     flex: 0 0 auto;
     border-radius: 999px;
@@ -299,7 +309,7 @@ h2 {
     list-style: none;
 }
 
-.product-list button {
+.product-select {
     display: grid;
     gap: 5px;
     width: 100%;
@@ -313,7 +323,7 @@ h2 {
     cursor: pointer;
 }
 
-.product-list button:hover {
+.product-select:hover {
     border-color: rgba(31, 96, 74, 0.34);
     background: #f4faf7;
 }
@@ -326,6 +336,83 @@ h2 {
 
 .product-list strong {
     overflow-wrap: anywhere;
+}
+
+.product-actions,
+.quantity-actions,
+.mode-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.product-actions {
+    margin-top: 10px;
+}
+
+.product-actions button,
+.quantity-actions button,
+.customer-list > li > button,
+.mode-switch button,
+.primary-button {
+    min-height: 34px;
+    border: 1px solid rgba(31, 96, 74, 0.2);
+    border-radius: 8px;
+    padding: 0 11px;
+    color: #174c39;
+    background: #f4faf7;
+    font-size: 0.78rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.product-actions button:first-child,
+.primary-button {
+    border-color: #1f604a;
+    color: #ffffff;
+    background: #1f604a;
+}
+
+.customer-list {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.customer-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(23, 32, 27, 0.08);
+}
+
+.customer-list li:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.customer-list div:not(.quantity-actions),
+.account-user {
+    display: grid;
+    gap: 4px;
+}
+
+.customer-list code,
+.account-user span {
+    color: #6e7a74;
+    font-size: 0.78rem;
+}
+
+.quantity-actions .danger,
+.customer-list .danger {
+    border-color: rgba(190, 92, 48, 0.2);
+    color: #8b4327;
+    background: #fff6f1;
 }
 
 .lookup-form {
@@ -421,6 +508,62 @@ h2 {
     line-height: 1.6;
 }
 
+.account-panel {
+    flex-basis: 360px;
+}
+
+.account-user,
+.account-note,
+.form-error {
+    margin-bottom: 14px;
+}
+
+.account-note {
+    color: #66746d;
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.form-error {
+    color: #a14728;
+    font-size: 0.88rem;
+}
+
+.mode-switch {
+    margin-bottom: 14px;
+}
+
+.mode-switch button.active {
+    border-color: #1f604a;
+    color: #ffffff;
+    background: #1f604a;
+}
+
+.auth-form {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.auth-form input {
+    min-width: 0;
+    height: 42px;
+    border: 1px solid rgba(23, 32, 27, 0.16);
+    border-radius: 8px;
+    padding: 0 12px;
+    color: #17201b;
+    background: #ffffff;
+}
+
+.primary-button {
+    min-height: 42px;
+}
+
+.primary-button:disabled {
+    cursor: wait;
+    opacity: 0.62;
+}
+
 .accent-panel {
     background: #18352c;
     color: #f7fbf6;
@@ -477,6 +620,11 @@ h2 {
     .topbar-actions a,
     .status {
         text-align: center;
+    }
+
+    .customer-list li {
+        align-items: stretch;
+        flex-direction: column;
     }
 
     .metrics {

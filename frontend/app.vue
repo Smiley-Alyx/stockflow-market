@@ -2,9 +2,16 @@
 import type { CatalogCategory } from '~/composables/useCatalogApi';
 
 const catalogApi = useCatalogApi();
+const customer = useCustomerState();
 const productSlug = ref('wireless-scanner');
 const productSlugInput = ref(productSlug.value);
 const selectedCategorySlug = ref('');
+const authMode = ref<'login' | 'register'>('login');
+const authName = ref('');
+const authEmail = ref('');
+const authPassword = ref('');
+const authError = ref('');
+const authPending = ref(false);
 
 const { data: categories, error: categoriesError, pending: categoriesPending } = await useAsyncData(
     'catalog-categories',
@@ -78,6 +85,35 @@ const loadProduct = async () => {
     productSlug.value = nextSlug;
 };
 
+const submitAuth = async () => {
+    authPending.value = true;
+    authError.value = '';
+
+    try {
+        if (authMode.value === 'register') {
+            await customer.register(authName.value, authEmail.value, authPassword.value);
+        } else {
+            await customer.login(authEmail.value, authPassword.value);
+        }
+
+        authPassword.value = '';
+    } catch {
+        authError.value = 'Не удалось войти. Проверьте данные формы.';
+    } finally {
+        authPending.value = false;
+    }
+};
+
+const logout = async () => {
+    authError.value = '';
+
+    try {
+        await customer.logout();
+    } catch {
+        authError.value = 'Не удалось завершить сессию.';
+    }
+};
+
 function countCategories(nodes: CatalogCategory[]): number {
     return nodes.reduce((total, category) => total + 1 + countCategories(category.children), 0);
 }
@@ -85,6 +121,8 @@ function countCategories(nodes: CatalogCategory[]): number {
 function flattenCategories(nodes: CatalogCategory[]): CatalogCategory[] {
     return nodes.flatMap((category) => [category, ...flattenCategories(category.children)]);
 }
+
+onMounted(() => customer.initialize());
 
 useHead({
     htmlAttrs: {
@@ -104,6 +142,8 @@ main.shell
                 p Gateway shell
 
             .topbar-actions
+                span.counter Корзина {{ customer.cartCount }}
+                span.counter Избранное {{ customer.favoriteCount }}
                 a(href="/api/catalog/products?per_page=10") Catalog API
                 span.status(:class="{ 'status-muted': categoriesError || productListError }")
                     | {{ catalogStatus }}
@@ -167,10 +207,14 @@ main.shell
 
             ul.product-list(v-if="products.length")
                 li(v-for="item in products" :key="item.id")
-                    button(type="button" @click="productSlugInput = item.slug; productSlug = item.slug")
+                    button.product-select(type="button" @click="productSlugInput = item.slug; productSlug = item.slug")
                         span {{ item.category?.name ?? 'Без категории' }}
                         strong {{ item.name }}
                         code {{ item.sku }}
+                    .product-actions
+                        button(type="button" @click="customer.addCartItem(item)") В корзину
+                        button(type="button" @click="customer.toggleFavorite(item)")
+                            | {{ customer.isFavorite(item.id) ? 'Убрать из избранного' : 'В избранное' }}
 
             p.empty-state(v-else-if="productListError")
                 | Backend API недоступен для списка опубликованных товаров.
@@ -199,10 +243,89 @@ main.shell
                     template(v-for="attribute in product.attributes" :key="attribute.name")
                         dt {{ attribute.name }}
                         dd {{ attribute.value }}
+                .product-actions
+                    button(type="button" @click="customer.addCartItem(product)") Добавить в корзину
+                    button(type="button" @click="customer.toggleFavorite(product)")
+                        | {{ customer.isFavorite(product.id) ? 'Убрать из избранного' : 'В избранное' }}
 
             p.empty-state(v-else-if="productError")
                 | Backend API недоступен для запроса выбранного товара.
 
             p.empty-state(v-else)
                 | Товар не найден или backend API пока недоступен для выбранного slug.
+
+        article.panel
+            .panel-heading
+                h2 Корзина
+                span {{ customer.user.value ? 'аккаунт' : 'локально' }}
+
+            ul.customer-list(v-if="customer.state.value.cart.items.length")
+                li(v-for="item in customer.state.value.cart.items" :key="item.product_id")
+                    div
+                        strong {{ item.product_name }}
+                        code {{ item.sku }}
+                    .quantity-actions
+                        button(type="button" @click="customer.setCartItem(item, item.quantity - 1)") −
+                        span {{ item.quantity }}
+                        button(type="button" @click="customer.setCartItem(item, item.quantity + 1)") +
+                        button.danger(type="button" @click="customer.removeCartItem(item.product_id)") Удалить
+
+            p.empty-state(v-else) Корзина пока пуста.
+
+        article.panel
+            .panel-heading
+                h2 Избранное
+                span {{ customer.favoriteCount }}
+
+            ul.customer-list(v-if="customer.state.value.favorites.length")
+                li(v-for="item in customer.state.value.favorites" :key="item.product_id")
+                    div
+                        strong {{ item.product_name }}
+                        code {{ item.sku }}
+                    button.danger(type="button" @click="customer.toggleFavorite(item)") Убрать
+
+            p.empty-state(v-else) В избранном пока ничего нет.
+
+        article.panel.account-panel
+            .panel-heading
+                h2 Аккаунт
+                span {{ customer.user.value ? 'серверное хранение' : 'гостевой режим' }}
+
+            template(v-if="customer.user.value")
+                p.account-user
+                    strong {{ customer.user.value.name }}
+                    span {{ customer.user.value.email }}
+                p.account-note Корзина и избранное доступны после входа с другого устройства.
+                button.primary-button(type="button" @click="logout") Выйти
+
+            template(v-else)
+                .mode-switch
+                    button(type="button" :class="{ active: authMode === 'login' }" @click="authMode = 'login'")
+                        | Вход
+                    button(type="button" :class="{ active: authMode === 'register' }" @click="authMode = 'register'")
+                        | Регистрация
+                form.auth-form(@submit.prevent="submitAuth")
+                    input(
+                        v-if="authMode === 'register'"
+                        v-model="authName"
+                        type="text"
+                        name="name"
+                        autocomplete="name"
+                        placeholder="Имя"
+                        required
+                    )
+                    input(v-model="authEmail" type="email" name="email" autocomplete="email" placeholder="Email" required)
+                    input(
+                        v-model="authPassword"
+                        type="password"
+                        name="password"
+                        :autocomplete="authMode === 'register' ? 'new-password' : 'current-password'"
+                        placeholder="Пароль"
+                        minlength="8"
+                        required
+                    )
+                    button.primary-button(type="submit" :disabled="authPending")
+                        | {{ authMode === 'register' ? 'Зарегистрироваться' : 'Войти' }}
+                p.account-note Гостевые позиции будут перенесены в аккаунт после входа.
+                p.form-error(v-if="authError") {{ authError }}
 </template>
