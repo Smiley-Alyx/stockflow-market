@@ -39,6 +39,7 @@ if [ ! -f "$ROOT_DIR/.env" ]; then
 fi
 
 docker compose -f "$COMPOSE_FILE" up -d --build postgres redis rabbitmq elasticsearch
+docker compose -f "$COMPOSE_FILE" build php
 docker compose -f "$COMPOSE_FILE" run --rm php composer install
 
 if grep -q '^APP_KEY=$' "$ROOT_DIR/.env"; then
