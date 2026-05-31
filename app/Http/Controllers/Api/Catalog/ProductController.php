@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api\Catalog;
 
-use App\Domains\Catalog\Read\CatalogReadService;
+use App\Domains\Catalog\Read\ProductCardReadService;
 use App\Domains\Catalog\Search\CatalogProductQuery;
 use App\Domains\Catalog\Search\CatalogProductSearch;
 use App\Domains\Catalog\Services\CatalogUrlService;
@@ -70,7 +70,7 @@ class ProductController extends Controller
         );
     }
 
-    public function show(string $slug, CatalogReadService $catalog): JsonResponse
+    public function show(string $slug, ProductCardReadService $catalog): JsonResponse
     {
         $product = $catalog->productBySlug($slug);
 

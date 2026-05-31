@@ -289,6 +289,22 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ProductOffer'
+        card_attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductAttribute'
+        gallery:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductGalleryImage'
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductDocument'
+        warehouses:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductWarehouseAvailability'
     ProductAvailability:
       type: object
       required:
@@ -458,6 +474,94 @@ components:
             - 'null'
         attributes:
           type: object
+    ProductGalleryImage:
+      type: object
+      required:
+        - id
+        - file_id
+        - title
+        - url
+      properties:
+        id:
+          type: integer
+        file_id:
+          type: integer
+        title:
+          type:
+            - string
+            - 'null'
+        url:
+          type:
+            - string
+            - 'null'
+    ProductDocument:
+      type: object
+      required:
+        - id
+        - file_id
+        - type
+        - title
+        - url
+        - mime_type
+        - size
+      properties:
+        id:
+          type: integer
+        file_id:
+          type: integer
+        type:
+          type: string
+          enum:
+            - instruction
+            - certificate
+            - attachment
+        title:
+          type: string
+        url:
+          type:
+            - string
+            - 'null'
+        mime_type:
+          type:
+            - string
+            - 'null'
+        size:
+          type:
+            - integer
+            - 'null'
+    ProductWarehouseAvailability:
+      type: object
+      required:
+        - warehouse_id
+        - warehouse_code
+        - warehouse_name
+        - city_code
+        - city_name
+        - available_quantity
+        - in_stock
+      properties:
+        warehouse_id:
+          type: integer
+        warehouse_code:
+          type:
+            - string
+            - 'null'
+        warehouse_name:
+          type:
+            - string
+            - 'null'
+        city_code:
+          type:
+            - string
+            - 'null'
+        city_name:
+          type:
+            - string
+            - 'null'
+        available_quantity:
+          type: integer
+        in_stock:
+          type: boolean
     CategoryTreeResponse:
       type: object
       required:
@@ -492,6 +596,10 @@ components:
             - string
             - 'null'
         filterable_attributes:
+          type: array
+          items:
+            type: string
+        card_attribute_names:
           type: array
           items:
             type: string

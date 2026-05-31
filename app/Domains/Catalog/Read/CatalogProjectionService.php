@@ -6,6 +6,7 @@ use App\Domains\Catalog\Models\CatalogProductProjection;
 use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Models\Product;
 use App\Domains\Catalog\Models\ProductAttribute;
+use App\Domains\Catalog\Models\ProductFile;
 use App\Domains\Catalog\Models\ProductOffer;
 use App\Domains\Catalog\Search\CatalogSearchIndexService;
 use App\Domains\Catalog\Services\CatalogUrlService;
@@ -25,7 +26,7 @@ class CatalogProjectionService
 
         /** @var Product|null $fresh */
         $fresh = Product::query()
-            ->with(['brand.logoFile', 'category.imageFile', 'imageFile', 'attributes', 'offers.imageFile'])
+            ->with(['brand.logoFile', 'category.imageFile', 'imageFile', 'attributes', 'offers.imageFile', 'files.file'])
             ->find($productId);
 
         if (! $fresh instanceof Product) {
@@ -156,6 +157,43 @@ class CatalogProjectionService
                 ->map(fn (ProductAttribute $attribute): array => [
                     'name' => $attribute->name,
                     'value' => $attribute->value,
+                ])
+                ->values()
+                ->all(),
+            'card_attributes' => collect($product->category?->card_attribute_names ?? [])
+                ->map(function (string $name) use ($product): ?array {
+                    $attribute = $product->attributes->firstWhere('name', $name);
+
+                    return $attribute instanceof ProductAttribute ? [
+                        'name' => $attribute->name,
+                        'value' => $attribute->value,
+                    ] : null;
+                })
+                ->filter()
+                ->values()
+                ->all(),
+            'gallery' => $product->files
+                ->where('type', ProductFile::TYPE_GALLERY)
+                ->sortBy([['position', 'asc'], ['id', 'asc']])
+                ->map(fn (ProductFile $file): array => [
+                    'id' => $file->id,
+                    'file_id' => $file->file_id,
+                    'title' => $file->title,
+                    'url' => $file->file?->url(),
+                ])
+                ->values()
+                ->all(),
+            'documents' => $product->files
+                ->where('type', '!=', ProductFile::TYPE_GALLERY)
+                ->sortBy([['type', 'asc'], ['position', 'asc'], ['id', 'asc']])
+                ->map(fn (ProductFile $file): array => [
+                    'id' => $file->id,
+                    'file_id' => $file->file_id,
+                    'type' => $file->type,
+                    'title' => $file->title ?? $file->file?->original_name,
+                    'url' => $file->file?->url(),
+                    'mime_type' => $file->file?->mime_type,
+                    'size' => $file->file?->size,
                 ])
                 ->values()
                 ->all(),

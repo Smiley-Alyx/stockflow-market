@@ -96,6 +96,30 @@ class InventoryReadService
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function warehouseAvailabilityForProductId(int $productId): array
+    {
+        return StockItem::query()
+            ->with('warehouse')
+            ->where('product_id', $productId)
+            ->whereHas('warehouse', fn (Builder $query): Builder => $query->where('is_active', true))
+            ->orderBy('warehouse_id')
+            ->get()
+            ->map(fn (StockItem $item): array => [
+                'warehouse_id' => $item->warehouse_id,
+                'warehouse_code' => $item->warehouse?->code,
+                'warehouse_name' => $item->warehouse?->name,
+                'city_code' => $item->warehouse?->city_code,
+                'city_name' => $item->warehouse?->city_name,
+                'available_quantity' => $item->availableQuantity(),
+                'in_stock' => $item->availableQuantity() > 0,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
      * @param  array<int, int>  $productIds
      * @return array<int, array<int, string>>
      */

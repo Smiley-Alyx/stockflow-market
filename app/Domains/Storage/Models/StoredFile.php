@@ -3,6 +3,7 @@
 namespace App\Domains\Storage\Models;
 
 use App\Domains\Catalog\Models\Product;
+use App\Domains\Catalog\Models\ProductFile;
 use App\Domains\Catalog\Models\ProductOffer;
 use App\Domains\Catalog\Read\CatalogCacheKeys;
 use App\Domains\Catalog\Read\CatalogProjectionService;
@@ -90,6 +91,11 @@ class StoredFile extends Model
             ->merge(
                 ProductOffer::query()
                     ->where('image_file_id', $this->id)
+                    ->pluck('product_id'),
+            )
+            ->merge(
+                ProductFile::query()
+                    ->where('file_id', $this->id)
                     ->pluck('product_id'),
             )
             ->unique();

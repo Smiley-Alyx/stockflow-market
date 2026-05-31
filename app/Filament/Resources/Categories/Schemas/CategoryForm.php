@@ -34,6 +34,7 @@ class CategoryForm
                     ->default(true)
                     ->required(),
                 TagsInput::make('filterable_attributes'),
+                TagsInput::make('card_attribute_names'),
                 Textarea::make('description')
                     ->columnSpanFull(),
             ]);

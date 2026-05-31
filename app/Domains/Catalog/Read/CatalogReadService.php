@@ -115,6 +115,7 @@ class CatalogReadService
                 'description' => $category->description,
                 'image_url' => $category->imageFile?->url(),
                 'filterable_attributes' => $category->filterable_attributes ?? [],
+                'card_attribute_names' => $category->card_attribute_names ?? [],
                 'url' => $this->urls->categoryUrl($category),
                 'children' => $this->buildCategoryBranch($categories, $category->id),
             ])

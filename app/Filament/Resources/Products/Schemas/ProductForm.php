@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources\Products\Schemas;
 
+use App\Domains\Catalog\Models\ProductFile;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -61,6 +63,27 @@ class ProductForm
                 Textarea::make('short_description')
                     ->columnSpanFull(),
                 Textarea::make('description')
+                    ->columnSpanFull(),
+                Repeater::make('files')
+                    ->relationship()
+                    ->schema([
+                        Select::make('file_id')
+                            ->relationship('file', 'original_name')
+                            ->searchable()
+                            ->preload()
+                            ->required(),
+                        Select::make('type')
+                            ->options(ProductFile::typeOptions())
+                            ->required(),
+                        TextInput::make('title')
+                            ->maxLength(255),
+                        TextInput::make('position')
+                            ->numeric()
+                            ->minValue(0)
+                            ->default(0)
+                            ->required(),
+                    ])
+                    ->columns(2)
                     ->columnSpanFull(),
             ]);
     }
