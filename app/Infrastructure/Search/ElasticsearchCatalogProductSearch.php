@@ -33,20 +33,21 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
         $filterableAttributes = $this->filterableAttributes($query, $category);
 
         if (! $this->circuitBreaker->allows('elasticsearch')) {
-            return $this->degradedResults($query);
+            return $this->degradedResults($query, $category);
         }
 
         try {
             $response = Http::baseUrl(rtrim((string) config('stockflow.dependencies.elasticsearch.host'), '/'))
                 ->timeout((int) ceil(config('stockflow.search.indexing.timeout_ms') / 1000))
                 ->asJson()
-                ->post('/catalog_products/_search', [
+                ->post('/catalog_products/_search', array_filter([
                     'from' => ($query->page - 1) * $query->perPage,
                     'size' => $query->perPage,
                     'query' => $this->searchQuery($query, $category),
+                    'post_filter' => $this->priceFilter($query),
                     'sort' => $this->sort($query->sort),
                     'aggs' => $this->aggregations($filterableAttributes),
-                ])
+                ], fn (mixed $value): bool => $value !== null))
                 ->throw()
                 ->json();
 
@@ -65,18 +66,20 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
                     'category_path' => $category === null ? null : $this->urls->categoryPath($category),
                     'canonical_url' => $category === null ? '/catalog/' : $this->urls->categoryUrl($category),
                     'breadcrumbs' => $category === null ? [] : $this->urls->breadcrumbs($category),
+                    'filter_url' => $this->urls->filterUrl($category, $query->filters, $query->priceFrom, $query->priceTo),
+                    'price_range' => $this->priceRange($response, $category, $query),
                     'city_code' => $query->cityCode,
                     'sort' => $query->sort,
                     'current_page' => $query->page,
                     'per_page' => $query->perPage,
                     'total' => $this->totalHits($response),
-                    'filters' => $this->availableFilters($response, $filterableAttributes),
+                    'filters' => $this->availableFilters($response, $filterableAttributes, $category, $query),
                 ],
             ];
         } catch (Throwable) {
             $this->circuitBreaker->recordFailure('elasticsearch');
 
-            return $this->degradedResults($query);
+            return $this->degradedResults($query, $category);
         }
     }
 
@@ -145,6 +148,21 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    private function priceFilter(CatalogProductQuery $query): ?array
+    {
+        if ($query->priceFrom === null && $query->priceTo === null) {
+            return null;
+        }
+
+        return ['range' => ['price.amount_minor' => array_filter([
+            'gte' => $query->priceFrom,
+            'lte' => $query->priceTo,
+        ], fn (?int $value): bool => $value !== null)]];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function cityAvailabilityFilter(string $cityCode, bool $inStock): array
@@ -186,6 +204,10 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
             ->mapWithKeys(fn (string $attribute): array => [
                 $attribute => ['terms' => ['field' => 'filters.'.$attribute.'.keyword', 'size' => 100]],
             ])
+            ->merge([
+                'price_min' => ['min' => ['field' => 'price.amount_minor']],
+                'price_max' => ['max' => ['field' => 'price.amount_minor']],
+            ])
             ->all();
     }
 
@@ -220,33 +242,71 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
      * @param  array<int, string>  $attributes
      * @return array<string, array<int, array{value: string, count: int}>>
      */
-    private function availableFilters(array $response, array $attributes): array
+    private function availableFilters(array $response, array $attributes, ?Category $category, CatalogProductQuery $query): array
     {
         return collect($attributes)
             ->mapWithKeys(fn (string $attribute): array => [
                 $attribute => collect(data_get($response, 'aggregations.'.$attribute.'.buckets', []))
-                    ->map(fn (array $bucket): array => [
-                        'value' => (string) ($bucket['key'] ?? ''),
-                        'count' => (int) ($bucket['doc_count'] ?? 0),
-                    ])
+                    ->map(function (array $bucket) use ($attribute, $category, $query): array {
+                        $value = (string) ($bucket['key'] ?? '');
+                        $filters = $query->filters;
+                        $filters[$attribute] = collect($filters[$attribute] ?? [])
+                            ->push($value)
+                            ->unique()
+                            ->values()
+                            ->all();
+
+                        return [
+                            'value' => $value,
+                            'count' => (int) ($bucket['doc_count'] ?? 0),
+                            'url' => $this->urls->filterUrl($category, $filters, $query->priceFrom, $query->priceTo),
+                        ];
+                    })
                     ->all(),
             ])
             ->all();
     }
 
     /**
+     * @return array{min: int|null, max: int|null, selected_min: int|null, selected_max: int|null, url: string, url_template: string}
+     */
+    private function priceRange(array $response, ?Category $category, CatalogProductQuery $query): array
+    {
+        $min = data_get($response, 'aggregations.price_min.value');
+        $max = data_get($response, 'aggregations.price_max.value');
+
+        return [
+            'min' => $min === null ? null : (int) floor($min),
+            'max' => $max === null ? null : (int) ceil($max),
+            'selected_min' => $query->priceFrom,
+            'selected_max' => $query->priceTo,
+            'url' => $this->urls->filterUrl($category, $query->filters, $query->priceFrom, $query->priceTo),
+            'url_template' => $this->urls->priceUrlTemplate($category, $query->filters),
+        ];
+    }
+
+    /**
      * @return array{data: array<int, array<string, mixed>>, meta: array<string, mixed>}
      */
-    private function degradedResults(CatalogProductQuery $query): array
+    private function degradedResults(CatalogProductQuery $query, ?Category $category): array
     {
         return [
             'data' => [],
             'meta' => [
                 'query' => $query->query,
                 'category' => $query->category,
-                'category_path' => $query->categoryPath,
-                'canonical_url' => '/catalog/',
-                'breadcrumbs' => [],
+                'category_path' => $category === null ? $query->categoryPath : $this->urls->categoryPath($category),
+                'canonical_url' => $category === null ? '/catalog/' : $this->urls->categoryUrl($category),
+                'breadcrumbs' => $category === null ? [] : $this->urls->breadcrumbs($category),
+                'filter_url' => $this->urls->filterUrl($category, $query->filters, $query->priceFrom, $query->priceTo),
+                'price_range' => [
+                    'min' => null,
+                    'max' => null,
+                    'selected_min' => $query->priceFrom,
+                    'selected_max' => $query->priceTo,
+                    'url' => $this->urls->filterUrl($category, $query->filters, $query->priceFrom, $query->priceTo),
+                    'url_template' => $this->urls->priceUrlTemplate($category, $query->filters),
+                ],
                 'city_code' => $query->cityCode,
                 'sort' => $query->sort,
                 'current_page' => $query->page,

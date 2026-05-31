@@ -11,6 +11,7 @@ use App\Domains\Catalog\Search\CatalogSearchIndexService;
 use App\Domains\Inventory\Models\StockItem;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Pricing\Models\ProductPrice;
+use App\Domains\Pricing\Read\PricingReadService;
 use App\Domains\Search\Events\SearchIndexRequested;
 use App\Infrastructure\Messaging\OutboxMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -103,11 +104,13 @@ class CatalogSearchApiTest extends TestCase
                             ['key' => '128gb', 'doc_count' => 2],
                         ],
                     ],
+                    'price_min' => ['value' => 99900],
+                    'price_max' => ['value' => 129900],
                 ],
             ]),
         ]);
 
-        $this->getJson('/api/catalog/products?category=devices&q=SCAN-001&brands[]=acme&filters[color][]=black&filters[color][]=white&filters[memory][]=128gb&in_stock=1&city_code=WAW&sort=price_asc&per_page=12')
+        $this->getJson('/api/catalog/products?category=devices&q=SCAN-001&brands[]=acme&filters[color][]=black&filters[color][]=white&filters[memory][]=128gb&in_stock=1&city_code=WAW&price_from=90000&price_to=140000&sort=price_asc&per_page=12')
             ->assertOk()
             ->assertJsonPath('data.0.sku', 'SCAN-001')
             ->assertJsonPath('data.0.offers.0.sku', 'SCAN-001-BLK')
@@ -116,13 +119,20 @@ class CatalogSearchApiTest extends TestCase
             ->assertJsonPath('data.0.price.discount_amount_minor', 30000)
             ->assertJsonPath('data.0.price.discount_percent', 23)
             ->assertJsonPath('data.0.price.city_code', 'waw')
+            ->assertJsonPath('data.0.price.has_discount', true)
             ->assertJsonPath('data.0.availability.in_stock', true)
             ->assertJsonPath('data.0.availability.available_quantity', 5)
             ->assertJsonPath('data.0.availability.city_code', 'waw')
             ->assertJsonPath('meta.sort', 'price_asc')
             ->assertJsonPath('meta.per_page', 12)
             ->assertJsonPath('meta.filters.color.0.value', 'black')
-            ->assertJsonPath('meta.filters.color.1.count', 3);
+            ->assertJsonPath('meta.filters.color.1.count', 3)
+            ->assertJsonPath('meta.filter_url', '/catalog/devices/filter/color-is-black-or-white/memory-is-128gb/price-from-90000-to-140000/apply/')
+            ->assertJsonPath('meta.price_range.min', 99900)
+            ->assertJsonPath('meta.price_range.max', 129900)
+            ->assertJsonPath('meta.price_range.selected_min', 90000)
+            ->assertJsonPath('meta.price_range.selected_max', 140000)
+            ->assertJsonPath('meta.price_range.url_template', '/catalog/devices/filter/color-is-black-or-white/memory-is-128gb/price-from-{price_from}-to-{price_to}/apply/');
 
         Http::assertSent(function ($request): bool {
             $body = $request->data();
@@ -133,6 +143,7 @@ class CatalogSearchApiTest extends TestCase
                 && in_array(['terms' => ['filters.memory.keyword' => ['128gb']]], $body['query']['bool']['filter'], true)
                 && in_array(['terms' => ['brand.slug.keyword' => ['acme']]], $body['query']['bool']['filter'], true)
                 && in_array(['term' => ['availability.city_codes.keyword' => 'waw']], $body['query']['bool']['filter'], true)
+                && $body['post_filter'] === ['range' => ['price.amount_minor' => ['gte' => 90000, 'lte' => 140000]]]
                 && $body['sort'][0] === ['price.amount_minor' => ['order' => 'asc', 'missing' => '_last']];
         });
     }
@@ -193,6 +204,34 @@ class CatalogSearchApiTest extends TestCase
         });
     }
 
+    public function test_catalog_filter_url_resolves_multiple_values_and_price_range(): void
+    {
+        $this->createProduct();
+
+        Http::fake([
+            '*/catalog_products/_search' => Http::response([
+                'hits' => [
+                    'total' => ['value' => 0],
+                    'hits' => [],
+                ],
+            ]),
+        ]);
+
+        $this->getJson('/catalog/devices/filter/color-is-black-or-white/price-from-99900-to-129900/apply/')
+            ->assertOk()
+            ->assertJsonPath('meta.category_path', 'devices')
+            ->assertJsonPath('meta.filter_url', '/catalog/devices/filter/color-is-black-or-white/price-from-99900-to-129900/apply/')
+            ->assertJsonPath('meta.price_range.selected_min', 99900)
+            ->assertJsonPath('meta.price_range.selected_max', 129900);
+
+        Http::assertSent(function ($request): bool {
+            $body = $request->data();
+
+            return in_array(['terms' => ['filters.color.keyword' => ['black', 'white']]], $body['query']['bool']['filter'], true)
+                && $body['post_filter'] === ['range' => ['price.amount_minor' => ['gte' => 99900, 'lte' => 129900]]];
+        });
+    }
+
     public function test_catalog_search_document_contains_filtering_and_merchandising_data(): void
     {
         $product = $this->createProduct();
@@ -247,7 +286,28 @@ class CatalogSearchApiTest extends TestCase
         $this->assertSame('SCAN-001-BLK', $message->payload['document']['offers'][0]['sku']);
         $this->assertSame(99900, $message->payload['document']['price']['amount_minor']);
         $this->assertSame(129900, $message->payload['document']['price']['original_amount_minor']);
+        $this->assertTrue($message->payload['document']['price']['has_discount']);
         $this->assertSame(['waw'], $message->payload['document']['availability']['city_codes']);
+    }
+
+    public function test_catalog_price_without_sale_keeps_original_price(): void
+    {
+        $product = $this->createProduct();
+
+        ProductPrice::query()->create([
+            'product_id' => $product->id,
+            'price_type' => 'retail',
+            'amount_minor' => 129900,
+            'currency' => 'USD',
+            'is_active' => true,
+        ]);
+
+        $price = $this->app->make(PricingReadService::class)->catalogPricesForProductIds([$product->id])[$product->id];
+
+        $this->assertFalse($price['has_discount']);
+        $this->assertSame(129900, $price['amount_minor']);
+        $this->assertSame(129900, $price['original_amount_minor']);
+        $this->assertSame(0, $price['discount_amount_minor']);
     }
 
     public function test_products_endpoint_accepts_only_supported_page_sizes_and_sorts(): void

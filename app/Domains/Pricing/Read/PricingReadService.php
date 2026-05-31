@@ -32,6 +32,7 @@ class PricingReadService
                 $discountAmount = $original['amount_minor'] - $effective['amount_minor'];
 
                 return [
+                    'has_discount' => $discountAmount > 0,
                     'amount_minor' => $effective['amount_minor'],
                     'original_amount_minor' => $original['amount_minor'],
                     'discount_amount_minor' => $discountAmount,

@@ -7,6 +7,129 @@ use Illuminate\Validation\ValidationException;
 
 class CatalogUrlService
 {
+    /**
+     * @param  array<string, array<int, string>>  $filters
+     */
+    public function filterUrl(?Category $category, array $filters, ?int $priceFrom = null, ?int $priceTo = null): string
+    {
+        $url = $category === null ? '/catalog/' : $this->categoryUrl($category);
+        $segments = collect($filters)
+            ->sortKeys()
+            ->map(function (array $values, string $name): string {
+                $values = collect($values)
+                    ->map(fn (mixed $value): string => rawurlencode((string) $value))
+                    ->sort()
+                    ->implode('-or-');
+
+                return rawurlencode($name).'-is-'.$values;
+            })
+            ->values()
+            ->all();
+
+        if ($priceFrom !== null || $priceTo !== null) {
+            $segments[] = match (true) {
+                $priceFrom !== null && $priceTo !== null => 'price-from-'.$priceFrom.'-to-'.$priceTo,
+                $priceFrom !== null => 'price-from-'.$priceFrom,
+                default => 'price-to-'.$priceTo,
+            };
+        }
+
+        return $segments === []
+            ? $url
+            : $url.'filter/'.implode('/', $segments).'/apply/';
+    }
+
+    /**
+     * @param  array<string, array<int, string>>  $filters
+     */
+    public function priceUrlTemplate(?Category $category, array $filters): string
+    {
+        $url = $this->filterUrl($category, $filters);
+
+        if (str_contains($url, '/filter/')) {
+            return str_replace('/apply/', '/price-from-{price_from}-to-{price_to}/apply/', $url);
+        }
+
+        return $url.'filter/price-from-{price_from}-to-{price_to}/apply/';
+    }
+
+    /**
+     * @return array{category_path: string, filters: array<string, array<int, string>>, price_from: int|null, price_to: int|null}
+     */
+    public function parseCatalogPath(string $path): array
+    {
+        $segments = collect(explode('/', trim($path, '/')))
+            ->filter()
+            ->values();
+
+        if ($segments->first() === 'catalog') {
+            $segments->shift();
+        }
+
+        $filterPosition = $segments->search('filter');
+        $categorySegments = $filterPosition === false ? $segments : $segments->take($filterPosition);
+        $filterSegments = $filterPosition === false ? collect() : $segments->slice($filterPosition + 1)->values();
+
+        if ($filterSegments->last() === 'apply') {
+            $filterSegments->pop();
+        } elseif ($filterSegments->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'path' => ['Catalog filter URL must end with apply.'],
+            ]);
+        }
+
+        $categoryPath = $categorySegments->implode('/');
+        $this->pathSegments($categoryPath);
+        $filters = [];
+        $priceFrom = null;
+        $priceTo = null;
+
+        foreach ($filterSegments as $segment) {
+            if (preg_match('/^price-from-(\d+)-to-(\d+)$/', $segment, $matches) === 1) {
+                $priceFrom = (int) $matches[1];
+                $priceTo = (int) $matches[2];
+
+                continue;
+            }
+
+            if (preg_match('/^price-from-(\d+)$/', $segment, $matches) === 1) {
+                $priceFrom = (int) $matches[1];
+
+                continue;
+            }
+
+            if (preg_match('/^price-to-(\d+)$/', $segment, $matches) === 1) {
+                $priceTo = (int) $matches[1];
+
+                continue;
+            }
+
+            if (preg_match('/^([a-zA-Z0-9_-]+)-is-(.+)$/', $segment, $matches) !== 1) {
+                throw ValidationException::withMessages([
+                    'path' => ['Catalog filter URL contains an invalid segment.'],
+                ]);
+            }
+
+            $filters[rawurldecode($matches[1])] = collect(explode('-or-', $matches[2]))
+                ->map(fn (string $value): string => rawurldecode($value))
+                ->values()
+                ->all();
+        }
+
+        if ($priceFrom !== null && $priceTo !== null && $priceFrom > $priceTo) {
+            throw ValidationException::withMessages([
+                'path' => ['Minimum price must not exceed maximum price.'],
+            ]);
+        }
+
+        return [
+            'category_path' => $categoryPath,
+            'filters' => $filters,
+            'price_from' => $priceFrom,
+            'price_to' => $priceTo,
+        ];
+    }
+
     public function assertValidParent(Category $category): void
     {
         $ancestors = [];

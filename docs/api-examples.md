@@ -27,7 +27,8 @@ curl -sS "$BASE_URL/health/ready"
 ```bash
 curl -sS "$BASE_URL/api/homepage"
 curl -sS "$BASE_URL/api/catalog/categories/tree"
-curl -sS "$BASE_URL/api/catalog/products?per_page=10"
+curl -sS "$BASE_URL/api/catalog/products?per_page=12"
+curl -sS "$BASE_URL/catalog/devices/filter/color-is-black-or-white/price-from-99900-to-129900/apply/"
 curl -sS "$BASE_URL/api/catalog/products/demo-checkout-scanner"
 ```
 
@@ -81,7 +82,8 @@ curl -sS -X POST "$BASE_URL/api/orders/$ORDER_ID/paid"
 ```bash
 http GET "$BASE_URL/health/live"
 http GET "$BASE_URL/api/homepage"
-http GET "$BASE_URL/api/catalog/products" per_page==10
+http GET "$BASE_URL/api/catalog/products" per_page==12
+http GET "$BASE_URL/catalog/devices/filter/color-is-black-or-white/price-from-99900-to-129900/apply/"
 http GET "$BASE_URL/api/pricing/prices" "product_ids[]==$PRODUCT_ID" city_code==waw
 http GET "$BASE_URL/api/inventory/stock" sku=="$SKU" city_code==waw
 http GET "$BASE_URL/api/search/products" q=="Demo Scanner"

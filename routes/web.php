@@ -25,6 +25,9 @@ Route::get('/metrics', MetricsController::class);
 
 Route::get('/api/catalog/products', [ProductController::class, 'index'])
     ->middleware('throttle:stockflow-catalog');
+Route::get('/catalog/{path}', [ProductController::class, 'path'])
+    ->where('path', '.*')
+    ->middleware('throttle:stockflow-catalog');
 Route::get('/api/catalog/products/{slug}', [ProductController::class, 'show']);
 Route::get('/api/catalog/categories/tree', [CategoryController::class, 'tree']);
 Route::get('/api/homepage', HomepageController::class);

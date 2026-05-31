@@ -52,6 +52,18 @@ paths:
           required: false
           schema:
             type: string
+        - name: price_from
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - name: price_to
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
         - name: sort
           in: query
           required: false
@@ -97,6 +109,28 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: Invalid catalog filters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /catalog/{path}:
+    get:
+      summary: List products by catalog and filter URL
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated product list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductListResponse'
+        '422':
+          description: Invalid catalog URL
           content:
             application/json:
               schema:
@@ -184,6 +218,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CategoryBreadcrumb'
+        filter_url:
+          type: string
+        price_range:
+          $ref: '#/components/schemas/CatalogPriceRange'
     Product:
       type: object
       required:
@@ -269,6 +307,7 @@ components:
     CatalogPrice:
       type: object
       required:
+        - has_discount
         - amount_minor
         - original_amount_minor
         - discount_amount_minor
@@ -276,6 +315,8 @@ components:
         - currency
         - city_code
       properties:
+        has_discount:
+          type: boolean
         amount_minor:
           type: integer
         original_amount_minor:
@@ -290,6 +331,36 @@ components:
           type:
             - string
             - 'null'
+    CatalogPriceRange:
+      type: object
+      required:
+        - min
+        - max
+        - selected_min
+        - selected_max
+        - url
+        - url_template
+      properties:
+        min:
+          type:
+            - integer
+            - 'null'
+        max:
+          type:
+            - integer
+            - 'null'
+        selected_min:
+          type:
+            - integer
+            - 'null'
+        selected_max:
+          type:
+            - integer
+            - 'null'
+        url:
+          type: string
+        url_template:
+          type: string
     ProductCategory:
       type: object
       required:
