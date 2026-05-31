@@ -22,6 +22,7 @@ class CartItemController extends Controller
             cartId: isset($payload['cart_id']) ? (int) $payload['cart_id'] : null,
             productId: (int) $payload['product_id'],
             quantity: (int) $payload['quantity'],
+            userId: $request->user()?->id,
         );
 
         return response()->json(['data' => $this->cartPayload($cart)], 201);

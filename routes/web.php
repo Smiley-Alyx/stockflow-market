@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\Api\Auth\SessionController;
 use App\Http\Controllers\Api\Catalog\CategoryController;
 use App\Http\Controllers\Api\Catalog\ProductController;
+use App\Http\Controllers\Api\Customers\CustomerStateController;
 use App\Http\Controllers\Api\Homepage\HomepageController;
 use App\Http\Controllers\Api\Inventory\ReservationController;
 use App\Http\Controllers\Api\Inventory\StockController;
@@ -31,6 +33,19 @@ Route::get('/catalog/{path}', [ProductController::class, 'path'])
 Route::get('/api/catalog/products/{slug}', [ProductController::class, 'show']);
 Route::get('/api/catalog/categories/tree', [CategoryController::class, 'tree']);
 Route::get('/api/homepage', HomepageController::class);
+Route::get('/api/session/csrf', [SessionController::class, 'csrf']);
+Route::get('/api/session', [SessionController::class, 'show']);
+Route::post('/api/session/register', [SessionController::class, 'register']);
+Route::post('/api/session/login', [SessionController::class, 'login']);
+Route::delete('/api/session', [SessionController::class, 'destroy']);
+Route::middleware('auth')->group(function (): void {
+    Route::get('/api/customer-state', [CustomerStateController::class, 'show']);
+    Route::post('/api/customer-state/merge', [CustomerStateController::class, 'merge']);
+    Route::put('/api/customer-state/cart/items/{productId}', [CustomerStateController::class, 'setCartItem']);
+    Route::delete('/api/customer-state/cart/items/{productId}', [CustomerStateController::class, 'removeCartItem']);
+    Route::put('/api/customer-state/favorites/{productId}', [CustomerStateController::class, 'addFavorite']);
+    Route::delete('/api/customer-state/favorites/{productId}', [CustomerStateController::class, 'removeFavorite']);
+});
 Route::get('/api/inventory/stock', [StockController::class, 'show']);
 Route::get('/api/inventory/stock-movements', [StockController::class, 'movements']);
 Route::post('/api/inventory/reservations', [ReservationController::class, 'store']);

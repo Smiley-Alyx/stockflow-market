@@ -7,13 +7,15 @@ use Illuminate\Support\Facades\DB;
 
 class CartService
 {
-    public function addItem(?int $cartId, int $productId, int $quantity): Cart
+    public function addItem(?int $cartId, int $productId, int $quantity, ?int $userId = null): Cart
     {
-        return DB::transaction(function () use ($cartId, $productId, $quantity): Cart {
+        return DB::transaction(function () use ($cartId, $productId, $quantity, $userId): Cart {
             /** @var Cart $cart */
-            $cart = $cartId === null
-                ? Cart::query()->create()
-                : Cart::query()->lockForUpdate()->findOrFail($cartId);
+            $cart = $userId !== null
+                ? Cart::query()->firstOrCreate(['user_id' => $userId])
+                : ($cartId === null
+                    ? Cart::query()->create()
+                    : Cart::query()->lockForUpdate()->findOrFail($cartId));
 
             $item = $cart->items()
                 ->where('product_id', $productId)

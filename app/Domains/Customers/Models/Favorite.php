@@ -1,17 +1,17 @@
 <?php
 
-namespace App\Domains\Orders\Models;
+namespace App\Domains\Customers\Models;
 
+use App\Domains\Catalog\Models\Product;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['user_id'])]
-class Cart extends Model
+#[Fillable(['user_id', 'product_id'])]
+class Favorite extends Model
 {
-    protected $table = 'orders_carts';
+    protected $table = 'customer_favorites';
 
     /**
      * @return BelongsTo<User, $this>
@@ -22,10 +22,10 @@ class Cart extends Model
     }
 
     /**
-     * @return HasMany<CartItem, $this>
+     * @return BelongsTo<Product, $this>
      */
-    public function items(): HasMany
+    public function product(): BelongsTo
     {
-        return $this->hasMany(CartItem::class);
+        return $this->belongsTo(Product::class);
     }
 }
