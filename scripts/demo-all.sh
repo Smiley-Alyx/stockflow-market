@@ -53,7 +53,7 @@ wait_for_url "Payment mock" "http://localhost:8081/health"
 wait_for_url "Delivery mock" "http://localhost:8082/health"
 wait_for_url "ERP mock" "http://localhost:8083/health"
 
-for service in queue-worker search-index-worker scheduler payment-mock-worker delivery-mock-worker; do
+for service in queue-worker search-index-worker scheduler domain-outbox-worker provider-outbox-worker provider-outcome-worker payment-mock-worker delivery-mock-worker; do
     assert_service_running "$service"
 done
 

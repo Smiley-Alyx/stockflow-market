@@ -72,6 +72,19 @@ return [
         ],
     ],
 
+    'provider_saga' => [
+        'enabled' => (bool) env('STOCKFLOW_PROVIDER_SAGA_ENABLED', false),
+        'payment_token' => env('STOCKFLOW_PROVIDER_SAGA_PAYMENT_TOKEN', 'tok_approved_visa'),
+        'rabbitmq' => [
+            'host' => env('RABBITMQ_HOST', 'rabbitmq'),
+            'port' => (int) env('RABBITMQ_PORT', 5672),
+            'user' => env('RABBITMQ_USER', 'stockflow'),
+            'password' => env('RABBITMQ_PASSWORD', 'secret'),
+            'vhost' => env('RABBITMQ_VHOST', '/'),
+            'outcomes_queue' => env('STOCKFLOW_PROVIDER_OUTCOMES_QUEUE', 'stockflow.market.provider.outcomes'),
+        ],
+    ],
+
     'search' => [
         'indexing' => [
             'queue' => env('STOCKFLOW_SEARCH_INDEX_QUEUE', 'search-indexing'),

@@ -6,6 +6,8 @@ services:
     environment:
       RABBITMQ_ENABLED: "true"
       RABBITMQ_PASSWORD: stockflow
+      RABBITMQ_USER: stockflow
+      STOCKFLOW_PROVIDER_SAGA_ENABLED: "true"
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -24,6 +26,42 @@ services:
     extends:
       file: compose.yaml
       service: scheduler
+
+  provider-outbox-worker:
+    extends:
+      file: compose.yaml
+      service: queue-worker
+    container_name: stockflow-provider-outbox-worker
+    command: php artisan messaging:provider-outbox:publish --loop
+    environment:
+      RABBITMQ_ENABLED: "true"
+      RABBITMQ_PASSWORD: stockflow
+      RABBITMQ_USER: stockflow
+      STOCKFLOW_PROVIDER_SAGA_ENABLED: "true"
+
+  domain-outbox-worker:
+    extends:
+      file: compose.yaml
+      service: queue-worker
+    container_name: stockflow-domain-outbox-worker
+    command: php artisan messaging:outbox:publish --loop
+    environment:
+      RABBITMQ_ENABLED: "true"
+      RABBITMQ_PASSWORD: stockflow
+      RABBITMQ_USER: stockflow
+      STOCKFLOW_PROVIDER_SAGA_ENABLED: "true"
+
+  provider-outcome-worker:
+    extends:
+      file: compose.yaml
+      service: queue-worker
+    container_name: stockflow-provider-outcome-worker
+    command: php artisan messaging:provider-outcomes:consume
+    environment:
+      RABBITMQ_ENABLED: "true"
+      RABBITMQ_PASSWORD: stockflow
+      RABBITMQ_USER: stockflow
+      STOCKFLOW_PROVIDER_SAGA_ENABLED: "true"
 
   frontend:
     extends:

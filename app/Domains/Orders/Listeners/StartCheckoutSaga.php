@@ -3,25 +3,25 @@
 namespace App\Domains\Orders\Listeners;
 
 use App\Domains\Orders\Events\OrderConfirmationRequested;
-use App\Domains\Orders\Services\OrderService;
+use App\Domains\Orders\Services\CheckoutSagaService;
 use App\Infrastructure\Messaging\DomainEventContext;
 use App\Infrastructure\Messaging\InboxConsumer;
 
-class ReserveInventoryForOrder
+class StartCheckoutSaga
 {
     public function __construct(
         private readonly InboxConsumer $inbox,
-        private readonly OrderService $orders,
+        private readonly CheckoutSagaService $sagas,
     ) {}
 
     public function handle(OrderConfirmationRequested $event): void
     {
-        if (config('stockflow.provider_saga.enabled')) {
+        if (! config('stockflow.provider_saga.enabled')) {
             return;
         }
 
         $this->inbox->consume($this->messageId($event), self::class, function () use ($event): void {
-            $this->orders->reserveInventory($event->order->id);
+            $this->sagas->start($event->order->id);
         });
     }
 
