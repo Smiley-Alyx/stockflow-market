@@ -38,7 +38,7 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
-    command: php artisan serve --host=0.0.0.0 --port=8000
+    command: php artisan serve --host=0.0.0.0 --port=8000 --no-reload
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health/live || exit 1"]
       interval: 10s
@@ -210,7 +210,7 @@ services:
       POSTGRES_USER: stockflow
       POSTGRES_PASSWORD: secret
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U stockflow -d stockflow"]
       interval: 10s

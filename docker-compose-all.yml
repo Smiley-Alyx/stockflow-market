@@ -1,0 +1,184 @@
+services:
+  php:
+    extends:
+      file: compose.yaml
+      service: php
+    environment:
+      RABBITMQ_ENABLED: "true"
+      RABBITMQ_PASSWORD: stockflow
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  queue-worker:
+    extends:
+      file: compose.yaml
+      service: queue-worker
+
+  search-index-worker:
+    extends:
+      file: compose.yaml
+      service: search-index-worker
+
+  scheduler:
+    extends:
+      file: compose.yaml
+      service: scheduler
+
+  frontend:
+    extends:
+      file: compose.yaml
+      service: frontend
+
+  prometheus:
+    extends:
+      file: compose.yaml
+      service: prometheus
+
+  grafana:
+    extends:
+      file: compose.yaml
+      service: grafana
+
+  postgres:
+    extends:
+      file: compose.yaml
+      service: postgres
+
+  redis:
+    extends:
+      file: compose.yaml
+      service: redis
+
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    container_name: stockflow-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: stockflow
+      RABBITMQ_DEFAULT_PASS: stockflow
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  elasticsearch:
+    extends:
+      file: compose.yaml
+      service: elasticsearch
+
+  erp-mock:
+    build:
+      context: ../stockflow-erp-mock
+    environment:
+      ERP_HTTP_ADDRESS: ":8080"
+      ERP_LOG_LEVEL: info
+      ERP_RABBITMQ_CONSUMER_TAG: stockflow-erp-mock
+      ERP_RABBITMQ_MAX_RETRY_COUNT: 3
+      ERP_RABBITMQ_PREFETCH_COUNT: 10
+      ERP_RABBITMQ_PUBLISH_TIMEOUT: 5s
+      ERP_RABBITMQ_RETRY_DELAY: 2s
+      ERP_RABBITMQ_URL: amqp://stockflow:stockflow@rabbitmq:5672/
+      ERP_SHUTDOWN_TIMEOUT: 10s
+    ports:
+      - "8083:8080"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  payment-mock:
+    build:
+      context: ../stockflow-payment-mock
+    environment: &payment-mock-env
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8081
+      DB_CONNECTION: sqlite
+      DB_DATABASE: /app/database/database.sqlite
+      PAYMENT_MOCK_SERVICE_NAME: stockflow-payment-mock
+      PAYMENT_MOCK_HTTP_PORT: 8080
+      PAYMENT_MOCK_DEBUG_ENABLED: "true"
+      PAYMENT_MOCK_PUBLISH_EVENTS: "true"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: stockflow
+      RABBITMQ_PASSWORD: stockflow
+      RABBITMQ_VHOST: /
+      RABBITMQ_SETUP_TOPOLOGY: "true"
+    ports:
+      - "8081:8080"
+    volumes:
+      - payment-mock-data:/app/database
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  payment-mock-worker:
+    build:
+      context: ../stockflow-payment-mock
+    command: ["php", "artisan", "payment-mock:consume-requests"]
+    environment: *payment-mock-env
+    volumes:
+      - payment-mock-data:/app/database
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      payment-mock:
+        condition: service_started
+
+  delivery-mock:
+    build:
+      context: ../stockflow-delivery-mock
+    environment: &delivery-mock-env
+      DELIVERY_MOCK_SERVICE_NAME: stockflow-delivery-mock
+      DELIVERY_MOCK_HTTP_PORT: 8080
+      DELIVERY_MOCK_DEBUG_ENABLED: "true"
+      DELIVERY_MOCK_PUBLISH_EVENTS: "true"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: stockflow
+      RABBITMQ_PASSWORD: stockflow
+      RABBITMQ_VHOST: /
+      RABBITMQ_EXCHANGE: stockflow.delivery
+      RABBITMQ_DLX: stockflow.delivery.dlx
+      RABBITMQ_REQUESTS_QUEUE: stockflow.delivery.requests
+      RABBITMQ_RETRY_QUEUE: stockflow.delivery.requests.retry
+      RABBITMQ_DLQ: stockflow.delivery.requests.dlq
+      RABBITMQ_SETUP_TOPOLOGY: "true"
+    ports:
+      - "8082:8080"
+    volumes:
+      - delivery-mock-state:/app/var/state
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  delivery-mock-worker:
+    build:
+      context: ../stockflow-delivery-mock
+    command: ["php", "bin/consume-requests.php"]
+    environment: *delivery-mock-env
+    volumes:
+      - delivery-mock-state:/app/var/state
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      delivery-mock:
+        condition: service_started
+
+volumes:
+  composer-cache:
+  npm-cache:
+  postgres-data:
+  redis-data:
+  rabbitmq-data:
+  elasticsearch-data:
+  prometheus-data:
+  grafana-data:
+  payment-mock-data:
+  delivery-mock-state:

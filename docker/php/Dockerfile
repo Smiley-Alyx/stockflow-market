@@ -15,6 +15,9 @@ RUN apk add --no-cache \
         postgresql-dev \
         sqlite-dev \
         unzip \
+        $PHPIZE_DEPS \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
     && docker-php-ext-install \
         bcmath \
         intl \
@@ -22,8 +25,11 @@ RUN apk add --no-cache \
         pdo_pgsql \
         pdo_sqlite \
         zip \
+    && apk del $PHPIZE_DEPS \
     && addgroup -g "${GID}" stockflow \
-    && adduser -D -u "${UID}" -G stockflow stockflow
+    && adduser -D -u "${UID}" -G stockflow stockflow \
+    && mkdir -p /tmp/composer-cache \
+    && chown stockflow:stockflow /tmp/composer-cache
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/stockflow.ini
