@@ -1,20 +1,37 @@
 import type { CatalogProduct } from '~/composables/useCatalogApi';
 
+type CustomerPrice = CatalogProduct['price'];
+
 type CustomerProduct = {
     product_id: number;
     slug: string;
     sku: string;
     product_name: string;
+    image_url: string | null;
+    price: CustomerPrice;
 };
 
 type CartItem = CustomerProduct & {
     quantity: number;
+    is_selected: boolean;
+    removed_at: string | null;
+    line_amount_minor: number | null;
+};
+
+type CartSummary = {
+    items_count: number;
+    selected_items_count: number;
+    amount_minor: number;
+    selected_amount_minor: number;
+    currency: string | null;
 };
 
 type CustomerState = {
     cart: {
         id: number | null;
         items: CartItem[];
+        removed_items: CartItem[];
+        summary: CartSummary;
     };
     favorites: CustomerProduct[];
 };
@@ -28,6 +45,10 @@ type Customer = {
 type SessionData = {
     user: Customer | null;
     customer_state: CustomerState | null;
+};
+
+type DraftOrder = {
+    id: number;
 };
 
 const STORAGE_KEY = 'stockflow-customer-state';
@@ -121,10 +142,22 @@ export const useCustomerState = () => {
         const item = toCustomerProduct(product);
         const existingItem = guestState.value.cart.items.find((entry) => entry.product_id === item.product_id);
 
+        guestState.value.cart.removed_items = guestState.value.cart.removed_items.filter(
+            (entry) => entry.product_id !== item.product_id,
+        );
+
         if (existingItem) {
             existingItem.quantity = quantity;
+            existingItem.is_selected = true;
+            existingItem.line_amount_minor = lineAmount(existingItem);
         } else {
-            guestState.value.cart.items.push({ ...item, quantity });
+            guestState.value.cart.items.push({
+                ...item,
+                quantity,
+                is_selected: true,
+                removed_at: null,
+                line_amount_minor: item.price ? item.price.amount_minor * quantity : null,
+            });
         }
 
         persistGuestState();
@@ -141,8 +174,114 @@ export const useCustomerState = () => {
             return;
         }
 
-        guestState.value.cart.items = guestState.value.cart.items.filter((item) => item.product_id !== productId);
+        const item = guestState.value.cart.items.find((entry) => entry.product_id === productId);
+
+        if (item) {
+            guestState.value.cart.items = guestState.value.cart.items.filter((entry) => entry.product_id !== productId);
+            guestState.value.cart.removed_items = [
+                ...guestState.value.cart.removed_items.filter((entry) => entry.product_id !== productId),
+                { ...item, is_selected: false, removed_at: new Date().toISOString() },
+            ];
+            persistGuestState();
+        }
+    };
+
+    const restoreCartItem = async (productId: number) => {
+        if (user.value) {
+            customerState.value = (
+                await request<{ data: CustomerState }>(`/api/customer-state/cart/items/${productId}/restore`, {
+                    method: 'PUT',
+                    mutation: true,
+                })
+            ).data;
+            return;
+        }
+
+        const item = guestState.value.cart.removed_items.find((entry) => entry.product_id === productId);
+
+        if (item) {
+            guestState.value.cart.removed_items = guestState.value.cart.removed_items.filter(
+                (entry) => entry.product_id !== productId,
+            );
+            guestState.value.cart.items.push({ ...item, is_selected: true, removed_at: null });
+            persistGuestState();
+        }
+    };
+
+    const selectCartItem = async (productId: number, selected: boolean) => {
+        if (user.value) {
+            customerState.value = (
+                await request<{ data: CustomerState }>(`/api/customer-state/cart/items/${productId}/selection`, {
+                    method: 'PUT',
+                    body: { selected },
+                    mutation: true,
+                })
+            ).data;
+            return;
+        }
+
+        const item = guestState.value.cart.items.find((entry) => entry.product_id === productId);
+
+        if (item) {
+            item.is_selected = selected;
+            persistGuestState();
+        }
+    };
+
+    const selectAllCartItems = async (selected: boolean) => {
+        if (user.value) {
+            customerState.value = (
+                await request<{ data: CustomerState }>('/api/customer-state/cart/selection', {
+                    method: 'PUT',
+                    body: { selected },
+                    mutation: true,
+                })
+            ).data;
+            return;
+        }
+
+        guestState.value.cart.items.forEach((item) => {
+            item.is_selected = selected;
+        });
         persistGuestState();
+    };
+
+    const checkout = async (selectedOnly: boolean) => {
+        const items = state.value.cart.items.filter((item) => !selectedOnly || item.is_selected);
+
+        if (!items.length) {
+            throw new Error('Cart is empty');
+        }
+
+        let cartId = state.value.cart.id;
+
+        if (!user.value) {
+            cartId = null;
+
+            for (const item of items) {
+                const response: { data: { id: number } } = await request('/api/cart/items', {
+                    method: 'POST',
+                    body: {
+                        cart_id: cartId,
+                        product_id: item.product_id,
+                        quantity: item.quantity,
+                    },
+                    mutation: true,
+                });
+                cartId = response.data.id;
+            }
+        }
+
+        const response = await request<{ data: DraftOrder }>('/api/orders/draft', {
+            method: 'POST',
+            body: {
+                cart_id: cartId,
+                product_ids: items.map((item) => item.product_id),
+            },
+            mutation: true,
+        });
+
+        return response.data;
     };
 
     const toggleFavorite = async (product: CatalogProduct | CustomerProduct) => {
@@ -194,6 +333,7 @@ export const useCustomerState = () => {
     };
 
     const persistGuestState = () => {
+        guestState.value.cart.summary = cartSummary(guestState.value.cart.items);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(guestState.value));
     };
 
@@ -233,6 +373,10 @@ export const useCustomerState = () => {
         addCartItem,
         setCartItem,
         removeCartItem,
+        restoreCartItem,
+        selectCartItem,
+        selectAllCartItems,
+        checkout,
         toggleFavorite,
         isFavorite,
     };
@@ -243,6 +387,8 @@ function emptyState(): CustomerState {
         cart: {
             id: null,
             items: [],
+            removed_items: [],
+            summary: cartSummary([]),
         },
         favorites: [],
     };
@@ -256,15 +402,50 @@ function readGuestState(): CustomerState {
     }
 
     try {
-        return JSON.parse(stored) as CustomerState;
+        const state = JSON.parse(stored) as Partial<CustomerState>;
+        const cart = state.cart ?? emptyState().cart;
+        const items = (cart.items ?? []).map(normalizeCartItem);
+
+        return {
+            cart: {
+                id: null,
+                items,
+                removed_items: (cart.removed_items ?? []).map(normalizeCartItem),
+                summary: cartSummary(items),
+            },
+            favorites: (state.favorites ?? []).map(normalizeCustomerProduct),
+        };
     } catch {
         return emptyState();
     }
 }
 
+function normalizeCartItem(item: Partial<CartItem> & Pick<CartItem, 'product_id' | 'slug' | 'sku' | 'product_name' | 'quantity'>): CartItem {
+    const product = normalizeCustomerProduct(item);
+
+    return {
+        ...product,
+        quantity: item.quantity,
+        is_selected: item.is_selected ?? true,
+        removed_at: item.removed_at ?? null,
+        line_amount_minor: product.price ? product.price.amount_minor * item.quantity : null,
+    };
+}
+
+function normalizeCustomerProduct(product: Partial<CustomerProduct> & Pick<CustomerProduct, 'product_id' | 'slug' | 'sku' | 'product_name'>): CustomerProduct {
+    return {
+        product_id: product.product_id,
+        slug: product.slug,
+        sku: product.sku,
+        product_name: product.product_name,
+        image_url: product.image_url ?? null,
+        price: product.price ?? null,
+    };
+}
+
 function toCustomerProduct(product: CatalogProduct | CustomerProduct): CustomerProduct {
     if ('product_id' in product) {
-        return product;
+        return normalizeCustomerProduct(product);
     }
 
     return {
@@ -272,7 +453,28 @@ function toCustomerProduct(product: CatalogProduct | CustomerProduct): CustomerP
         slug: product.slug,
         sku: product.sku,
         product_name: product.name,
+        image_url: product.image_url,
+        price: product.price,
     };
+}
+
+function cartSummary(items: CartItem[]): CartSummary {
+    const pricedItems = items.filter((item) => item.line_amount_minor !== null);
+    const currencies = [...new Set(pricedItems.map((item) => item.price?.currency).filter(Boolean))];
+
+    return {
+        items_count: items.reduce((total, item) => total + item.quantity, 0),
+        selected_items_count: items.filter((item) => item.is_selected).reduce((total, item) => total + item.quantity, 0),
+        amount_minor: pricedItems.reduce((total, item) => total + (item.line_amount_minor ?? 0), 0),
+        selected_amount_minor: pricedItems
+            .filter((item) => item.is_selected)
+            .reduce((total, item) => total + (item.line_amount_minor ?? 0), 0),
+        currency: currencies.length === 1 ? currencies[0] ?? null : null,
+    };
+}
+
+function lineAmount(item: CartItem): number | null {
+    return item.price ? item.price.amount_minor * item.quantity : null;
 }
 
 function productId(product: CatalogProduct | CustomerProduct): number {
