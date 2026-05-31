@@ -41,10 +41,10 @@ Route::delete('/api/session', [SessionController::class, 'destroy']);
 Route::middleware('auth')->group(function (): void {
     Route::get('/api/customer-state', [CustomerStateController::class, 'show']);
     Route::post('/api/customer-state/merge', [CustomerStateController::class, 'merge']);
-    Route::put('/api/customer-state/cart/items/{productId}', [CustomerStateController::class, 'setCartItem']);
-    Route::delete('/api/customer-state/cart/items/{productId}', [CustomerStateController::class, 'removeCartItem']);
-    Route::put('/api/customer-state/favorites/{productId}', [CustomerStateController::class, 'addFavorite']);
-    Route::delete('/api/customer-state/favorites/{productId}', [CustomerStateController::class, 'removeFavorite']);
+    Route::put('/api/customer-state/cart/items/{product}', [CustomerStateController::class, 'setCartItem']);
+    Route::delete('/api/customer-state/cart/items/{product}', [CustomerStateController::class, 'removeCartItem']);
+    Route::put('/api/customer-state/favorites/{product}', [CustomerStateController::class, 'addFavorite']);
+    Route::delete('/api/customer-state/favorites/{product}', [CustomerStateController::class, 'removeFavorite']);
 });
 Route::get('/api/inventory/stock', [StockController::class, 'show']);
 Route::get('/api/inventory/stock-movements', [StockController::class, 'movements']);

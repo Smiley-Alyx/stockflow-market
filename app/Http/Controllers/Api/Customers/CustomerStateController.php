@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Customers;
 
+use App\Domains\Catalog\Models\Product;
 use App\Domains\Customers\Services\CustomerStateService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -33,35 +34,35 @@ class CustomerStateController extends Controller
         ]);
     }
 
-    public function setCartItem(int $productId, Request $request, CustomerStateService $customers): JsonResponse
+    public function setCartItem(Product $product, Request $request, CustomerStateService $customers): JsonResponse
     {
         $payload = $request->validate([
             'quantity' => ['required', 'integer', 'min:1', 'max:1000'],
         ]);
 
         return response()->json([
-            'data' => $customers->setCartItem($request->user(), $productId, (int) $payload['quantity']),
+            'data' => $customers->setCartItem($request->user(), $product->id, (int) $payload['quantity']),
         ]);
     }
 
-    public function removeCartItem(int $productId, Request $request, CustomerStateService $customers): JsonResponse
+    public function removeCartItem(Product $product, Request $request, CustomerStateService $customers): JsonResponse
     {
         return response()->json([
-            'data' => $customers->removeCartItem($request->user(), $productId),
+            'data' => $customers->removeCartItem($request->user(), $product->id),
         ]);
     }
 
-    public function addFavorite(int $productId, Request $request, CustomerStateService $customers): JsonResponse
+    public function addFavorite(Product $product, Request $request, CustomerStateService $customers): JsonResponse
     {
         return response()->json([
-            'data' => $customers->addFavorite($request->user(), $productId),
+            'data' => $customers->addFavorite($request->user(), $product->id),
         ]);
     }
 
-    public function removeFavorite(int $productId, Request $request, CustomerStateService $customers): JsonResponse
+    public function removeFavorite(Product $product, Request $request, CustomerStateService $customers): JsonResponse
     {
         return response()->json([
-            'data' => $customers->removeFavorite($request->user(), $productId),
+            'data' => $customers->removeFavorite($request->user(), $product->id),
         ]);
     }
 }

@@ -74,6 +74,19 @@ class CustomerStateApiTest extends TestCase
             ->assertJsonCount(0, 'data.favorites');
     }
 
+    public function test_customer_state_mutations_reject_unknown_products(): void
+    {
+        $this->postJson('/api/session/register', [
+            'name' => 'Alexandra',
+            'email' => 'alexandra@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ])->assertCreated();
+
+        $this->putJson('/api/customer-state/cart/items/999', ['quantity' => 1])->assertNotFound();
+        $this->putJson('/api/customer-state/favorites/999')->assertNotFound();
+    }
+
     private function createProduct(string $name, string $slug, string $sku): Product
     {
         $category = Category::query()->firstOrCreate(
