@@ -16,7 +16,7 @@ class HomepageReadService
     {
         $blocks = HomepageBlock::query()
             ->where('is_active', true)
-            ->with('products')
+            ->with(['imageFile', 'products'])
             ->orderBy('position')
             ->orderBy('id')
             ->get();
@@ -42,7 +42,10 @@ class HomepageReadService
                         $block->type === HomepageBlock::TYPE_CITIES => [
                             'cities' => $cities ??= $this->cities(),
                         ],
-                        default => $block->settings ?? [],
+                        default => array_merge(
+                            $block->settings ?? [],
+                            ['image_url' => $block->imageFile?->url()],
+                        ),
                     },
                 ];
             })

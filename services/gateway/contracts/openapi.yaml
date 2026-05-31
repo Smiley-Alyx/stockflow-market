@@ -1380,6 +1380,10 @@ components:
           type: string
         url:
           type: string
+        image_url:
+          type:
+            - string
+            - 'null'
         breadcrumbs:
           type: array
           items:
@@ -1423,6 +1427,10 @@ components:
           type: string
         slug:
           type: string
+        logo_url:
+          type:
+            - string
+            - 'null'
     ProductOffer:
       type: object
       required:
@@ -1507,6 +1515,10 @@ components:
         slug:
           type: string
         description:
+          type:
+            - string
+            - 'null'
+        image_url:
           type:
             - string
             - 'null'

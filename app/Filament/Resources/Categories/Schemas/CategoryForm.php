@@ -19,6 +19,10 @@ class CategoryForm
                     ->relationship('parent', 'name')
                     ->searchable()
                     ->preload(),
+                Select::make('image_file_id')
+                    ->relationship('imageFile', 'original_name')
+                    ->searchable()
+                    ->preload(),
                 TextInput::make('name')
                     ->required()
                     ->maxLength(255),

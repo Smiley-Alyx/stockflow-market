@@ -3,11 +3,13 @@
 namespace App\Domains\Homepage\Models;
 
 use App\Domains\Catalog\Models\Product;
+use App\Domains\Storage\Models\StoredFile;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-#[Fillable(['type', 'title', 'position', 'is_active', 'settings'])]
+#[Fillable(['image_file_id', 'type', 'title', 'position', 'is_active', 'settings'])]
 class HomepageBlock extends Model
 {
     public const TYPE_RECOMMENDED_PRODUCTS = 'recommended_products';
@@ -56,6 +58,14 @@ class HomepageBlock extends Model
         return $this->belongsToMany(Product::class, 'homepage_block_products')
             ->withPivot('position')
             ->orderByPivot('position');
+    }
+
+    /**
+     * @return BelongsTo<StoredFile, $this>
+     */
+    public function imageFile(): BelongsTo
+    {
+        return $this->belongsTo(StoredFile::class, 'image_file_id');
     }
 
     /**

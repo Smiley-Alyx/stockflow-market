@@ -13,6 +13,7 @@ use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Pricing\Models\ProductPrice;
 use App\Domains\Pricing\Read\PricingReadService;
 use App\Domains\Search\Events\SearchIndexRequested;
+use App\Domains\Storage\Models\StoredFile;
 use App\Infrastructure\Messaging\OutboxMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -335,6 +336,11 @@ class CatalogSearchApiTest extends TestCase
             'slug' => 'acme',
         ]);
 
+        $image = StoredFile::query()->create([
+            'source_url' => 'https://example.com/scanner.jpg',
+            'original_name' => 'scanner.jpg',
+        ]);
+
         return Product::query()->create([
             'category_id' => $category->id,
             'brand_id' => $brand->id,
@@ -342,7 +348,7 @@ class CatalogSearchApiTest extends TestCase
             'slug' => 'wireless-scanner',
             'sku' => 'SCAN-001',
             'short_description' => 'Compact scanner.',
-            'image_url' => 'https://example.com/scanner.jpg',
+            'image_file_id' => $image->id,
             'rating' => 4.75,
             'rating_count' => 24,
             'status' => 'published',

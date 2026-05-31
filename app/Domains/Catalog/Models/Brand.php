@@ -5,12 +5,14 @@ namespace App\Domains\Catalog\Models;
 use App\Domains\Catalog\Read\CatalogCacheKeys;
 use App\Domains\Catalog\Read\CatalogProjectionService;
 use App\Domains\Catalog\Search\CatalogSearchIndexService;
+use App\Domains\Storage\Models\StoredFile;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 
-#[Fillable(['name', 'slug', 'description'])]
+#[Fillable(['logo_file_id', 'name', 'slug', 'description'])]
 class Brand extends Model
 {
     protected $table = 'catalog_brands';
@@ -33,6 +35,14 @@ class Brand extends Model
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
+    }
+
+    /**
+     * @return BelongsTo<StoredFile, $this>
+     */
+    public function logoFile(): BelongsTo
+    {
+        return $this->belongsTo(StoredFile::class, 'logo_file_id');
     }
 
     private function syncProductProjections(): void

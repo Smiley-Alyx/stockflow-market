@@ -20,6 +20,10 @@ class HomepageBlockForm
                     ->required(),
                 TextInput::make('title')
                     ->maxLength(255),
+                Select::make('image_file_id')
+                    ->relationship('imageFile', 'original_name')
+                    ->searchable()
+                    ->preload(),
                 TextInput::make('position')
                     ->required()
                     ->numeric()

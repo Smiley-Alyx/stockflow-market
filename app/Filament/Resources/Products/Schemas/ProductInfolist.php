@@ -22,7 +22,8 @@ class ProductInfolist
                     ->badge(),
                 TextEntry::make('published_at')
                     ->dateTime(),
-                TextEntry::make('image_url'),
+                TextEntry::make('imageFile.original_name')
+                    ->label('Image file'),
                 TextEntry::make('rating'),
                 TextEntry::make('rating_count'),
                 TextEntry::make('short_description')

@@ -5,12 +5,13 @@ namespace App\Domains\Catalog\Models;
 use App\Domains\Catalog\Read\CatalogCacheKeys;
 use App\Domains\Catalog\Read\CatalogProjectionService;
 use App\Domains\Catalog\Services\CatalogUrlService;
+use App\Domains\Storage\Models\StoredFile;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['parent_id', 'name', 'slug', 'description', 'is_active', 'filterable_attributes'])]
+#[Fillable(['parent_id', 'image_file_id', 'name', 'slug', 'description', 'is_active', 'filterable_attributes'])]
 class Category extends Model
 {
     protected $table = 'catalog_categories';
@@ -42,6 +43,14 @@ class Category extends Model
     public function parent(): BelongsTo
     {
         return $this->belongsTo(Category::class, 'parent_id');
+    }
+
+    /**
+     * @return BelongsTo<StoredFile, $this>
+     */
+    public function imageFile(): BelongsTo
+    {
+        return $this->belongsTo(StoredFile::class, 'image_file_id');
     }
 
     /**

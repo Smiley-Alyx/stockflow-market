@@ -6,6 +6,7 @@ use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Models\Product;
 use App\Domains\Homepage\Models\HomepageBlock;
 use App\Domains\Inventory\Models\Warehouse;
+use App\Domains\Storage\Models\StoredFile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\AssertsOpenApiContracts;
 use Tests\TestCase;
@@ -38,7 +39,7 @@ class HomepageApiTest extends TestCase
             'title' => 'Hidden banner',
             'position' => 0,
             'is_active' => false,
-            'settings' => ['image_url' => 'https://example.test/hidden.jpg'],
+            'image_file_id' => $this->createFile('https://example.test/hidden.jpg')->id,
         ]);
 
         $this->getJson('/api/homepage')
@@ -101,11 +102,13 @@ class HomepageApiTest extends TestCase
 
     public function test_homepage_endpoint_matches_gateway_contract(): void
     {
+        $file = $this->createFile('https://example.test/banner.jpg');
+
         HomepageBlock::query()->create([
             'type' => HomepageBlock::TYPE_BANNER,
             'title' => 'Main banner',
             'position' => 0,
-            'settings' => ['image_url' => 'https://example.test/banner.jpg'],
+            'image_file_id' => $file->id,
         ]);
 
         $payload = $this->getJson('/api/homepage')
@@ -118,6 +121,7 @@ class HomepageApiTest extends TestCase
         $this->assertContractDeclaresResponse($contract, '/api/homepage', '200', 'HomepageResponse');
         $this->assertSchemaMatchesPayload($contract, 'HomepageResponse', $payload);
         $this->assertSchemaMatchesPayload($contract, 'HomepageBlock', $payload['data'][0]);
+        $this->assertSame('https://example.test/banner.jpg', $payload['data'][0]['content']['image_url']);
     }
 
     private function createProduct(
@@ -160,6 +164,14 @@ class HomepageApiTest extends TestCase
             'latitude' => $latitude,
             'longitude' => $longitude,
             'is_active' => $isActive,
+        ]);
+    }
+
+    private function createFile(string $url): StoredFile
+    {
+        return StoredFile::query()->create([
+            'source_url' => $url,
+            'original_name' => basename($url),
         ]);
     }
 }

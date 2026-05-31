@@ -7,6 +7,7 @@ use App\Domains\Catalog\Events\ProductCreated;
 use App\Domains\Catalog\Events\ProductUpdated;
 use App\Domains\Catalog\Read\CatalogCacheKeys;
 use App\Domains\Catalog\Read\CatalogProjectionService;
+use App\Domains\Storage\Models\StoredFile;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,12 +16,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'category_id',
     'brand_id',
+    'image_file_id',
     'name',
     'slug',
     'sku',
     'description',
     'short_description',
-    'image_url',
     'rating',
     'rating_count',
     'status',
@@ -74,6 +75,14 @@ class Product extends Model
     public function brand(): BelongsTo
     {
         return $this->belongsTo(Brand::class);
+    }
+
+    /**
+     * @return BelongsTo<StoredFile, $this>
+     */
+    public function imageFile(): BelongsTo
+    {
+        return $this->belongsTo(StoredFile::class, 'image_file_id');
     }
 
     /**

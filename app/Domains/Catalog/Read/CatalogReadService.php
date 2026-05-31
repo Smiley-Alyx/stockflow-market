@@ -92,6 +92,7 @@ class CatalogReadService
     private function fetchActiveCategoryTree(): array
     {
         $categories = Category::query()
+            ->with('imageFile')
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
@@ -112,6 +113,7 @@ class CatalogReadService
                 'name' => $category->name,
                 'slug' => $category->slug,
                 'description' => $category->description,
+                'image_url' => $category->imageFile?->url(),
                 'filterable_attributes' => $category->filterable_attributes ?? [],
                 'url' => $this->urls->categoryUrl($category),
                 'children' => $this->buildCategoryBranch($categories, $category->id),

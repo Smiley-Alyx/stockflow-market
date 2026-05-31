@@ -23,8 +23,8 @@ class CatalogSearchDocumentFactory
     public function make(Product $product): array
     {
         $product = Product::query()
-            ->with(['brand', 'category', 'attributes', 'offers'])
-            ->find($product->id) ?? $product->loadMissing(['brand', 'category', 'attributes', 'offers']);
+            ->with(['brand.logoFile', 'category.imageFile', 'imageFile', 'attributes', 'offers.imageFile'])
+            ->find($product->id) ?? $product->loadMissing(['brand.logoFile', 'category.imageFile', 'imageFile', 'attributes', 'offers.imageFile']);
 
         $availability = $this->inventory->availabilityForProductIds([$product->id])[$product->id] ?? $this->emptyAvailability();
         $availability['city_codes'] = $this->inventory->availableCityCodesForProductIds([$product->id])[$product->id] ?? [];
@@ -39,18 +39,20 @@ class CatalogSearchDocumentFactory
                 'path' => $this->urls->categoryPath($product->category),
                 'url' => $this->urls->categoryUrl($product->category),
                 'breadcrumbs' => $this->urls->breadcrumbs($product->category),
+                'image_url' => $product->category->imageFile?->url(),
             ] : null,
             'brand' => $product->brand ? [
                 'id' => $product->brand->id,
                 'name' => $product->brand->name,
                 'slug' => $product->brand->slug,
+                'logo_url' => $product->brand->logoFile?->url(),
             ] : null,
             'name' => $product->name,
             'slug' => $product->slug,
             'sku' => $product->sku,
             'description' => $product->description,
             'short_description' => $product->short_description,
-            'image_url' => $product->image_url,
+            'image_url' => $product->imageFile?->url(),
             'rating' => (float) $product->rating,
             'rating_count' => $product->rating_count,
             'status' => $product->status,
@@ -81,7 +83,7 @@ class CatalogSearchDocumentFactory
                     'name' => $offer->name,
                     'sku' => $offer->sku,
                     'status' => $offer->status,
-                    'image_url' => $offer->image_url,
+                    'image_url' => $offer->imageFile?->url(),
                     'attributes' => $offer->attributes ?? [],
                 ])
                 ->values()

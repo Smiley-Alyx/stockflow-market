@@ -43,9 +43,10 @@ class ProductForm
                     ->default('draft')
                     ->required(),
                 DateTimePicker::make('published_at'),
-                TextInput::make('image_url')
-                    ->url()
-                    ->maxLength(255),
+                Select::make('image_file_id')
+                    ->relationship('imageFile', 'original_name')
+                    ->searchable()
+                    ->preload(),
                 TextInput::make('rating')
                     ->numeric()
                     ->minValue(0)

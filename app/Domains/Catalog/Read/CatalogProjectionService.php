@@ -25,7 +25,7 @@ class CatalogProjectionService
 
         /** @var Product|null $fresh */
         $fresh = Product::query()
-            ->with(['brand', 'category', 'attributes', 'offers'])
+            ->with(['brand.logoFile', 'category.imageFile', 'imageFile', 'attributes', 'offers.imageFile'])
             ->find($productId);
 
         if (! $fresh instanceof Product) {
@@ -130,7 +130,7 @@ class CatalogProjectionService
             'sku' => $product->sku,
             'description' => $product->description,
             'short_description' => $product->short_description,
-            'image_url' => $product->image_url,
+            'image_url' => $product->imageFile?->url(),
             'rating' => (float) $product->rating,
             'rating_count' => $product->rating_count,
             'status' => $product->status,
@@ -143,11 +143,13 @@ class CatalogProjectionService
                 'path' => $this->urls->categoryPath($product->category),
                 'url' => $this->urls->categoryUrl($product->category),
                 'breadcrumbs' => $this->urls->breadcrumbs($product->category),
+                'image_url' => $product->category->imageFile?->url(),
             ] : null,
             'brand' => $product->brand ? [
                 'id' => $product->brand->id,
                 'name' => $product->brand->name,
                 'slug' => $product->brand->slug,
+                'logo_url' => $product->brand->logoFile?->url(),
             ] : null,
             'attributes' => $product->attributes
                 ->sortBy('name')
@@ -164,7 +166,7 @@ class CatalogProjectionService
                     'name' => $offer->name,
                     'sku' => $offer->sku,
                     'status' => $offer->status,
-                    'image_url' => $offer->image_url,
+                    'image_url' => $offer->imageFile?->url(),
                     'attributes' => $offer->attributes ?? [],
                 ])
                 ->values()
