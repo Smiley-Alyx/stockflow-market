@@ -16,6 +16,7 @@ class ProductController extends Controller
     {
         $filters = $request->validate([
             'category' => ['sometimes', 'string', 'max:255'],
+            'category_path' => ['sometimes', 'string', 'max:767'],
             'q' => ['sometimes', 'string', 'min:1', 'max:255'],
             'brands' => ['sometimes', 'array'],
             'brands.*' => ['string', 'max:255'],
@@ -32,6 +33,7 @@ class ProductController extends Controller
         $products = $catalog->products(new CatalogProductQuery(
             query: $filters['q'] ?? null,
             category: $filters['category'] ?? null,
+            categoryPath: $filters['category_path'] ?? null,
             filters: $filters['filters'] ?? [],
             brands: $filters['brands'] ?? [],
             inStock: array_key_exists('in_stock', $filters) ? (bool) $filters['in_stock'] : null,

@@ -4,12 +4,17 @@ namespace App\Domains\Catalog\Read;
 
 use App\Domains\Catalog\Models\CatalogProductProjection;
 use App\Domains\Catalog\Models\Category;
+use App\Domains\Catalog\Services\CatalogUrlService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 class CatalogReadService
 {
+    public function __construct(
+        private readonly CatalogUrlService $urls,
+    ) {}
+
     /**
      * @return array<string, mixed>|null
      */
@@ -108,6 +113,7 @@ class CatalogReadService
                 'slug' => $category->slug,
                 'description' => $category->description,
                 'filterable_attributes' => $category->filterable_attributes ?? [],
+                'url' => $this->urls->categoryUrl($category),
                 'children' => $this->buildCategoryBranch($categories, $category->id),
             ])
             ->values()

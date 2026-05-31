@@ -12,6 +12,11 @@ paths:
           required: false
           schema:
             type: string
+        - name: category_path
+          in: query
+          required: false
+          schema:
+            type: string
         - name: q
           in: query
           required: false
@@ -796,6 +801,16 @@ components:
           type: integer
         total:
           type: integer
+        category_path:
+          type:
+            - string
+            - 'null'
+        canonical_url:
+          type: string
+        breadcrumbs:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryBreadcrumb'
     SearchPaginationMeta:
       type: object
       required:
@@ -1280,12 +1295,39 @@ components:
         - id
         - name
         - slug
+        - path
+        - url
+        - breadcrumbs
       properties:
         id:
           type: integer
         name:
           type: string
         slug:
+          type: string
+        path:
+          type: string
+        url:
+          type: string
+        breadcrumbs:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryBreadcrumb'
+    CategoryBreadcrumb:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+        - url
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        url:
           type: string
     ProductAttribute:
       type: object
@@ -1384,6 +1426,7 @@ components:
         - name
         - slug
         - filterable_attributes
+        - url
         - children
       properties:
         id:
@@ -1400,6 +1443,8 @@ components:
           type: array
           items:
             type: string
+        url:
+          type: string
         children:
           type: array
           items:

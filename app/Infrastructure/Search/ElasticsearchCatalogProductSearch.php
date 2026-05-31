@@ -5,6 +5,7 @@ namespace App\Infrastructure\Search;
 use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Search\CatalogProductQuery;
 use App\Domains\Catalog\Search\CatalogProductSearch;
+use App\Domains\Catalog\Services\CatalogUrlService;
 use App\Domains\Inventory\Read\InventoryReadService;
 use App\Domains\Pricing\Read\PricingReadService;
 use App\Infrastructure\Resilience\CircuitBreaker;
@@ -17,6 +18,7 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
     public function __construct(
         private readonly InventoryReadService $inventory,
         private readonly PricingReadService $pricing,
+        private readonly CatalogUrlService $urls,
         private ?CircuitBreaker $circuitBreaker = null,
     ) {
         $this->circuitBreaker ??= app(CircuitBreaker::class);
@@ -27,7 +29,8 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
      */
     public function products(CatalogProductQuery $query): array
     {
-        $filterableAttributes = $this->filterableAttributes($query);
+        $category = $this->urls->resolveCategory($query->categoryPath, $query->category);
+        $filterableAttributes = $this->filterableAttributes($query, $category);
 
         if (! $this->circuitBreaker->allows('elasticsearch')) {
             return $this->degradedResults($query);
@@ -40,7 +43,7 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
                 ->post('/catalog_products/_search', [
                     'from' => ($query->page - 1) * $query->perPage,
                     'size' => $query->perPage,
-                    'query' => $this->searchQuery($query),
+                    'query' => $this->searchQuery($query, $category),
                     'sort' => $this->sort($query->sort),
                     'aggs' => $this->aggregations($filterableAttributes),
                 ])
@@ -59,6 +62,9 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
                 'meta' => [
                     'query' => $query->query,
                     'category' => $query->category,
+                    'category_path' => $category === null ? null : $this->urls->categoryPath($category),
+                    'canonical_url' => $category === null ? '/catalog/' : $this->urls->categoryUrl($category),
+                    'breadcrumbs' => $category === null ? [] : $this->urls->breadcrumbs($category),
                     'city_code' => $query->cityCode,
                     'sort' => $query->sort,
                     'current_page' => $query->page,
@@ -77,14 +83,9 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
     /**
      * @return array<int, string>
      */
-    private function filterableAttributes(CatalogProductQuery $query): array
+    private function filterableAttributes(CatalogProductQuery $query, ?Category $category): array
     {
-        $attributes = $query->category === null
-            ? []
-            : Category::query()
-                ->where('slug', $query->category)
-                ->where('is_active', true)
-                ->value('filterable_attributes') ?? [];
+        $attributes = $category?->filterable_attributes ?? [];
 
         $attributes = collect(is_array($attributes) ? $attributes : json_decode((string) $attributes, true))
             ->map(fn (mixed $attribute): string => (string) $attribute)
@@ -107,12 +108,12 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
     /**
      * @return array<string, mixed>
      */
-    private function searchQuery(CatalogProductQuery $query): array
+    private function searchQuery(CatalogProductQuery $query, ?Category $category): array
     {
         $filters = [['term' => ['status' => 'published']]];
 
-        if ($query->category !== null) {
-            $filters[] = ['term' => ['category.slug.keyword' => $query->category]];
+        if ($category !== null) {
+            $filters[] = ['term' => ['category.path.keyword' => $this->urls->categoryPath($category)]];
         }
 
         if ($query->brands !== []) {
@@ -243,6 +244,9 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
             'meta' => [
                 'query' => $query->query,
                 'category' => $query->category,
+                'category_path' => $query->categoryPath,
+                'canonical_url' => '/catalog/',
+                'breadcrumbs' => [],
                 'city_code' => $query->cityCode,
                 'sort' => $query->sort,
                 'current_page' => $query->page,

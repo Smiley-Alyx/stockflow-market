@@ -8,6 +8,7 @@ use App\Domains\Catalog\Models\Product;
 use App\Domains\Catalog\Models\ProductAttribute;
 use App\Domains\Catalog\Models\ProductOffer;
 use App\Domains\Catalog\Search\CatalogSearchIndexService;
+use App\Domains\Catalog\Services\CatalogUrlService;
 use App\Domains\Inventory\Read\InventoryReadService;
 use Illuminate\Support\Collection;
 
@@ -15,6 +16,7 @@ class CatalogProjectionService
 {
     public function __construct(
         private readonly InventoryReadService $inventory,
+        private readonly CatalogUrlService $urls,
     ) {}
 
     public function syncProduct(Product|int $product): void
@@ -69,8 +71,18 @@ class CatalogProjectionService
 
     public function syncCategoryProducts(Category $category): void
     {
+        $categoryIds = collect([$category->id]);
+        $parentIds = $categoryIds;
+
+        while ($parentIds->isNotEmpty()) {
+            $parentIds = Category::query()
+                ->whereIn('parent_id', $parentIds)
+                ->pluck('id');
+            $categoryIds = $categoryIds->merge($parentIds);
+        }
+
         Product::query()
-            ->where('category_id', $category->id)
+            ->whereIn('category_id', $categoryIds)
             ->orderBy('id')
             ->chunkById(100, function (Collection $products): void {
                 foreach ($products as $product) {
@@ -128,6 +140,9 @@ class CatalogProjectionService
                 'id' => $product->category->id,
                 'name' => $product->category->name,
                 'slug' => $product->category->slug,
+                'path' => $this->urls->categoryPath($product->category),
+                'url' => $this->urls->categoryUrl($product->category),
+                'breadcrumbs' => $this->urls->breadcrumbs($product->category),
             ] : null,
             'brand' => $product->brand ? [
                 'id' => $product->brand->id,

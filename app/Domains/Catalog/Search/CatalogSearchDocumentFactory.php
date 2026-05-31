@@ -5,6 +5,7 @@ namespace App\Domains\Catalog\Search;
 use App\Domains\Catalog\Models\Product;
 use App\Domains\Catalog\Models\ProductAttribute;
 use App\Domains\Catalog\Models\ProductOffer;
+use App\Domains\Catalog\Services\CatalogUrlService;
 use App\Domains\Inventory\Read\InventoryReadService;
 use App\Domains\Pricing\Read\PricingReadService;
 
@@ -13,6 +14,7 @@ class CatalogSearchDocumentFactory
     public function __construct(
         private readonly InventoryReadService $inventory,
         private readonly PricingReadService $pricing,
+        private readonly CatalogUrlService $urls,
     ) {}
 
     /**
@@ -34,6 +36,9 @@ class CatalogSearchDocumentFactory
                 'id' => $product->category->id,
                 'name' => $product->category->name,
                 'slug' => $product->category->slug,
+                'path' => $this->urls->categoryPath($product->category),
+                'url' => $this->urls->categoryUrl($product->category),
+                'breadcrumbs' => $this->urls->breadcrumbs($product->category),
             ] : null,
             'brand' => $product->brand ? [
                 'id' => $product->brand->id,

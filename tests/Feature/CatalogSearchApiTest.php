@@ -148,6 +148,51 @@ class CatalogSearchApiTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_products_endpoint_resolves_nested_category_path(): void
+    {
+        $equipment = Category::query()->create([
+            'name' => 'Equipment',
+            'slug' => 'equipment',
+            'is_active' => true,
+        ]);
+        $devices = Category::query()->create([
+            'parent_id' => $equipment->id,
+            'name' => 'Devices',
+            'slug' => 'devices',
+            'is_active' => true,
+        ]);
+        Category::query()->create([
+            'parent_id' => $devices->id,
+            'name' => 'Scanners',
+            'slug' => 'scanners',
+            'is_active' => true,
+        ]);
+
+        Http::fake([
+            '*/catalog_products/_search' => Http::response([
+                'hits' => [
+                    'total' => ['value' => 0],
+                    'hits' => [],
+                ],
+            ]),
+        ]);
+
+        $this->getJson('/api/catalog/products?category_path=equipment/devices/scanners')
+            ->assertOk()
+            ->assertJsonPath('meta.category_path', 'equipment/devices/scanners')
+            ->assertJsonPath('meta.canonical_url', '/catalog/equipment/devices/scanners/')
+            ->assertJsonPath('meta.breadcrumbs.0.url', '/catalog/equipment/')
+            ->assertJsonPath('meta.breadcrumbs.2.url', '/catalog/equipment/devices/scanners/');
+
+        Http::assertSent(function ($request): bool {
+            return in_array(
+                ['term' => ['category.path.keyword' => 'equipment/devices/scanners']],
+                $request->data()['query']['bool']['filter'],
+                true,
+            );
+        });
+    }
+
     public function test_catalog_search_document_contains_filtering_and_merchandising_data(): void
     {
         $product = $this->createProduct();

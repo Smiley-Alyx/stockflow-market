@@ -11,6 +11,7 @@ class CatalogProductQuery
     public function __construct(
         public readonly ?string $query,
         public readonly ?string $category,
+        public readonly ?string $categoryPath,
         public readonly array $filters,
         public readonly array $brands,
         public readonly ?bool $inStock,

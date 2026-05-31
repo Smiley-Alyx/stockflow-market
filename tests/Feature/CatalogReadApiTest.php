@@ -15,6 +15,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class CatalogReadApiTest extends TestCase
@@ -297,6 +298,78 @@ class CatalogReadApiTest extends TestCase
             ->assertJsonPath('data.0.children.0.slug', 'scanners')
             ->assertJsonMissing(['slug' => 'legacy'])
             ->assertJsonMissing(['slug' => 'archived']);
+    }
+
+    public function test_category_tree_and_product_payload_return_nested_catalog_urls(): void
+    {
+        $equipment = Category::query()->create([
+            'name' => 'Equipment',
+            'slug' => 'equipment',
+            'is_active' => true,
+        ]);
+
+        $devices = Category::query()->create([
+            'parent_id' => $equipment->id,
+            'name' => 'Devices',
+            'slug' => 'devices',
+            'is_active' => true,
+        ]);
+
+        $scanners = Category::query()->create([
+            'parent_id' => $devices->id,
+            'name' => 'Scanners',
+            'slug' => 'scanners',
+            'is_active' => true,
+        ]);
+
+        Product::query()->create([
+            'category_id' => $scanners->id,
+            'name' => 'Wireless Scanner',
+            'slug' => 'wireless-scanner',
+            'sku' => 'SCAN-001',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $this->getJson('/api/catalog/categories/tree')
+            ->assertOk()
+            ->assertJsonPath('data.0.url', '/catalog/equipment/')
+            ->assertJsonPath('data.0.children.0.url', '/catalog/equipment/devices/')
+            ->assertJsonPath('data.0.children.0.children.0.url', '/catalog/equipment/devices/scanners/');
+
+        $this->getJson('/api/catalog/products/wireless-scanner')
+            ->assertOk()
+            ->assertJsonPath('data.category.path', 'equipment/devices/scanners')
+            ->assertJsonPath('data.category.url', '/catalog/equipment/devices/scanners/')
+            ->assertJsonPath('data.category.breadcrumbs.0.url', '/catalog/equipment/')
+            ->assertJsonPath('data.category.breadcrumbs.1.url', '/catalog/equipment/devices/')
+            ->assertJsonPath('data.category.breadcrumbs.2.url', '/catalog/equipment/devices/scanners/');
+    }
+
+    public function test_category_rejects_more_than_three_hierarchy_levels(): void
+    {
+        $equipment = Category::query()->create([
+            'name' => 'Equipment',
+            'slug' => 'equipment',
+        ]);
+        $devices = Category::query()->create([
+            'parent_id' => $equipment->id,
+            'name' => 'Devices',
+            'slug' => 'devices',
+        ]);
+        $scanners = Category::query()->create([
+            'parent_id' => $devices->id,
+            'name' => 'Scanners',
+            'slug' => 'scanners',
+        ]);
+
+        $this->expectException(ValidationException::class);
+
+        Category::query()->create([
+            'parent_id' => $scanners->id,
+            'name' => 'Handheld',
+            'slug' => 'handheld',
+        ]);
     }
 
     public function test_product_cache_ttl_is_read_from_config(): void
