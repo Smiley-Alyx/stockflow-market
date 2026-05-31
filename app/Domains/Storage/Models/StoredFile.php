@@ -9,7 +9,9 @@ use App\Domains\Catalog\Read\CatalogProjectionService;
 use App\Domains\Catalog\Search\CatalogSearchIndexService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 #[Fillable([
     'disk',
@@ -25,28 +27,25 @@ class StoredFile extends Model
 {
     protected $table = 'storage_files';
 
+    /** @var Collection<int, int> */
+    private Collection $affectedProductIds;
+
     protected static function booted(): void
     {
+        static::saving(function (StoredFile $file): void {
+            $file->assertValidLocation();
+        });
+
         static::updated(function (StoredFile $file): void {
-            CatalogCacheKeys::invalidateCategoryTree();
-            CatalogCacheKeys::invalidateProducts();
+            $file->refreshReferences($file->relatedProductIds());
+        });
 
-            $productIds = Product::query()
-                ->where('image_file_id', $file->id)
-                ->orWhereHas('category', fn ($query) => $query->where('image_file_id', $file->id))
-                ->orWhereHas('brand', fn ($query) => $query->where('logo_file_id', $file->id))
-                ->pluck('id')
-                ->merge(
-                    ProductOffer::query()
-                        ->where('image_file_id', $file->id)
-                        ->pluck('product_id'),
-                )
-                ->unique();
+        static::deleting(function (StoredFile $file): void {
+            $file->affectedProductIds = $file->relatedProductIds();
+        });
 
-            foreach ($productIds as $productId) {
-                app(CatalogProjectionService::class)->syncProduct($productId);
-                app(CatalogSearchIndexService::class)->requestProduct($productId);
-            }
+        static::deleted(function (StoredFile $file): void {
+            $file->refreshReferences($file->affectedProductIds);
         });
     }
 
@@ -61,6 +60,53 @@ class StoredFile extends Model
         }
 
         return Storage::disk($this->disk)->url($this->path);
+    }
+
+    private function assertValidLocation(): void
+    {
+        if ($this->source_url === null && ($this->disk === null || $this->path === null)) {
+            throw ValidationException::withMessages([
+                'source_url' => 'A source URL or a disk and path pair is required.',
+            ]);
+        }
+
+        if (($this->disk === null) !== ($this->path === null)) {
+            throw ValidationException::withMessages([
+                'disk' => 'Disk and path must be specified together.',
+            ]);
+        }
+    }
+
+    /**
+     * @return Collection<int, int>
+     */
+    private function relatedProductIds(): Collection
+    {
+        return Product::query()
+            ->where('image_file_id', $this->id)
+            ->orWhereHas('category', fn ($query) => $query->where('image_file_id', $this->id))
+            ->orWhereHas('brand', fn ($query) => $query->where('logo_file_id', $this->id))
+            ->pluck('id')
+            ->merge(
+                ProductOffer::query()
+                    ->where('image_file_id', $this->id)
+                    ->pluck('product_id'),
+            )
+            ->unique();
+    }
+
+    /**
+     * @param  Collection<int, int>  $productIds
+     */
+    private function refreshReferences(Collection $productIds): void
+    {
+        CatalogCacheKeys::invalidateCategoryTree();
+        CatalogCacheKeys::invalidateProducts();
+
+        foreach ($productIds as $productId) {
+            app(CatalogProjectionService::class)->syncProduct($productId);
+            app(CatalogSearchIndexService::class)->requestProduct($productId);
+        }
     }
 
     /**

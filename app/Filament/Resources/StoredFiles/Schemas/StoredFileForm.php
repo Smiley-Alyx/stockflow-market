@@ -16,8 +16,10 @@ class StoredFileForm
                     ->required()
                     ->maxLength(255),
                 TextInput::make('disk')
+                    ->requiredWith('path')
                     ->maxLength(255),
                 TextInput::make('path')
+                    ->requiredWith('disk')
                     ->maxLength(255),
                 TextInput::make('source_url')
                     ->url()

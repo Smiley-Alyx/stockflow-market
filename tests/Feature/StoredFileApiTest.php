@@ -11,6 +11,7 @@ use App\Domains\Storage\Models\StoredFile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class StoredFileApiTest extends TestCase
@@ -113,6 +114,39 @@ class StoredFileApiTest extends TestCase
         $this->getJson('/api/homepage')
             ->assertOk()
             ->assertJsonPath('data.0.content.image_url', 'https://example.test/banner.jpg');
+    }
+
+    public function test_stored_file_requires_source_url_or_disk_path_pair(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        StoredFile::query()->create([
+            'original_name' => 'invalid.jpg',
+        ]);
+    }
+
+    public function test_deleting_stored_file_refreshes_catalog_projection(): void
+    {
+        $image = $this->createFile('https://example.test/scanner.jpg');
+        $category = Category::query()->create([
+            'name' => 'Devices',
+            'slug' => 'devices',
+        ]);
+        Product::query()->create([
+            'category_id' => $category->id,
+            'image_file_id' => $image->id,
+            'name' => 'Wireless Scanner',
+            'slug' => 'wireless-scanner',
+            'sku' => 'SCAN-001',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $image->delete();
+
+        $this->getJson('/api/catalog/products/wireless-scanner')
+            ->assertOk()
+            ->assertJsonPath('data.image_url', null);
     }
 
     private function createFile(string $url): StoredFile
