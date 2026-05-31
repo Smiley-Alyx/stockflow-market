@@ -34,6 +34,7 @@ return new class extends Migration
         Schema::dropIfExists('customer_favorites');
 
         Schema::table('orders_carts', function (Blueprint $table) {
+            $table->dropUnique(['user_id']);
             $table->dropConstrainedForeignId('user_id');
         });
     }
