@@ -18,6 +18,7 @@ class ProviderMessageRecorder
         ?string $causationId = null,
     ): ProviderOutboxMessage {
         $messageId = (string) Str::uuid();
+        $causationId ??= $messageId;
 
         return ProviderOutboxMessage::query()->create([
             'exchange' => $exchange,

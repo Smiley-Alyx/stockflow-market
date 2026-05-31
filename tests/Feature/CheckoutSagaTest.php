@@ -23,7 +23,9 @@ class CheckoutSagaTest extends TestCase
         $saga = $this->app->make(CheckoutSagaService::class)->start($order->id);
         $reservation = $saga->reservations->firstOrFail();
 
-        $this->assertProviderMessage('inventory.reservation.requested.v1');
+        $reservationMessage = $this->assertProviderMessage('inventory.reservation.requested.v1');
+        $this->assertSame($reservationMessage->message_id, $reservationMessage->causation_id);
+        $this->assertSame($reservationMessage->message_id, $reservationMessage->headers['causation_id']);
 
         $this->outcome($saga, 'inventory.reservation.confirmed.v1', [
             'reservation_id' => $reservation->reservation_id,
