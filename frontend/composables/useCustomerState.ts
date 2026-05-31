@@ -51,6 +51,57 @@ type DraftOrder = {
     id: number;
 };
 
+type CheckoutOption = {
+    code: string;
+    name: string;
+};
+
+type CheckoutAddress = {
+    recipient_name: string | null;
+    recipient_phone: string | null;
+    country_code: string | null;
+    city: string | null;
+    postal_code: string | null;
+    address_line_1: string | null;
+    address_line_2: string | null;
+};
+
+type CheckoutShipment = {
+    id?: number;
+    delivery_service: string;
+    items: Array<{
+        order_item_id: number;
+        quantity: number;
+    }>;
+};
+
+type CheckoutData = {
+    order: {
+        id: number;
+        status: string;
+        payment_method: string | null;
+        checkout_at: string | null;
+        address: CheckoutAddress;
+        total_amount_minor: number;
+        currency: string | null;
+        items: Array<{
+            id: number;
+            product_id: number;
+            sku: string;
+            product_name: string;
+            quantity: number;
+            unit_amount_minor: number;
+            line_amount_minor: number;
+            currency: string;
+        }>;
+        shipments: CheckoutShipment[];
+    };
+    options: {
+        payment_methods: CheckoutOption[];
+        delivery_services: CheckoutOption[];
+    };
+};
+
 const STORAGE_KEY = 'stockflow-customer-state';
 
 export const useCustomerState = () => {
@@ -284,6 +335,38 @@ export const useCustomerState = () => {
         return response.data;
     };
 
+    const fetchCheckout = async (orderId: number) => {
+        const response = await request<{ data: CheckoutData }>(`/api/orders/${orderId}/checkout`);
+
+        return response.data;
+    };
+
+    const configureCheckout = async (
+        orderId: number,
+        payload: {
+            payment_method: string;
+            address: Record<string, string>;
+            shipments: CheckoutShipment[];
+        },
+    ) => {
+        const response = await request<{ data: CheckoutData }>(`/api/orders/${orderId}/checkout`, {
+            method: 'PUT',
+            body: payload,
+            mutation: true,
+        });
+
+        return response.data;
+    };
+
+    const confirmOrder = async (orderId: number) => {
+        const response = await request<{ data: DraftOrder }>(`/api/orders/${orderId}/confirm`, {
+            method: 'POST',
+            mutation: true,
+        });
+
+        return response.data;
+    };
+
     const toggleFavorite = async (product: CatalogProduct | CustomerProduct) => {
         const item = toCustomerProduct(product);
         const favorite = isFavorite(item.product_id);
@@ -377,6 +460,9 @@ export const useCustomerState = () => {
         selectCartItem,
         selectAllCartItems,
         checkout,
+        fetchCheckout,
+        configureCheckout,
+        confirmOrder,
         toggleFavorite,
         isFavorite,
     };

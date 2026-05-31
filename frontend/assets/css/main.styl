@@ -946,6 +946,117 @@ h2 {
     line-height: 1.5;
 }
 
+.checkout-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+}
+
+.checkout-main {
+    display: grid;
+    flex: 1 1 auto;
+    gap: 18px;
+}
+
+.checkout-section {
+    display: grid;
+    gap: 14px;
+}
+
+.checkout-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.checkout-fields label,
+.checkout-service {
+    display: grid;
+    gap: 6px;
+}
+
+.checkout-fields span,
+.checkout-service span {
+    color: #52635b;
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
+.checkout-fields input,
+.checkout-service select,
+.checkout-item-list select {
+    min-width: 0;
+    height: 42px;
+    border: 1px solid rgba(23, 32, 27, 0.16);
+    border-radius: 8px;
+    padding: 0 12px;
+    color: #17201b;
+    background: #ffffff;
+}
+
+.checkout-field-wide {
+    grid-column: 1 / -1;
+}
+
+.checkout-options {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.checkout-options label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid rgba(23, 32, 27, 0.1);
+    border-radius: 8px;
+    padding: 11px 12px;
+    color: #52635b;
+    background: #fbfcfa;
+    font-size: 0.88rem;
+    font-weight: 800;
+}
+
+.checkout-item-list {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.checkout-item-list li {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) auto minmax(150px, 0.6fr);
+    align-items: center;
+    gap: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(23, 32, 27, 0.08);
+}
+
+.checkout-item-list div {
+    display: grid;
+    gap: 4px;
+}
+
+.checkout-item-list code {
+    color: #6e7a74;
+    font-size: 0.78rem;
+}
+
+.checkout-item-list label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #52635b;
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
+.checkout-total {
+    font-size: 1.8rem;
+}
+
 .accent-panel {
     background: #18352c;
     color: #f7fbf6;
@@ -1014,7 +1125,8 @@ h2 {
     }
 
     .cart-layout,
-    .cart-title {
+    .cart-title,
+    .checkout-layout {
         align-items: stretch;
         flex-direction: column;
     }
@@ -1027,6 +1139,11 @@ h2 {
     .cart-page-list li {
         align-items: flex-start;
         flex-wrap: wrap;
+    }
+
+    .checkout-fields,
+    .checkout-item-list li {
+        grid-template-columns: 1fr;
     }
 
     .product-main-image,

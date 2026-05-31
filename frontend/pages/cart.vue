@@ -1,7 +1,6 @@
 <script setup lang="ts">
 const customer = useCustomerState();
 const checkoutPending = ref(false);
-const checkoutMessage = ref('');
 const checkoutError = ref('');
 
 const cart = computed(() => customer.state.value.cart);
@@ -19,12 +18,11 @@ const toggleItem = (productId: number, event: Event) => {
 
 const checkout = async (selectedOnly: boolean) => {
     checkoutPending.value = true;
-    checkoutMessage.value = '';
     checkoutError.value = '';
 
     try {
         const order = await customer.checkout(selectedOnly);
-        checkoutMessage.value = `Создан черновик заказа №${order.id}.`;
+        await navigateTo(`/checkout/?order=${order.id}`);
     } catch {
         checkoutError.value = 'Не удалось создать заказ. Проверьте выбранные товары и доступность API.';
     } finally {
@@ -134,6 +132,5 @@ main.shell.cart-shell
             ) Купить всё
             p.account-note(v-if="!customer.user.value")
                 | Корзина сохранена в этом браузере. После входа товары будут перенесены в аккаунт.
-            p.checkout-message(v-if="checkoutMessage") {{ checkoutMessage }}
             p.form-error(v-if="checkoutError") {{ checkoutError }}
 </template>
