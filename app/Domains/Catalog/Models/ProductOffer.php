@@ -4,6 +4,7 @@ namespace App\Domains\Catalog\Models;
 
 use App\Domains\Catalog\Read\CatalogCacheKeys;
 use App\Domains\Catalog\Read\CatalogProjectionService;
+use App\Domains\Catalog\Search\CatalogSearchIndexService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,11 +19,13 @@ class ProductOffer extends Model
         static::saved(function (ProductOffer $offer): void {
             CatalogCacheKeys::invalidateProducts();
             app(CatalogProjectionService::class)->syncProduct($offer->product_id);
+            app(CatalogSearchIndexService::class)->requestProduct($offer->product_id);
         });
 
         static::deleted(function (ProductOffer $offer): void {
             CatalogCacheKeys::invalidateProducts();
             app(CatalogProjectionService::class)->syncProduct($offer->product_id);
+            app(CatalogSearchIndexService::class)->requestProduct($offer->product_id);
         });
     }
 

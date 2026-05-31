@@ -4,6 +4,7 @@ namespace App\Domains\Catalog\Models;
 
 use App\Domains\Catalog\Read\CatalogCacheKeys;
 use App\Domains\Catalog\Read\CatalogProjectionService;
+use App\Domains\Catalog\Search\CatalogSearchIndexService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -41,6 +42,7 @@ class Brand extends Model
             ->chunkById(100, function (Collection $products): void {
                 foreach ($products as $product) {
                     app(CatalogProjectionService::class)->syncProduct($product->id);
+                    app(CatalogSearchIndexService::class)->requestProduct($product->id);
                 }
             });
     }

@@ -12,6 +12,53 @@ paths:
           required: false
           schema:
             type: string
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+        - name: brands
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+        - name: filters
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            type: object
+            additionalProperties:
+              type: array
+              items:
+                type: string
+        - name: in_stock
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: city_code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - newest
+              - price_asc
+              - price_desc
+              - rating_asc
+              - rating_desc
+            default: newest
         - name: page
           in: query
           required: false
@@ -24,8 +71,11 @@ paths:
           required: false
           schema:
             type: integer
-            minimum: 1
-            maximum: 100
+            enum:
+              - 12
+              - 16
+              - 20
+              - 24
             default: 20
       responses:
         '200':
@@ -36,6 +86,12 @@ paths:
                 $ref: '#/components/schemas/ProductListResponse'
         '429':
           description: Catalog rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Invalid catalog filters
           content:
             application/json:
               schema:
@@ -731,13 +787,10 @@ components:
       type: object
       required:
         - current_page
-        - last_page
         - per_page
         - total
       properties:
         current_page:
-          type: integer
-        last_page:
           type: integer
         per_page:
           type: integer
@@ -1139,6 +1192,18 @@ components:
           type:
             - string
             - 'null'
+        short_description:
+          type:
+            - string
+            - 'null'
+        image_url:
+          type:
+            - string
+            - 'null'
+        rating:
+          type: number
+        rating_count:
+          type: integer
         status:
           type: string
           enum:
@@ -1147,6 +1212,10 @@ components:
             - archived
         availability:
           $ref: '#/components/schemas/ProductAvailability'
+        price:
+          oneOf:
+            - $ref: '#/components/schemas/CatalogPrice'
+            - type: 'null'
         published_at:
           type:
             - string
@@ -1154,10 +1223,18 @@ components:
           format: date-time
         category:
           $ref: '#/components/schemas/ProductCategory'
+        brand:
+          oneOf:
+            - $ref: '#/components/schemas/ProductBrand'
+            - type: 'null'
         attributes:
           type: array
           items:
             $ref: '#/components/schemas/ProductAttribute'
+        offers:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductOffer'
     ProductAvailability:
       type: object
       required:
@@ -1169,6 +1246,34 @@ components:
         available_quantity:
           type: integer
           minimum: 0
+        city_code:
+          type:
+            - string
+            - 'null'
+    CatalogPrice:
+      type: object
+      required:
+        - amount_minor
+        - original_amount_minor
+        - discount_amount_minor
+        - discount_percent
+        - currency
+        - city_code
+      properties:
+        amount_minor:
+          type: integer
+        original_amount_minor:
+          type: integer
+        discount_amount_minor:
+          type: integer
+        discount_percent:
+          type: integer
+        currency:
+          type: string
+        city_code:
+          type:
+            - string
+            - 'null'
     ProductCategory:
       type: object
       required:
@@ -1192,6 +1297,45 @@ components:
           type: string
         value:
           type: string
+    ProductBrand:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+    ProductOffer:
+      type: object
+      required:
+        - id
+        - name
+        - sku
+        - status
+        - image_url
+        - attributes
+      properties:
+        id:
+          type: integer
+        name:
+          type:
+            - string
+            - 'null'
+        sku:
+          type: string
+        status:
+          type: string
+        image_url:
+          type:
+            - string
+            - 'null'
+        attributes:
+          type: object
     SearchProduct:
       type: object
       required:
@@ -1239,6 +1383,7 @@ components:
         - id
         - name
         - slug
+        - filterable_attributes
         - children
       properties:
         id:
@@ -1251,6 +1396,10 @@ components:
           type:
             - string
             - 'null'
+        filterable_attributes:
+          type: array
+          items:
+            type: string
         children:
           type: array
           items:

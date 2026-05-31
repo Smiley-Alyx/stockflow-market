@@ -114,8 +114,10 @@ trait AssertsOpenApiContracts
     private function parsePropertySchema(string $body): array
     {
         preg_match('/^          \$ref: \'#\/components\/schemas\/(?<ref>[A-Za-z0-9_]+)\'$/m', $body, $refMatch);
+        preg_match('/^\s+- \$ref: \'#\/components\/schemas\/(?<ref>[A-Za-z0-9_]+)\'$/m', $body, $oneOfRefMatch);
         preg_match('/^\s+type: (?<type>[A-Za-z0-9_]+)$/m', $body, $typeMatch);
         preg_match_all('/^\s+- \'?(?<type>[A-Za-z0-9_]+)\'?$/m', $body, $typeListMatches);
+        preg_match_all('/^\s+- type: \'?(?<type>[A-Za-z0-9_]+)\'?$/m', $body, $oneOfTypeMatches);
         preg_match('/^            \$ref: \'#\/components\/schemas\/(?<ref>[A-Za-z0-9_]+)\'$/m', $body, $itemRefMatch);
         preg_match('/^\s+format: (?<format>[A-Za-z0-9_-]+)$/m', $body, $formatMatch);
         preg_match('/^\s+enum:\n(?<enum>(?:\s+- .+\n?)+)/m', $body, $enumMatch);
@@ -131,6 +133,10 @@ trait AssertsOpenApiContracts
             $types = array_merge($types, $typeListMatches['type']);
         }
 
+        if (isset($oneOfTypeMatches['type'])) {
+            $types = array_merge($types, $oneOfTypeMatches['type']);
+        }
+
         if (isset($enumMatch['enum'])) {
             $enum = array_map(
                 static fn (string $line): string => trim(preg_replace('/^\s*-\s*/', '', trim($line)), "'\""),
@@ -140,7 +146,7 @@ trait AssertsOpenApiContracts
 
         return [
             'types' => array_values(array_unique($types)),
-            'ref' => $refMatch['ref'] ?? null,
+            'ref' => $refMatch['ref'] ?? $oneOfRefMatch['ref'] ?? null,
             'item_ref' => $itemRefMatch['ref'] ?? null,
             'format' => $formatMatch['format'] ?? null,
             'enum' => $enum,
@@ -181,6 +187,12 @@ trait AssertsOpenApiContracts
 
         if (in_array('integer', $schema['types'], true)) {
             $this->assertIsInt($value, $message);
+
+            return;
+        }
+
+        if (in_array('number', $schema['types'], true)) {
+            $this->assertIsNumeric($value, $message);
 
             return;
         }

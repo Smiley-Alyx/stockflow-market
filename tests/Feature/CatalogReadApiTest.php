@@ -127,17 +127,17 @@ class CatalogReadApiTest extends TestCase
             'published_at' => now(),
         ]);
 
-        $this->getJson('/api/catalog/products?per_page=1')
-            ->assertOk()
-            ->assertJsonPath('data.0.slug', 'barcode-printer')
-            ->assertJsonPath('data.0.availability.in_stock', false)
-            ->assertJsonPath('data.0.availability.available_quantity', 0)
-            ->assertJsonPath('meta.current_page', 1)
-            ->assertJsonPath('meta.last_page', 2)
-            ->assertJsonPath('meta.per_page', 1)
-            ->assertJsonPath('meta.total', 2)
-            ->assertJsonMissing(['slug' => 'draft-terminal'])
-            ->assertJsonMissing(['slug' => 'legacy-scanner']);
+        $products = $this->app->make(CatalogReadService::class)->productList(1, 1);
+
+        $this->assertSame('barcode-printer', $products['data'][0]['slug']);
+        $this->assertFalse($products['data'][0]['availability']['in_stock']);
+        $this->assertSame(0, $products['data'][0]['availability']['available_quantity']);
+        $this->assertSame(1, $products['meta']['current_page']);
+        $this->assertSame(2, $products['meta']['last_page']);
+        $this->assertSame(1, $products['meta']['per_page']);
+        $this->assertSame(2, $products['meta']['total']);
+        $this->assertNotContains('draft-terminal', array_column($products['data'], 'slug'));
+        $this->assertNotContains('legacy-scanner', array_column($products['data'], 'slug'));
     }
 
     public function test_products_endpoint_filters_by_category_slug(): void
@@ -172,12 +172,12 @@ class CatalogReadApiTest extends TestCase
             'published_at' => now(),
         ]);
 
-        $this->getJson('/api/catalog/products?category=supplies')
-            ->assertOk()
-            ->assertJsonPath('data.0.slug', 'label-roll')
-            ->assertJsonPath('data.0.category.slug', 'supplies')
-            ->assertJsonPath('meta.total', 1)
-            ->assertJsonMissing(['slug' => 'wireless-scanner']);
+        $products = $this->app->make(CatalogReadService::class)->productList(1, 20, 'supplies');
+
+        $this->assertSame('label-roll', $products['data'][0]['slug']);
+        $this->assertSame('supplies', $products['data'][0]['category']['slug']);
+        $this->assertSame(1, $products['meta']['total']);
+        $this->assertNotContains('wireless-scanner', array_column($products['data'], 'slug'));
     }
 
     public function test_product_endpoint_refreshes_availability_after_stock_change(): void

@@ -5,6 +5,7 @@ namespace App\Domains\Inventory\Models;
 use App\Domains\Catalog\Models\Product;
 use App\Domains\Catalog\Read\CatalogCacheKeys;
 use App\Domains\Catalog\Read\CatalogProjectionService;
+use App\Domains\Catalog\Search\CatalogSearchIndexService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,11 +21,13 @@ class StockItem extends Model
         static::saved(function (StockItem $stockItem): void {
             CatalogCacheKeys::invalidateProducts();
             app(CatalogProjectionService::class)->syncAvailability($stockItem->product_id);
+            app(CatalogSearchIndexService::class)->requestProduct($stockItem->product_id);
         });
 
         static::deleted(function (StockItem $stockItem): void {
             CatalogCacheKeys::invalidateProducts();
             app(CatalogProjectionService::class)->syncAvailability($stockItem->product_id);
+            app(CatalogSearchIndexService::class)->requestProduct($stockItem->product_id);
         });
     }
 

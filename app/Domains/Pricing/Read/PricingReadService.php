@@ -11,6 +11,45 @@ class PricingReadService
      * @param  array<int, int>  $productIds
      * @return array<int, array<string, mixed>>
      */
+    public function catalogPricesForProductIds(array $productIds, ?string $cityCode = null): array
+    {
+        return collect($this->pricesForProductIds($productIds, ['retail', 'sale'], $cityCode))
+            ->groupBy('product_id')
+            ->map(function ($prices): ?array {
+                $retail = $prices->firstWhere('price_type', 'retail');
+                $sale = $prices->firstWhere('price_type', 'sale');
+
+                if ($retail === null && $sale === null) {
+                    return null;
+                }
+
+                $original = $retail ?? $sale;
+                $effective = $sale !== null
+                    && $sale['currency'] === $original['currency']
+                    && $sale['amount_minor'] < $original['amount_minor']
+                        ? $sale
+                        : $original;
+                $discountAmount = $original['amount_minor'] - $effective['amount_minor'];
+
+                return [
+                    'amount_minor' => $effective['amount_minor'],
+                    'original_amount_minor' => $original['amount_minor'],
+                    'discount_amount_minor' => $discountAmount,
+                    'discount_percent' => $original['amount_minor'] > 0
+                        ? (int) floor($discountAmount * 100 / $original['amount_minor'])
+                        : 0,
+                    'currency' => $effective['currency'],
+                    'city_code' => $effective['city_code'],
+                ];
+            })
+            ->filter()
+            ->all();
+    }
+
+    /**
+     * @param  array<int, int>  $productIds
+     * @return array<int, array<string, mixed>>
+     */
     public function pricesForProductIds(array $productIds, array $priceTypes = [], ?string $cityCode = null): array
     {
         $productIds = collect($productIds)

@@ -57,7 +57,7 @@ class InventoryReadService
      * @param  array<int, int>  $productIds
      * @return array<int, array{in_stock: bool, available_quantity: int}>
      */
-    public function availabilityForProductIds(array $productIds): array
+    public function availabilityForProductIds(array $productIds, ?string $cityCode = null): array
     {
         $productIds = collect($productIds)
             ->map(fn (mixed $productId): int => (int) $productId)
@@ -69,10 +69,17 @@ class InventoryReadService
             return [];
         }
 
+        $cityCode = trim((string) $cityCode);
+        $cityCode = $cityCode === '' ? null : strtolower($cityCode);
+
         return StockItem::query()
             ->select('product_id')
             ->selectRaw('SUM(CASE WHEN on_hand_quantity > reserved_quantity THEN on_hand_quantity - reserved_quantity ELSE 0 END) as available_quantity')
             ->whereIn('product_id', $productIds)
+            ->whereHas('warehouse', fn (Builder $query): Builder => $query
+                ->where('is_active', true)
+                ->when($cityCode !== null, fn (Builder $query): Builder => $query->where('city_code', $cityCode))
+            )
             ->groupBy('product_id')
             ->get()
             ->mapWithKeys(function (StockItem $item): array {
@@ -85,6 +92,42 @@ class InventoryReadService
                     ],
                 ];
             })
+            ->all();
+    }
+
+    /**
+     * @param  array<int, int>  $productIds
+     * @return array<int, array<int, string>>
+     */
+    public function availableCityCodesForProductIds(array $productIds): array
+    {
+        $productIds = collect($productIds)
+            ->map(fn (mixed $productId): int => (int) $productId)
+            ->filter(fn (int $productId): bool => $productId > 0)
+            ->unique()
+            ->values();
+
+        if ($productIds->isEmpty()) {
+            return [];
+        }
+
+        return StockItem::query()
+            ->select('product_id', 'inventory_warehouses.city_code')
+            ->join('inventory_warehouses', 'inventory_warehouses.id', '=', 'inventory_stock_items.warehouse_id')
+            ->where('inventory_warehouses.is_active', true)
+            ->whereIn('product_id', $productIds)
+            ->groupBy('product_id', 'inventory_warehouses.city_code')
+            ->havingRaw('SUM(CASE WHEN on_hand_quantity > reserved_quantity THEN on_hand_quantity - reserved_quantity ELSE 0 END) > 0')
+            ->get()
+            ->groupBy('product_id')
+            ->map(fn ($items): array => $items
+                ->pluck('city_code')
+                ->map(fn (mixed $cityCode): string => (string) $cityCode)
+                ->unique()
+                ->sort()
+                ->values()
+                ->all()
+            )
             ->all();
     }
 

@@ -6,6 +6,7 @@ use App\Domains\Catalog\Events\ProductArchived;
 use App\Domains\Catalog\Events\ProductCreated;
 use App\Domains\Catalog\Events\ProductUpdated;
 use App\Domains\Catalog\Listeners\InvalidateCatalogProductsOnStockChanged;
+use App\Domains\Catalog\Search\CatalogProductSearch;
 use App\Domains\Inventory\Events\StockChanged;
 use App\Domains\Orders\Events\OrderConfirmationRequested;
 use App\Domains\Orders\Listeners\ReserveInventoryForOrder;
@@ -20,6 +21,7 @@ use App\Domains\Search\Listeners\RequestProductIndexDeletion;
 use App\Domains\Search\Listeners\RequestProductIndexing;
 use App\Infrastructure\Search\DeadLetters\ArraySearchIndexDeadLetterStore;
 use App\Infrastructure\Search\DeadLetters\RedisSearchIndexDeadLetterStore;
+use App\Infrastructure\Search\ElasticsearchCatalogProductSearch;
 use App\Infrastructure\Search\ElasticsearchProductSearch;
 use App\Infrastructure\Search\ElasticsearchSearchIndexer;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -36,6 +38,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(ProductSearch::class, ElasticsearchProductSearch::class);
+        $this->app->bind(CatalogProductSearch::class, ElasticsearchCatalogProductSearch::class);
         $this->app->bind(SearchIndexer::class, ElasticsearchSearchIndexer::class);
         $this->app->bind(SearchIndexDeadLetterStore::class, match (config('stockflow.search.indexing.dead_letter_backend')) {
             'array' => ArraySearchIndexDeadLetterStore::class,

@@ -7,6 +7,7 @@ use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Models\Product;
 use App\Domains\Catalog\Models\ProductAttribute;
 use App\Domains\Catalog\Models\ProductOffer;
+use App\Domains\Catalog\Search\CatalogSearchIndexService;
 use App\Domains\Inventory\Read\InventoryReadService;
 use Illuminate\Support\Collection;
 
@@ -74,6 +75,7 @@ class CatalogProjectionService
             ->chunkById(100, function (Collection $products): void {
                 foreach ($products as $product) {
                     $this->syncProduct($product->id);
+                    app(CatalogSearchIndexService::class)->requestProduct($product->id);
                 }
             });
     }

@@ -7,6 +7,7 @@ use App\Domains\Catalog\Models\Product;
 use App\Domains\Catalog\Models\ProductAttribute;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\Support\AssertsOpenApiContracts;
 use Tests\TestCase;
@@ -64,15 +65,42 @@ class CatalogApiContractTest extends TestCase
 
     public function test_product_list_endpoint_matches_gateway_and_catalog_contracts(): void
     {
-        $this->createProduct();
+        $product = $this->createProduct();
 
-        $payload = $this->getJson('/api/catalog/products?per_page=10')
+        Http::fake([
+            '*/catalog_products/_search' => Http::response([
+                'hits' => [
+                    'total' => ['value' => 1],
+                    'hits' => [['_source' => [
+                        'id' => $product->id,
+                        'name' => $product->name,
+                        'slug' => $product->slug,
+                        'sku' => $product->sku,
+                        'description' => $product->description,
+                        'status' => $product->status,
+                        'availability' => [
+                            'in_stock' => false,
+                            'available_quantity' => 0,
+                        ],
+                        'category' => [
+                            'id' => $product->category->id,
+                            'name' => $product->category->name,
+                            'slug' => $product->category->slug,
+                        ],
+                        'attributes' => [],
+                    ]]],
+                ],
+            ]),
+        ]);
+
+        $payload = $this->getJson('/api/catalog/products?per_page=12')
             ->assertOk()
             ->assertHeader('content-type', 'application/json')
             ->json();
 
         foreach ($this->catalogContracts() as $contract) {
             $this->assertContractDeclaresResponse($contract, '/api/catalog/products', '200', 'ProductListResponse');
+            $this->assertContractDeclaresResponse($contract, '/api/catalog/products', '422', 'ErrorResponse');
             $this->assertContractDeclaresResponse($contract, '/api/catalog/products', '429', 'ErrorResponse');
             $this->assertSchemaMatchesPayload($contract, 'ProductListResponse', $payload);
             $this->assertSchemaMatchesPayload($contract, 'PaginationMeta', $payload['meta']);
