@@ -357,6 +357,127 @@ class OrderCheckoutApiTest extends TestCase
             ->assertJsonPath('message', 'Promotion LATER is not active.');
     }
 
+    public function test_checkout_configures_address_payment_and_separate_shipments(): void
+    {
+        $scanner = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');
+        $terminal = $this->createProduct('Mobile Terminal', 'mobile-terminal', 'TERM-001');
+        $this->createPrice($scanner, 129900);
+        $this->createPrice($terminal, 249900);
+
+        $cart = $this->postJson('/api/cart/items', [
+            'product_id' => $scanner->id,
+            'quantity' => 2,
+        ])->json('data');
+
+        $cart = $this->postJson('/api/cart/items', [
+            'cart_id' => $cart['id'],
+            'product_id' => $terminal->id,
+            'quantity' => 1,
+        ])->json('data');
+
+        $order = $this->postJson('/api/orders/draft', [
+            'cart_id' => $cart['id'],
+        ])->json('data');
+
+        $optionsPayload = $this->getJson('/api/checkout/options')
+            ->assertOk()
+            ->assertJsonPath('data.payment_methods.0.code', 'bank_card')
+            ->assertJsonPath('data.delivery_services.1.code', 'cdek')
+            ->json();
+
+        $checkoutPayload = $this->putJson('/api/orders/'.$order['id'].'/checkout', [
+            'payment_method' => 'sbp',
+            'address' => [
+                'recipient_name' => 'Alexandra Shornikova',
+                'recipient_phone' => '+79990000000',
+                'country_code' => 'ru',
+                'city' => 'Москва',
+                'postal_code' => '101000',
+                'address_line_1' => 'ул. Тверская, д. 1',
+                'address_line_2' => 'кв. 2',
+            ],
+            'shipments' => [
+                [
+                    'delivery_service' => 'stockflow_courier',
+                    'items' => [
+                        ['order_item_id' => $order['items'][0]['id'], 'quantity' => 2],
+                    ],
+                ],
+                [
+                    'delivery_service' => 'cdek',
+                    'items' => [
+                        ['order_item_id' => $order['items'][1]['id'], 'quantity' => 1],
+                    ],
+                ],
+            ],
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.order.payment_method', 'sbp')
+            ->assertJsonPath('data.order.address.country_code', 'RU')
+            ->assertJsonCount(2, 'data.order.shipments')
+            ->assertJsonPath('data.order.shipments.1.delivery_service', 'cdek')
+            ->json();
+
+        $this->assertDatabaseHas('orders_orders', [
+            'id' => $order['id'],
+            'payment_method' => 'sbp',
+            'delivery_city' => 'Москва',
+        ]);
+        $this->assertDatabaseCount('orders_shipments', 2);
+        $this->assertDatabaseCount('orders_shipment_items', 2);
+
+        foreach ($this->orderContracts() as $contract) {
+            $this->assertContractDeclaresResponse($contract, '/api/checkout/options', '200', 'CheckoutOptionsResponse');
+            $this->assertContractDeclaresResponse($contract, '/api/orders/{id}/checkout', '200', 'CheckoutResponse');
+            $this->assertContractDeclaresResponse($contract, '/api/orders/{id}/checkout', '409', 'ErrorResponse');
+            $this->assertSchemaMatchesPayload($contract, 'CheckoutOptionsResponse', $optionsPayload);
+            $this->assertSchemaMatchesPayload($contract, 'CheckoutResponse', $checkoutPayload);
+        }
+    }
+
+    public function test_checkout_rejects_incomplete_shipment_distribution(): void
+    {
+        $scanner = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');
+        $terminal = $this->createProduct('Mobile Terminal', 'mobile-terminal', 'TERM-001');
+        $this->createPrice($scanner, 129900);
+        $this->createPrice($terminal, 249900);
+
+        $cart = $this->postJson('/api/cart/items', [
+            'product_id' => $scanner->id,
+            'quantity' => 1,
+        ])->json('data');
+        $cart = $this->postJson('/api/cart/items', [
+            'cart_id' => $cart['id'],
+            'product_id' => $terminal->id,
+            'quantity' => 1,
+        ])->json('data');
+        $order = $this->postJson('/api/orders/draft', [
+            'cart_id' => $cart['id'],
+        ])->json('data');
+
+        $this->putJson('/api/orders/'.$order['id'].'/checkout', [
+            'payment_method' => 'bank_card',
+            'address' => [
+                'recipient_name' => 'Alexandra Shornikova',
+                'recipient_phone' => '+79990000000',
+                'country_code' => 'RU',
+                'city' => 'Москва',
+                'postal_code' => '101000',
+                'address_line_1' => 'ул. Тверская, д. 1',
+            ],
+            'shipments' => [
+                [
+                    'delivery_service' => 'cdek',
+                    'items' => [
+                        ['order_item_id' => $order['items'][0]['id'], 'quantity' => 1],
+                    ],
+                ],
+            ],
+        ])
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'Shipment items must match order items.');
+    }
+
     public function test_order_endpoints_match_gateway_and_orders_contracts(): void
     {
         $product = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');

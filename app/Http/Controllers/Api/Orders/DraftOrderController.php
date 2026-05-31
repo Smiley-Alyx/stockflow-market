@@ -56,6 +56,7 @@ class DraftOrderController extends Controller
             'expired_at' => $order->expired_at?->toJSON(),
             'items' => $order->items
                 ->map(fn ($item): array => [
+                    'id' => $item->id,
                     'product_id' => $item->product_id,
                     'sku' => $item->sku,
                     'product_name' => $item->product_name,

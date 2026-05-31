@@ -495,6 +495,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/checkout/options:
+    get:
+      summary: Get checkout payment and delivery options
+      responses:
+        '200':
+          description: Checkout options
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutOptionsResponse'
+  /api/orders/{id}/checkout:
+    get:
+      summary: Get checkout state
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Checkout state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutResponse'
+    put:
+      summary: Configure address, payment and shipments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigureCheckoutRequest'
+      responses:
+        '200':
+          description: Checkout configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutResponse'
+        '409':
+          description: Invalid shipment distribution
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Invalid checkout payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/orders/{id}/confirm:
     post:
       summary: Request draft order confirmation and async inventory reservation
@@ -778,6 +839,28 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/Order'
+    CheckoutOptionsResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/CheckoutOptions'
+    CheckoutResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - order
+            - options
+          properties:
+            order:
+              $ref: '#/components/schemas/CheckoutOrder'
+            options:
+              $ref: '#/components/schemas/CheckoutOptions'
     AddCartItemRequest:
       type: object
       required:
@@ -807,6 +890,178 @@ components:
           type: array
           items:
             type: integer
+    ConfigureCheckoutRequest:
+      type: object
+      required:
+        - payment_method
+        - address
+        - shipments
+      properties:
+        payment_method:
+          type: string
+        address:
+          $ref: '#/components/schemas/CheckoutAddress'
+        shipments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckoutShipment'
+    CheckoutOptions:
+      type: object
+      required:
+        - payment_methods
+        - delivery_services
+      properties:
+        payment_methods:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckoutOption'
+        delivery_services:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckoutOption'
+    CheckoutOption:
+      type: object
+      required:
+        - code
+        - name
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+    CheckoutOrder:
+      type: object
+      required:
+        - id
+        - status
+        - payment_method
+        - checkout_at
+        - address
+        - total_amount_minor
+        - currency
+        - items
+        - shipments
+      properties:
+        id:
+          type: integer
+        status:
+          type: string
+        payment_method:
+          type:
+            - string
+            - 'null'
+        checkout_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        address:
+          $ref: '#/components/schemas/CheckoutAddress'
+        total_amount_minor:
+          type: integer
+        currency:
+          type:
+            - string
+            - 'null'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckoutOrderItem'
+        shipments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckoutShipment'
+    CheckoutAddress:
+      type: object
+      required:
+        - recipient_name
+        - recipient_phone
+        - country_code
+        - city
+        - postal_code
+        - address_line_1
+        - address_line_2
+      properties:
+        recipient_name:
+          type:
+            - string
+            - 'null'
+        recipient_phone:
+          type:
+            - string
+            - 'null'
+        country_code:
+          type:
+            - string
+            - 'null'
+        city:
+          type:
+            - string
+            - 'null'
+        postal_code:
+          type:
+            - string
+            - 'null'
+        address_line_1:
+          type:
+            - string
+            - 'null'
+        address_line_2:
+          type:
+            - string
+            - 'null'
+    CheckoutShipment:
+      type: object
+      required:
+        - delivery_service
+        - items
+      properties:
+        id:
+          type: integer
+        delivery_service:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckoutShipmentItem'
+    CheckoutShipmentItem:
+      type: object
+      required:
+        - order_item_id
+        - quantity
+      properties:
+        order_item_id:
+          type: integer
+        quantity:
+          type: integer
+    CheckoutOrderItem:
+      type: object
+      required:
+        - id
+        - product_id
+        - sku
+        - product_name
+        - quantity
+        - unit_amount_minor
+        - line_amount_minor
+        - currency
+      properties:
+        id:
+          type: integer
+        product_id:
+          type: integer
+        sku:
+          type: string
+        product_name:
+          type: string
+        quantity:
+          type: integer
+        unit_amount_minor:
+          type: integer
+        line_amount_minor:
+          type: integer
+        currency:
+          type: string
     CreateReservationRequest:
       type: object
       required:

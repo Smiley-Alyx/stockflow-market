@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['cart_id', 'status', 'city_code', 'promo_code', 'subtotal_amount_minor', 'discount_amount_minor', 'total_amount_minor', 'currency', 'confirmed_at', 'paid_at', 'cancelled_at', 'expired_at'])]
+#[Fillable(['cart_id', 'status', 'city_code', 'promo_code', 'subtotal_amount_minor', 'discount_amount_minor', 'total_amount_minor', 'currency', 'payment_method', 'recipient_name', 'recipient_phone', 'delivery_country_code', 'delivery_city', 'delivery_postal_code', 'delivery_address_line_1', 'delivery_address_line_2', 'checkout_at', 'confirmed_at', 'paid_at', 'cancelled_at', 'expired_at'])]
 class Order extends Model
 {
     public const STATUS_DRAFT = 'draft';
@@ -34,6 +34,14 @@ class Order extends Model
     }
 
     /**
+     * @return HasMany<Shipment, $this>
+     */
+    public function shipments(): HasMany
+    {
+        return $this->hasMany(Shipment::class);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -42,6 +50,7 @@ class Order extends Model
     {
         return [
             'confirmed_at' => 'datetime',
+            'checkout_at' => 'datetime',
             'paid_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'expired_at' => 'datetime',

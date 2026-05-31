@@ -31,6 +31,11 @@ class OrderConflict extends RuntimeException
         return new self("Order {$orderId} is not draft.");
     }
 
+    public static function invalidShipmentItems(): self
+    {
+        return new self('Shipment items must match order items.');
+    }
+
     public static function invalidStatusTransition(int $orderId, string $status, string $targetStatus): self
     {
         return new self("Order {$orderId} cannot be moved from {$status} to {$targetStatus}.");

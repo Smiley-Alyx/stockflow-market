@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Homepage\HomepageController;
 use App\Http\Controllers\Api\Inventory\ReservationController;
 use App\Http\Controllers\Api\Inventory\StockController;
 use App\Http\Controllers\Api\Orders\CartItemController;
+use App\Http\Controllers\Api\Orders\CheckoutController;
 use App\Http\Controllers\Api\Orders\DraftOrderController;
 use App\Http\Controllers\Api\Orders\OrderConfirmationController;
 use App\Http\Controllers\Api\Orders\OrderLifecycleController;
@@ -59,6 +60,10 @@ Route::get('/api/search/products', ProductSearchController::class)
 Route::post('/api/cart/items', [CartItemController::class, 'store'])
     ->middleware('throttle:stockflow-checkout');
 Route::post('/api/orders/draft', [DraftOrderController::class, 'store'])
+    ->middleware('throttle:stockflow-checkout');
+Route::get('/api/checkout/options', [CheckoutController::class, 'options']);
+Route::get('/api/orders/{id}/checkout', [CheckoutController::class, 'show']);
+Route::put('/api/orders/{id}/checkout', [CheckoutController::class, 'update'])
     ->middleware('throttle:stockflow-checkout');
 Route::post('/api/orders/{id}/confirm', [OrderConfirmationController::class, 'store'])
     ->middleware('throttle:stockflow-checkout');
