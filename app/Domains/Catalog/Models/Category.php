@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['parent_id', 'name', 'slug', 'description', 'is_active'])]
+#[Fillable(['parent_id', 'name', 'slug', 'description', 'is_active', 'filterable_attributes'])]
 class Category extends Model
 {
     protected $table = 'catalog_categories';
@@ -64,6 +64,7 @@ class Category extends Model
     {
         return [
             'is_active' => 'boolean',
+            'filterable_attributes' => 'array',
         ];
     }
 }

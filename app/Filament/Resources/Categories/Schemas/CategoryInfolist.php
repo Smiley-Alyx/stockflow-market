@@ -18,6 +18,8 @@ class CategoryInfolist
                     ->label('Parent'),
                 IconEntry::make('is_active')
                     ->boolean(),
+                TextEntry::make('filterable_attributes')
+                    ->badge(),
                 TextEntry::make('description')
                     ->columnSpanFull(),
                 TextEntry::make('created_at')

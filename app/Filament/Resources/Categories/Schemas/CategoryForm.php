@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Categories\Schemas;
 
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -28,6 +29,7 @@ class CategoryForm
                 Toggle::make('is_active')
                     ->default(true)
                     ->required(),
+                TagsInput::make('filterable_attributes'),
                 Textarea::make('description')
                     ->columnSpanFull(),
             ]);

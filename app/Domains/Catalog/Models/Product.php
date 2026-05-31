@@ -12,7 +12,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['category_id', 'name', 'slug', 'sku', 'description', 'status', 'published_at'])]
+#[Fillable([
+    'category_id',
+    'brand_id',
+    'name',
+    'slug',
+    'sku',
+    'description',
+    'short_description',
+    'image_url',
+    'rating',
+    'rating_count',
+    'status',
+    'published_at',
+])]
 class Product extends Model
 {
     protected $table = 'catalog_products';
@@ -56,11 +69,27 @@ class Product extends Model
     }
 
     /**
+     * @return BelongsTo<Brand, $this>
+     */
+    public function brand(): BelongsTo
+    {
+        return $this->belongsTo(Brand::class);
+    }
+
+    /**
      * @return HasMany<ProductAttribute, $this>
      */
     public function attributes(): HasMany
     {
         return $this->hasMany(ProductAttribute::class);
+    }
+
+    /**
+     * @return HasMany<ProductOffer, $this>
+     */
+    public function offers(): HasMany
+    {
+        return $this->hasMany(ProductOffer::class);
     }
 
     /**
@@ -72,6 +101,8 @@ class Product extends Model
     {
         return [
             'published_at' => 'datetime',
+            'rating' => 'decimal:2',
+            'rating_count' => 'integer',
         ];
     }
 }

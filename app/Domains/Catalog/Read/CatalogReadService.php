@@ -107,6 +107,7 @@ class CatalogReadService
                 'name' => $category->name,
                 'slug' => $category->slug,
                 'description' => $category->description,
+                'filterable_attributes' => $category->filterable_attributes ?? [],
                 'children' => $this->buildCategoryBranch($categories, $category->id),
             ])
             ->values()

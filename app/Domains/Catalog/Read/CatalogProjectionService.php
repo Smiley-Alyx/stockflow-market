@@ -6,6 +6,7 @@ use App\Domains\Catalog\Models\CatalogProductProjection;
 use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Models\Product;
 use App\Domains\Catalog\Models\ProductAttribute;
+use App\Domains\Catalog\Models\ProductOffer;
 use App\Domains\Inventory\Read\InventoryReadService;
 use Illuminate\Support\Collection;
 
@@ -21,7 +22,7 @@ class CatalogProjectionService
 
         /** @var Product|null $fresh */
         $fresh = Product::query()
-            ->with(['category', 'attributes'])
+            ->with(['brand', 'category', 'attributes', 'offers'])
             ->find($productId);
 
         if (! $fresh instanceof Product) {
@@ -114,6 +115,10 @@ class CatalogProjectionService
             'slug' => $product->slug,
             'sku' => $product->sku,
             'description' => $product->description,
+            'short_description' => $product->short_description,
+            'image_url' => $product->image_url,
+            'rating' => (float) $product->rating,
+            'rating_count' => $product->rating_count,
             'status' => $product->status,
             'availability' => $availability,
             'published_at' => $product->published_at?->toJSON(),
@@ -122,11 +127,28 @@ class CatalogProjectionService
                 'name' => $product->category->name,
                 'slug' => $product->category->slug,
             ] : null,
+            'brand' => $product->brand ? [
+                'id' => $product->brand->id,
+                'name' => $product->brand->name,
+                'slug' => $product->brand->slug,
+            ] : null,
             'attributes' => $product->attributes
                 ->sortBy('name')
                 ->map(fn (ProductAttribute $attribute): array => [
                     'name' => $attribute->name,
                     'value' => $attribute->value,
+                ])
+                ->values()
+                ->all(),
+            'offers' => $product->offers
+                ->sortBy('sku')
+                ->map(fn (ProductOffer $offer): array => [
+                    'id' => $offer->id,
+                    'name' => $offer->name,
+                    'sku' => $offer->sku,
+                    'status' => $offer->status,
+                    'image_url' => $offer->image_url,
+                    'attributes' => $offer->attributes ?? [],
                 ])
                 ->values()
                 ->all(),

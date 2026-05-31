@@ -19,6 +19,10 @@ class ProductForm
                     ->searchable()
                     ->preload()
                     ->required(),
+                Select::make('brand_id')
+                    ->relationship('brand', 'name')
+                    ->searchable()
+                    ->preload(),
                 TextInput::make('name')
                     ->required()
                     ->maxLength(255),
@@ -39,6 +43,22 @@ class ProductForm
                     ->default('draft')
                     ->required(),
                 DateTimePicker::make('published_at'),
+                TextInput::make('image_url')
+                    ->url()
+                    ->maxLength(255),
+                TextInput::make('rating')
+                    ->numeric()
+                    ->minValue(0)
+                    ->maxValue(5)
+                    ->default(0)
+                    ->required(),
+                TextInput::make('rating_count')
+                    ->numeric()
+                    ->minValue(0)
+                    ->default(0)
+                    ->required(),
+                Textarea::make('short_description')
+                    ->columnSpanFull(),
                 Textarea::make('description')
                     ->columnSpanFull(),
             ]);

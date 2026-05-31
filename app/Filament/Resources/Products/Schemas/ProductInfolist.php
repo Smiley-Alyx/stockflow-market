@@ -16,10 +16,17 @@ class ProductInfolist
                 TextEntry::make('slug'),
                 TextEntry::make('category.name')
                     ->label('Category'),
+                TextEntry::make('brand.name')
+                    ->label('Brand'),
                 TextEntry::make('status')
                     ->badge(),
                 TextEntry::make('published_at')
                     ->dateTime(),
+                TextEntry::make('image_url'),
+                TextEntry::make('rating'),
+                TextEntry::make('rating_count'),
+                TextEntry::make('short_description')
+                    ->columnSpanFull(),
                 TextEntry::make('description')
                     ->columnSpanFull(),
                 TextEntry::make('created_at')
