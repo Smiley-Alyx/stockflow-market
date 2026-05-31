@@ -10,6 +10,7 @@ RUN apk add --no-cache \
         curl \
         git \
         icu-dev \
+        linux-headers \
         libzip-dev \
         oniguruma-dev \
         postgresql-dev \
@@ -18,7 +19,7 @@ RUN apk add --no-cache \
         $PHPIZE_DEPS \
     && pecl install redis \
     && docker-php-ext-enable redis \
-    && docker-php-ext-install \
+    && docker-php-ext-install -j1 \
         bcmath \
         intl \
         pcntl \
@@ -26,7 +27,7 @@ RUN apk add --no-cache \
         pdo_sqlite \
         sockets \
         zip \
-    && apk del $PHPIZE_DEPS \
+    && apk del $PHPIZE_DEPS linux-headers \
     && addgroup -g "${GID}" stockflow \
     && adduser -D -u "${UID}" -G stockflow stockflow \
     && mkdir -p /tmp/composer-cache \
