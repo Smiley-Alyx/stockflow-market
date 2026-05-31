@@ -48,6 +48,7 @@ fi
 
 docker compose -f "$COMPOSE_FILE" up -d --build
 docker compose -f "$COMPOSE_FILE" exec -T php php artisan migrate --force
+docker compose -f "$COMPOSE_FILE" restart domain-outbox-worker provider-outbox-worker provider-outcome-worker
 
 wait_for_url "Market gateway" "http://localhost:8080/health/ready"
 wait_for_url "Payment mock" "http://localhost:8081/health"
