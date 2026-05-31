@@ -26,7 +26,7 @@ const {
     () =>
         catalogApi.fetchProducts({
             category: selectedCategorySlug.value || undefined,
-            per_page: 6,
+            per_page: 12,
         }),
     {
         watch: [selectedCategorySlug],
@@ -69,6 +69,15 @@ const productStatus = computed(() => {
 
     return product.value?.status ?? 'Не найден';
 });
+const selectedImageUrl = ref<string | null>(null);
+
+watch(
+    product,
+    (nextProduct) => {
+        selectedImageUrl.value = nextProduct?.image_url ?? nextProduct?.gallery[0]?.url ?? null;
+    },
+    { immediate: true },
+);
 
 const loadProduct = async () => {
     const nextSlug = productSlugInput.value.trim();
@@ -122,6 +131,29 @@ function flattenCategories(nodes: CatalogCategory[]): CatalogCategory[] {
     return nodes.flatMap((category) => [category, ...flattenCategories(category.children)]);
 }
 
+function formatMoney(amountMinor: number, currency: string): string {
+    return new Intl.NumberFormat('ru-RU', {
+        style: 'currency',
+        currency,
+    }).format(amountMinor / 100);
+}
+
+function formatFileSize(size: number | null): string {
+    if (size === null) {
+        return '';
+    }
+
+    return size < 1024 ? `${size} Б` : `${(size / 1024).toFixed(1)} КБ`;
+}
+
+function documentType(type: string): string {
+    return {
+        instruction: 'Инструкция',
+        certificate: 'Сертификат',
+        attachment: 'Файл',
+    }[type] ?? 'Файл';
+}
+
 onMounted(() => customer.initialize());
 
 useHead({
@@ -171,7 +203,7 @@ main.shell
                     strong SSR
 
     section.content-grid(aria-label="Операционные данные")
-        article.panel
+        article.panel.product-card-panel
             .panel-heading
                 h2 Категории
                 span read API
@@ -233,20 +265,79 @@ main.shell
                     input(id="product-slug" v-model="productSlugInput" name="product-slug" autocomplete="off")
                     button(type="submit" :disabled="productPending") Найти
 
-            .product-summary(v-if="product")
-                div
-                    span {{ product.category?.name ?? 'Без категории' }}
-                    strong {{ product.name }}
-                    code {{ product.sku }}
-                p {{ product.description ?? 'Описание товара не заполнено.' }}
-                dl.attribute-list(v-if="product.attributes.length")
-                    template(v-for="attribute in product.attributes" :key="attribute.name")
-                        dt {{ attribute.name }}
-                        dd {{ attribute.value }}
-                .product-actions
-                    button(type="button" @click="customer.addCartItem(product)") Добавить в корзину
-                    button(type="button" @click="customer.toggleFavorite(product)")
-                        | {{ customer.isFavorite(product.id) ? 'Убрать из избранного' : 'В избранное' }}
+            .product-card(v-if="product")
+                .product-media
+                    .product-main-image
+                        img(v-if="selectedImageUrl" :src="selectedImageUrl" :alt="product.name")
+                        span(v-else) Изображение не загружено
+                    .product-gallery(v-if="product.image_url || product.gallery.length")
+                        button(
+                            v-if="product.image_url"
+                            type="button"
+                            :class="{ active: selectedImageUrl === product.image_url }"
+                            @click="selectedImageUrl = product.image_url"
+                        )
+                            img(:src="product.image_url" :alt="product.name")
+                        button(
+                            v-for="image in product.gallery"
+                            :key="image.id"
+                            type="button"
+                            :class="{ active: selectedImageUrl === image.url }"
+                            @click="selectedImageUrl = image.url"
+                        )
+                            img(v-if="image.url" :src="image.url" :alt="image.title ?? product.name")
+
+                .product-core
+                    span.product-category {{ product.category?.name ?? 'Без категории' }}
+                    h3 {{ product.name }}
+                    p.product-brand(v-if="product.brand") Бренд: {{ product.brand.name }}
+                    code Артикул: {{ product.sku }}
+                    p.product-short {{ product.short_description ?? 'Краткое описание товара не заполнено.' }}
+                    .product-price(v-if="product.price")
+                        strong {{ formatMoney(product.price.amount_minor, product.price.currency) }}
+                        del(v-if="product.price.has_discount")
+                            | {{ formatMoney(product.price.original_amount_minor, product.price.currency) }}
+                        span(v-if="product.price.has_discount") −{{ product.price.discount_percent }}%
+                    p.empty-state(v-else) Цена пока не указана.
+                    dl.attribute-list.compact(v-if="product.card_attributes.length")
+                        template(v-for="attribute in product.card_attributes" :key="attribute.name")
+                            dt {{ attribute.name }}
+                            dd {{ attribute.value }}
+                    .product-actions
+                        button(type="button" @click="customer.addCartItem(product)") Добавить в корзину
+                        button(type="button" @click="customer.toggleFavorite(product)")
+                            | {{ customer.isFavorite(product.id) ? 'Убрать из избранного' : 'В избранное' }}
+
+                section.product-details
+                    h3 Описание
+                    p {{ product.description ?? 'Описание товара не заполнено.' }}
+
+                section.product-details(v-if="product.attributes.length")
+                    h3 Характеристики
+                    dl.attribute-list
+                        template(v-for="attribute in product.attributes" :key="attribute.name")
+                            dt {{ attribute.name }}
+                            dd {{ attribute.value }}
+
+                section.product-details
+                    h3 Наличие на складах
+                    ul.warehouse-list(v-if="product.warehouses.length")
+                        li(v-for="warehouse in product.warehouses" :key="warehouse.warehouse_id")
+                            div
+                                strong {{ warehouse.warehouse_name }}
+                                span {{ warehouse.city_name }}
+                            b(:class="{ available: warehouse.in_stock }")
+                                | {{ warehouse.in_stock ? `${warehouse.available_quantity} шт.` : 'Нет в наличии' }}
+                    p.empty-state(v-else) Информация по складам пока отсутствует.
+
+                section.product-details(v-if="product.documents.length")
+                    h3 Документы
+                    ul.document-list
+                        li(v-for="document in product.documents" :key="document.id")
+                            a(:href="document.url ?? undefined" target="_blank" rel="noreferrer")
+                                strong {{ documentType(document.type) }}
+                                span {{ document.title }}
+                                small(v-if="document.size") {{ formatFileSize(document.size) }}
 
             p.empty-state(v-else-if="productError")
                 | Backend API недоступен для запроса выбранного товара.
