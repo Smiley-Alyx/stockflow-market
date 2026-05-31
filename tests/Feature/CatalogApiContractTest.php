@@ -63,6 +63,22 @@ class CatalogApiContractTest extends TestCase
         }
     }
 
+    public function test_public_product_card_endpoint_matches_gateway_and_catalog_contracts(): void
+    {
+        $this->createProduct();
+
+        $payload = $this->getJson('/catalog/devices/wireless-scanner/')
+            ->assertOk()
+            ->assertHeader('content-type', 'application/json')
+            ->json();
+
+        foreach ($this->catalogContracts() as $contract) {
+            $this->assertContractDeclaresResponse($contract, '/catalog/{category_path}/{product_slug}', '200', 'ProductResponse');
+            $this->assertSchemaMatchesPayload($contract, 'ProductResponse', $payload);
+            $this->assertSchemaMatchesPayload($contract, 'Product', $payload['data']);
+        }
+    }
+
     public function test_product_list_endpoint_matches_gateway_and_catalog_contracts(): void
     {
         $product = $this->createProduct();

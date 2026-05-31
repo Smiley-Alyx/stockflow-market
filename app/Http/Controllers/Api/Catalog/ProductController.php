@@ -18,8 +18,23 @@ class ProductController extends Controller
         return response()->json($catalog->products($this->productQuery($this->validatedFilters($request))));
     }
 
-    public function path(string $path, Request $request, CatalogProductSearch $catalog, CatalogUrlService $urls): JsonResponse
-    {
+    public function path(
+        string $path,
+        Request $request,
+        CatalogProductSearch $catalog,
+        ProductCardReadService $cards,
+        CatalogUrlService $urls,
+    ): JsonResponse {
+        $productPath = $urls->parseProductPath($path);
+
+        if ($productPath !== null) {
+            $product = $cards->productByPath($productPath['category_path'], $productPath['product_slug']);
+
+            if ($product !== null) {
+                return response()->json(['data' => $product]);
+            }
+        }
+
         $filters = array_merge($this->validatedFilters($request), $urls->parseCatalogPath($path));
 
         return response()->json($catalog->products($this->productQuery($filters)));

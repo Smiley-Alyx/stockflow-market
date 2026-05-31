@@ -15,6 +15,7 @@ export type CatalogCategory = {
     id: number;
     name: string;
     slug: string;
+    url: string | null;
     description: string | null;
     children: CatalogCategory[];
 };
@@ -23,6 +24,7 @@ export type CatalogProduct = {
     id: number;
     name: string;
     slug: string;
+    url: string | null;
     sku: string;
     description: string | null;
     short_description: string | null;

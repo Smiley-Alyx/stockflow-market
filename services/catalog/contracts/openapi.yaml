@@ -135,6 +135,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /catalog/{category_path}/{product_slug}:
+    get:
+      summary: Get catalog product card by category path and product slug
+      parameters:
+        - name: category_path
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: product_slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product card found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
   /api/catalog/products/{slug}:
     get:
       summary: Get catalog product by slug
@@ -240,6 +261,10 @@ components:
           type: string
         slug:
           type: string
+        url:
+          type:
+            - string
+            - 'null'
         sku:
           type: string
         description:

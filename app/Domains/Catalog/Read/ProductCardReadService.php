@@ -31,4 +31,16 @@ class ProductCardReadService
             'warehouses' => $this->inventory->warehouseAvailabilityForProductId($productId),
         ]);
     }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function productByPath(string $categoryPath, string $slug): ?array
+    {
+        $product = $this->productBySlug($slug);
+
+        return $product !== null && $product['category']['path'] === trim($categoryPath, '/')
+            ? $product
+            : null;
+    }
 }

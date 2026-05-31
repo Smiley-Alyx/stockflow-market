@@ -339,11 +339,17 @@ class CatalogReadApiTest extends TestCase
 
         $this->getJson('/api/catalog/products/wireless-scanner')
             ->assertOk()
+            ->assertJsonPath('data.url', '/catalog/equipment/devices/scanners/wireless-scanner/')
             ->assertJsonPath('data.category.path', 'equipment/devices/scanners')
             ->assertJsonPath('data.category.url', '/catalog/equipment/devices/scanners/')
             ->assertJsonPath('data.category.breadcrumbs.0.url', '/catalog/equipment/')
             ->assertJsonPath('data.category.breadcrumbs.1.url', '/catalog/equipment/devices/')
             ->assertJsonPath('data.category.breadcrumbs.2.url', '/catalog/equipment/devices/scanners/');
+
+        $this->getJson('/catalog/equipment/devices/scanners/wireless-scanner/')
+            ->assertOk()
+            ->assertJsonPath('data.slug', 'wireless-scanner')
+            ->assertJsonPath('data.url', '/catalog/equipment/devices/scanners/wireless-scanner/');
     }
 
     public function test_category_rejects_more_than_three_hierarchy_levels(): void

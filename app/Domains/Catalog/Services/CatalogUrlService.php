@@ -196,6 +196,32 @@ class CatalogUrlService
         return '/catalog/'.$this->categoryPath($category).'/';
     }
 
+    public function productUrl(Category $category, string $productSlug): string
+    {
+        return $this->categoryUrl($category).$productSlug.'/';
+    }
+
+    /**
+     * @return array{category_path: string, product_slug: string}|null
+     */
+    public function parseProductPath(string $path): ?array
+    {
+        $segments = collect(explode('/', trim($path, '/')))
+            ->filter()
+            ->values();
+
+        if ($segments->count() < 2 || $segments->contains('filter')) {
+            return null;
+        }
+
+        $productSlug = (string) $segments->pop();
+
+        return [
+            'category_path' => $segments->implode('/'),
+            'product_slug' => $productSlug,
+        ];
+    }
+
     /**
      * @return array<int, array{id: int, name: string, slug: string, url: string}>
      */

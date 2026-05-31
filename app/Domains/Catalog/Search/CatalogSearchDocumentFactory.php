@@ -49,6 +49,7 @@ class CatalogSearchDocumentFactory
             ] : null,
             'name' => $product->name,
             'slug' => $product->slug,
+            'url' => $product->category ? $this->urls->productUrl($product->category, $product->slug) : null,
             'sku' => $product->sku,
             'description' => $product->description,
             'short_description' => $product->short_description,
