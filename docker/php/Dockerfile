@@ -24,6 +24,7 @@ RUN apk add --no-cache \
         pcntl \
         pdo_pgsql \
         pdo_sqlite \
+        sockets \
         zip \
     && apk del $PHPIZE_DEPS \
     && addgroup -g "${GID}" stockflow \
