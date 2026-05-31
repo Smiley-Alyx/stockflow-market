@@ -2,6 +2,39 @@
 
 StockFlow Market — инженерный pet-проект маркетплейса с микросервисным направлением вокруг Laravel, PostgreSQL, Redis, RabbitMQ, Elasticsearch, ClickHouse и заготовки Nuxt SSR frontend. Проект развивается как highload-oriented backend case: в нём последовательно прорабатываются каталог, остатки, заказы, цены, поиск, асинхронные события и локальная инфраструктура. Сейчас это фундамент и набор сквозных backend-срезов, а не завершённая production-система или готовый микросервисный маркетплейс.
 
+## Экосистема StockFlow
+
+`stockflow-market` — основной репозиторий и landing page экосистемы. Вокруг него
+подготовлены три независимых sandbox-сервиса для интеграции через RabbitMQ:
+
+| Репозиторий | RabbitMQ exchange | Ответственность |
+| --- | --- | --- |
+| **[stockflow-market](https://github.com/Smiley-Alyx/stockflow-market)** | orchestration boundary | Checkout, заказы, каталог и будущая оркестрация provider-событий |
+| [stockflow-erp-mock](https://github.com/Smiley-Alyx/stockflow-erp-mock) | `stockflow.inventory` | Резервирование и освобождение складских остатков |
+| [stockflow-payment-mock](https://github.com/Smiley-Alyx/stockflow-payment-mock) | `stockflow.payment` | Авторизация, capture и refund платежей |
+| [stockflow-delivery-mock](https://github.com/Smiley-Alyx/stockflow-delivery-mock) | `stockflow.delivery` | Создание, отмена и изменение статуса отправлений |
+
+```mermaid
+flowchart LR
+    client["Nuxt frontend / API client"] --> market["stockflow-market<br/>checkout · orders · fulfillment"]
+    market -. "следующий этап: provider orchestration" .-> rabbit["RabbitMQ<br/>topic exchanges"]
+    rabbit <-->|"reserve / release"| inventory["stockflow-erp-mock<br/>stockflow.inventory"]
+    rabbit <-->|"authorize / capture / refund"| payment["stockflow-payment-mock<br/>stockflow.payment"]
+    rabbit <-->|"create / cancel shipment"| delivery["stockflow-delivery-mock<br/>stockflow.delivery"]
+```
+
+Моки уже реализуют версионированные AsyncAPI-контракты, idempotency, retry, DLQ,
+failure injection и correlation headers. В `stockflow-market` текущий checkout
+пока резервирует остатки внутри Laravel-среза: публикация provider requests и
+обработка outcomes остаются следующим этапом интеграции.
+
+| Документ | Содержание |
+| --- | --- |
+| [`docs/architecture.md`](docs/architecture.md) | Контекст четырёх систем, границы интеграции и trade-offs |
+| [`docs/delivery-flow.md`](docs/delivery-flow.md) | Сквозной checkout sequence и компенсирующие действия |
+| [`docs/failure-modes.md`](docs/failure-modes.md) | Failure scenarios и таблица гарантий |
+| [`docs/demo.md`](docs/demo.md) | Пятиминутный сценарий демонстрации техлиду |
+
 ## Текущий статус
 
 Сейчас проект находится на этапе закладки фундамента:
@@ -149,7 +182,18 @@ RABBITMQ_ENABLED=true CLICKHOUSE_ENABLED=true docker compose --profile extended 
 
 Backend использует in-process публикацию outbox-событий по умолчанию. Переменная `STOCKFLOW_EVENT_BUS=rabbitmq` пока включает только circuit-breaker границу для тестирования поведения outbox при недоступности будущего transport, но не отправляет сообщения в RabbitMQ.
 
-Воспроизводимый сценарий `создать товар → событие → индексация → поиск → dead-letter/requeue` описан в [`docs/demo.md`](docs/demo.md).
+Все четыре репозитория можно поднять на одном RabbitMQ одной командой:
+
+```bash
+docker compose -f docker-compose-all.yml up -d --build
+```
+
+В общем стенде gateway остаётся на `http://localhost:8080`, payment mock доступен
+на `http://localhost:8081`, delivery mock — на `http://localhost:8082`, ERP mock —
+на `http://localhost:8083`. Подробности и команды проверки собраны в
+[`docs/demo.md`](docs/demo.md).
+
+Воспроизводимый сценарий `создать товар → событие → индексация → поиск → dead-letter/requeue` описан в [`docs/catalog-demo.md`](docs/catalog-demo.md).
 
 Законченный бизнес-сценарий `корзина → price snapshot → reserve stock → order created` описан в [`docs/checkout-demo.md`](docs/checkout-demo.md).
 
@@ -162,6 +206,9 @@ PostgreSQL: stockflow / secret
 RabbitMQ:   stockflow / secret
 ClickHouse: stockflow / secret
 ```
+
+Общий стенд из `docker-compose-all.yml` использует для RabbitMQ креды
+`stockflow / stockflow`, одинаковые для marketplace и трёх моков.
 
 ## Быстрый старт
 

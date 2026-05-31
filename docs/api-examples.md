@@ -111,5 +111,5 @@ http POST "$BASE_URL/api/orders/$ORDER_ID/paid"
 
 Подробные воспроизводимые сценарии:
 
-- [`docs/demo.md`](demo.md) — индексация каталога, поиск, dead-letter и requeue;
+- [`docs/catalog-demo.md`](catalog-demo.md) — индексация каталога, поиск, dead-letter и requeue;
 - [`docs/checkout-demo.md`](checkout-demo.md) — снимок цены, асинхронное резервирование и `orders.order.created`.

@@ -1,156 +1,90 @@
-# Демонстрация поискового контура
+# Демо экосистемы за 5 минут
 
-Этот сценарий показывает работающий backend-поток:
+## Цель
+
+Показать техлиду границы четырёх систем, единый RabbitMQ, доступность моков,
+контрактный checkout flow и готовые механизмы reliability.
+
+## 0:00–1:00 — поднять стенд
+
+Репозитории должны лежать рядом:
 
 ```text
-создать товар → записать событие в outbox → поставить индексацию в очередь
-→ найти товар через Elasticsearch → получить dead-letter при сбое → выполнить requeue
+projects/
+  stockflow-market/
+  stockflow-erp-mock/
+  stockflow-payment-mock/
+  stockflow-delivery-mock/
 ```
 
-RabbitMQ для этой демонстрации не нужен: текущий publisher обрабатывает transactional outbox in-process. Очередь поисковой индексации работает через Redis, а документы сохраняются в Elasticsearch.
-
-## Подготовка
-
-Запустить базовый локальный стек, установить зависимости и применить миграции:
+Запуск:
 
 ```bash
-docker compose up -d --build
-docker compose exec php composer install
-docker compose exec php php artisan key:generate
-docker compose exec php php artisan migrate
+./scripts/demo-all.sh
 ```
 
-Убедиться, что backend, Redis, Elasticsearch и worker индексации запущены:
+Скрипт собирает контейнеры, запускает общий broker, применяет market migrations,
+проверяет HTTP endpoints и убеждается, что фоновые consumers и workers
+запущены.
+
+## 1:00–2:00 — показать экосистему
+
+Откройте [README](../README.md#экосистема-stockflow) и проговорите:
+
+1. `stockflow-market` хранит checkout и должен оркестрировать saga.
+2. ERP mock резервирует остатки через `stockflow.inventory`.
+3. Payment mock моделирует authorize/capture/refund через `stockflow.payment`.
+4. Delivery mock создаёт отправления через `stockflow.delivery`.
+5. Все сообщения checkout связываются одним `correlation_id`.
+
+Целевая sequence diagram находится в
+[`delivery-flow.md`](delivery-flow.md#happy-path).
+
+## 2:00–3:00 — проверить runtime
 
 ```bash
-docker compose ps
+curl -s http://localhost:8080/health/ready
+curl -s http://localhost:8083/stock | jq
+curl -s http://localhost:8081/sandbox/cards | jq
+curl -s http://localhost:8082/health | jq
 ```
 
-## Создание товара
+RabbitMQ management UI: `http://localhost:15672`, логин и пароль:
+`stockflow / stockflow`.
 
-Создать или обновить демонстрационный товар через Eloquent. Изменение `description` делает команду повторяемой: при повторном запуске будет создано новое событие обновления.
+## 3:00–4:00 — показать reliability
+
+Откройте [`failure-modes.md`](failure-modes.md#таблица-гарантий) и покажите пять
+гарантий: at-least-once delivery, idempotency, DLQ, retry и correlation tracing.
+
+Быстрый fault injection для ERP:
 
 ```bash
-docker compose exec php php artisan tinker --execute='
-$category = App\Domains\Catalog\Models\Category::query()->firstOrCreate(
-    ["slug" => "demo-devices"],
-    ["name" => "Demo devices", "is_active" => true],
-);
+curl -s -X POST http://localhost:8083/debug/failure-mode \
+  -H 'content-type: application/json' \
+  --data '{"mode":"always_reject"}' | jq
 
-$product = App\Domains\Catalog\Models\Product::query()->updateOrCreate(
-    ["slug" => "demo-wireless-scanner"],
-    [
-        "category_id" => $category->id,
-        "name" => "Demo Wireless Scanner",
-        "sku" => "DEMO-SCAN-001",
-        "description" => "Demo run ".now()->toIso8601String(),
-        "status" => "published",
-        "published_at" => now(),
-    ],
-);
-
-dump(["product_id" => $product->id, "slug" => $product->slug]);
-'
+curl -s -X POST http://localhost:8083/debug/failure-mode \
+  -H 'content-type: application/json' \
+  --data '{"mode":"normal"}' | jq
 ```
 
-Модель товара отправит `catalog.product.created` или `catalog.product.updated`. Listener преобразует его в `search.index.requested` и сохранит событие в таблице transactional outbox.
+## 4:00–5:00 — обозначить границу готовности
 
-Посмотреть ожидающее событие:
+Сформулируйте явно:
+
+- sandbox providers уже готовы к автономной интеграции и failure testing;
+- market checkout сейчас работает как внутренний Laravel-срез;
+- следующий инженерный этап — outbox relay, saga state и idempotent consumers
+  outcomes в `stockflow-market`.
+
+Это важная граница: compose запускает всю экосистему, но не выдаёт
+автоматический end-to-end checkout до появления market-orchestrator.
+
+## Полезные команды
 
 ```bash
-docker compose exec postgres psql -U stockflow -d stockflow -c \
-  "select id, event_name, status, attempts from messaging_outbox order by id desc limit 5;"
+docker compose -f docker-compose-all.yml ps
+docker compose -f docker-compose-all.yml logs -f erp-mock payment-mock-worker delivery-mock-worker
+docker compose -f docker-compose-all.yml down
 ```
-
-## Индексация и поиск
-
-Опубликовать ожидающие outbox-события:
-
-```bash
-docker compose exec php php artisan messaging:outbox:publish
-```
-
-Команда отправит `search.index.requested` во внутренний event dispatcher. Listener поставит `IndexSearchDocument` в Redis-очередь `search-indexing`, а `search-index-worker` сохранит документ в Elasticsearch.
-
-Посмотреть логи worker:
-
-```bash
-docker compose logs --tail=50 search-index-worker
-```
-
-Найти товар через публичный API:
-
-```bash
-curl -sS "http://localhost:8080/api/search/products?q=Demo%20Wireless%20Scanner"
-```
-
-В `data` должен появиться товар со `slug` `demo-wireless-scanner`.
-
-## Dead-letter и requeue
-
-Остановить Elasticsearch:
-
-```bash
-docker compose stop elasticsearch
-```
-
-Обновить товар, чтобы создать новое событие индексации:
-
-```bash
-docker compose exec php php artisan tinker --execute='
-$product = App\Domains\Catalog\Models\Product::query()
-    ->where("slug", "demo-wireless-scanner")
-    ->firstOrFail();
-
-$product->update([
-    "name" => "Demo Scanner Requeued",
-    "description" => "Elasticsearch failure demo ".now()->toIso8601String(),
-]);
-'
-```
-
-Опубликовать outbox-событие:
-
-```bash
-docker compose exec php php artisan messaging:outbox:publish
-```
-
-Worker выполнит несколько попыток индексации. После исчерпания retry документ попадёт в Redis-backed dead-letter storage. Дождаться ошибки можно по логам:
-
-```bash
-docker compose logs -f search-index-worker
-```
-
-Остановить просмотр логов сочетанием `Ctrl+C`, затем вывести dead-letter записи:
-
-```bash
-docker compose exec php php artisan search:dead-letter list --index=catalog_products
-```
-
-Запомнить `ID` строки демонстрационного документа, восстановить Elasticsearch и дождаться закрытия circuit breaker:
-
-```bash
-docker compose start elasticsearch
-sleep 35
-```
-
-Вернуть запись в очередь, подставив её `ID`:
-
-```bash
-docker compose exec php php artisan search:dead-letter requeue --id=<ID>
-```
-
-Проверить, что товар снова находится:
-
-```bash
-curl -sS "http://localhost:8080/api/search/products?q=Demo%20Scanner%20Requeued"
-```
-
-## Что демонстрирует сценарий
-
-- события каталога не индексируют товар напрямую, а записывают `search.index.requested` в transactional outbox;
-- publisher отделён от создания товара и запускается командой `messaging:outbox:publish`;
-- Redis-очередь отделяет публикацию события от записи в Elasticsearch;
-- Elasticsearch обслуживает отдельный поисковый read endpoint;
-- retry и dead-letter сохраняют неиндексированный документ при сбое;
-- `search:dead-letter requeue` возвращает документ в штатную очередь после восстановления зависимости.
