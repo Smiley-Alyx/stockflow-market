@@ -32,7 +32,7 @@ class ProviderMessageRecorder
                 'correlation_id' => $correlationId,
                 'causation_id' => $causationId,
                 'idempotency_key' => $idempotencyKey,
-                'schema_version' => 1,
+                'schema_version' => $this->schemaVersion($exchange),
                 'retry_count' => 0,
                 'occurred_at' => now()->toISOString(),
                 'producer' => 'stockflow-market',
@@ -41,5 +41,10 @@ class ProviderMessageRecorder
             'status' => ProviderOutboxMessage::STATUS_PENDING,
             'available_at' => now(),
         ]);
+    }
+
+    private function schemaVersion(string $exchange): int|string
+    {
+        return $exchange === 'stockflow.inventory' ? 1 : 'v1';
     }
 }

@@ -32,7 +32,8 @@ class CheckoutSagaTest extends TestCase
         $this->outcome($saga, 'inventory.reservation.confirmed.v1', [
             'reservation_id' => $reservation->reservation_id,
         ]);
-        $this->assertProviderMessage('payment.authorization.requested.v1');
+        $authorizationMessage = $this->assertProviderMessage('payment.authorization.requested.v1');
+        $this->assertSame('v1', $authorizationMessage->headers['schema_version']);
 
         $this->outcome($saga, 'payment.authorization.approved.v1', [
             'authorization_id' => 'auth_demo_001',
