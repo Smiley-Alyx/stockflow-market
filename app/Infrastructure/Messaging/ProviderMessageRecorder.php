@@ -33,6 +33,7 @@ class ProviderMessageRecorder
                 'causation_id' => $causationId,
                 'idempotency_key' => $idempotencyKey,
                 'schema_version' => 1,
+                'retry_count' => 0,
                 'occurred_at' => now()->toISOString(),
                 'producer' => 'stockflow-market',
             ],
