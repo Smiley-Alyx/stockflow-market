@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Models\Product;
+use App\Domains\Pricing\Models\ProductPrice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -67,11 +68,73 @@ class CustomerStateApiTest extends TestCase
 
         $this->deleteJson('/api/customer-state/cart/items/'.$product->id)
             ->assertOk()
-            ->assertJsonCount(0, 'data.cart.items');
+            ->assertJsonCount(0, 'data.cart.items')
+            ->assertJsonCount(1, 'data.cart.removed_items');
 
         $this->deleteJson('/api/customer-state/favorites/'.$product->id)
             ->assertOk()
             ->assertJsonCount(0, 'data.favorites');
+    }
+
+    public function test_customer_can_select_remove_restore_and_checkout_cart_items(): void
+    {
+        $scanner = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');
+        $terminal = $this->createProduct('Checkout Terminal', 'checkout-terminal', 'TERM-001');
+        $this->createPrice($scanner, 'retail', 1000);
+        $this->createPrice($scanner, 'sale', 800);
+        $this->createPrice($terminal, 'retail', 2000);
+
+        $this->postJson('/api/session/register', [
+            'name' => 'Alexandra',
+            'email' => 'alexandra@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ])->assertCreated();
+
+        $this->putJson('/api/customer-state/cart/items/'.$scanner->id, ['quantity' => 2])->assertOk();
+        $cart = $this->putJson('/api/customer-state/cart/items/'.$terminal->id, ['quantity' => 1])
+            ->assertOk()
+            ->assertJsonPath('data.cart.summary.items_count', 3)
+            ->assertJsonPath('data.cart.summary.amount_minor', 3600)
+            ->json('data.cart');
+
+        $this->putJson('/api/customer-state/cart/items/'.$terminal->id.'/selection', ['is_selected' => false])
+            ->assertOk()
+            ->assertJsonPath('data.cart.summary.selected_items_count', 2)
+            ->assertJsonPath('data.cart.summary.selected_amount_minor', 1600);
+
+        $this->postJson('/api/orders/draft', [
+            'cart_id' => $cart['id'],
+            'product_ids' => [$scanner->id],
+        ])
+            ->assertCreated()
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.items.0.price_type', 'sale')
+            ->assertJsonPath('data.total_amount_minor', 1600);
+
+        $this->deleteJson('/api/customer-state/cart/items/'.$scanner->id)
+            ->assertOk()
+            ->assertJsonCount(1, 'data.cart.items')
+            ->assertJsonCount(1, 'data.cart.removed_items')
+            ->assertJsonPath('data.cart.summary.amount_minor', 2000);
+
+        $this->putJson('/api/customer-state/cart/items/'.$scanner->id.'/restore')
+            ->assertOk()
+            ->assertJsonCount(2, 'data.cart.items')
+            ->assertJsonCount(0, 'data.cart.removed_items');
+
+        $this->putJson('/api/customer-state/cart/selection', ['is_selected' => true])
+            ->assertOk()
+            ->assertJsonPath('data.cart.summary.selected_items_count', 3)
+            ->assertJsonPath('data.cart.summary.selected_amount_minor', 3600);
+
+        $this->postJson('/api/orders/draft', [
+            'cart_id' => $cart['id'],
+            'product_ids' => [$scanner->id, $terminal->id],
+        ])
+            ->assertCreated()
+            ->assertJsonCount(2, 'data.items')
+            ->assertJsonPath('data.total_amount_minor', 3600);
     }
 
     public function test_customer_state_mutations_reject_unknown_products(): void
@@ -101,6 +164,16 @@ class CustomerStateApiTest extends TestCase
             'sku' => $sku,
             'status' => 'published',
             'published_at' => now(),
+        ]);
+    }
+
+    private function createPrice(Product $product, string $type, int $amountMinor): ProductPrice
+    {
+        return ProductPrice::query()->create([
+            'product_id' => $product->id,
+            'price_type' => $type,
+            'amount_minor' => $amountMinor,
+            'currency' => 'USD',
         ]);
     }
 }

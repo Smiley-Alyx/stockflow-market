@@ -211,6 +211,10 @@ components:
           type: string
         promo_code:
           type: string
+        product_ids:
+          type: array
+          items:
+            type: integer
     Cart:
       type: object
       required:

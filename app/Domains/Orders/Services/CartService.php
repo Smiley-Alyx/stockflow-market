@@ -26,9 +26,12 @@ class CartService
                 $cart->items()->create([
                     'product_id' => $productId,
                     'quantity' => $quantity,
+                    'is_selected' => true,
                 ]);
             } else {
                 $item->quantity += $quantity;
+                $item->is_selected = true;
+                $item->removed_at = null;
                 $item->save();
             }
 

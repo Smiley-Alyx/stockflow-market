@@ -31,25 +31,33 @@ class OrderService
         private readonly DomainEventRecorder $events,
     ) {}
 
-    public function createDraft(int $cartId, ?string $cityCode = null, ?string $promoCode = null): Order
+    /**
+     * @param  array<int, int>|null  $productIds
+     */
+    public function createDraft(int $cartId, ?string $cityCode = null, ?string $promoCode = null, ?array $productIds = null): Order
     {
         $cityCode = $this->normalizeOptionalCode($cityCode, lowercase: true);
         $promoCode = $this->normalizeOptionalCode($promoCode);
 
-        return DB::transaction(function () use ($cartId, $cityCode, $promoCode): Order {
+        return DB::transaction(function () use ($cartId, $cityCode, $promoCode, $productIds): Order {
             /** @var Cart $cart */
             $cart = Cart::query()
                 ->with('items.product')
                 ->lockForUpdate()
                 ->findOrFail($cartId);
 
-            if ($cart->items->isEmpty()) {
+            $items = $cart->items
+                ->whereNull('removed_at')
+                ->when($productIds !== null, fn (Collection $items): Collection => $items->whereIn('product_id', $productIds))
+                ->values();
+
+            if ($items->isEmpty()) {
                 throw OrderConflict::emptyCart();
             }
 
-            $prices = $this->activeRetailPrices($cart->items->pluck('product_id')->all(), $cityCode);
+            $prices = $this->activeCheckoutPrices($items->pluck('product_id')->all(), $cityCode);
 
-            $currency = $this->resolveCurrency($cart->items, $prices);
+            $currency = $this->resolveCurrency($items, $prices);
             $promotion = $promoCode === null ? null : $this->activePromotion($promoCode);
 
             /** @var Order $order */
@@ -66,7 +74,7 @@ class OrderService
 
             $subtotal = 0;
 
-            foreach ($cart->items as $cartItem) {
+            foreach ($items as $cartItem) {
                 /** @var ProductPrice $price */
                 $price = $prices->get($cartItem->product_id);
                 $lineAmount = $price->amount_minor * $cartItem->quantity;
@@ -304,13 +312,13 @@ class OrderService
      * @param  array<int, int>  $productIds
      * @return Collection<int, ProductPrice>
      */
-    private function activeRetailPrices(array $productIds, ?string $cityCode): Collection
+    private function activeCheckoutPrices(array $productIds, ?string $cityCode): Collection
     {
         $now = now();
 
         return ProductPrice::query()
             ->whereIn('product_id', $productIds)
-            ->where('price_type', 'retail')
+            ->whereIn('price_type', ['retail', 'sale'])
             ->when(
                 $cityCode !== null,
                 fn (Builder $query): Builder => $query->where(fn (Builder $query): Builder => $query
@@ -334,7 +342,22 @@ class OrderService
             ->orderByDesc('id')
             ->lockForUpdate()
             ->get()
-            ->unique('product_id')
+            ->unique(fn (ProductPrice $price): string => $price->product_id.'|'.$price->price_type)
+            ->groupBy('product_id')
+            ->map(function (Collection $prices): ProductPrice {
+                /** @var ProductPrice|null $retail */
+                $retail = $prices->firstWhere('price_type', 'retail');
+                /** @var ProductPrice|null $sale */
+                $sale = $prices->firstWhere('price_type', 'sale');
+                $original = $retail ?? $sale;
+
+                return $sale !== null
+                    && $original !== null
+                    && $sale->currency === $original->currency
+                    && $sale->amount_minor < $original->amount_minor
+                        ? $sale
+                        : $original;
+            })
             ->keyBy('product_id');
     }
 

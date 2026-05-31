@@ -43,6 +43,9 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/api/customer-state/merge', [CustomerStateController::class, 'merge']);
     Route::put('/api/customer-state/cart/items/{product}', [CustomerStateController::class, 'setCartItem']);
     Route::delete('/api/customer-state/cart/items/{product}', [CustomerStateController::class, 'removeCartItem']);
+    Route::put('/api/customer-state/cart/items/{product}/restore', [CustomerStateController::class, 'restoreCartItem']);
+    Route::put('/api/customer-state/cart/items/{product}/selection', [CustomerStateController::class, 'selectCartItem']);
+    Route::put('/api/customer-state/cart/selection', [CustomerStateController::class, 'selectAllCartItems']);
     Route::put('/api/customer-state/favorites/{product}', [CustomerStateController::class, 'addFavorite']);
     Route::delete('/api/customer-state/favorites/{product}', [CustomerStateController::class, 'removeFavorite']);
 });

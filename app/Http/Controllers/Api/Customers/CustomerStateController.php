@@ -52,6 +52,35 @@ class CustomerStateController extends Controller
         ]);
     }
 
+    public function restoreCartItem(Product $product, Request $request, CustomerStateService $customers): JsonResponse
+    {
+        return response()->json([
+            'data' => $customers->restoreCartItem($request->user(), $product->id),
+        ]);
+    }
+
+    public function selectCartItem(Product $product, Request $request, CustomerStateService $customers): JsonResponse
+    {
+        $payload = $request->validate([
+            'is_selected' => ['required', 'boolean'],
+        ]);
+
+        return response()->json([
+            'data' => $customers->selectCartItem($request->user(), $product->id, (bool) $payload['is_selected']),
+        ]);
+    }
+
+    public function selectAllCartItems(Request $request, CustomerStateService $customers): JsonResponse
+    {
+        $payload = $request->validate([
+            'is_selected' => ['required', 'boolean'],
+        ]);
+
+        return response()->json([
+            'data' => $customers->selectAllCartItems($request->user(), (bool) $payload['is_selected']),
+        ]);
+    }
+
     public function addFavorite(Product $product, Request $request, CustomerStateService $customers): JsonResponse
     {
         return response()->json([

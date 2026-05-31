@@ -17,6 +17,8 @@ class DraftOrderController extends Controller
             'cart_id' => ['required', 'integer', 'min:1', 'exists:orders_carts,id'],
             'city_code' => ['sometimes', 'string', 'max:255'],
             'promo_code' => ['sometimes', 'string', 'max:255'],
+            'product_ids' => ['sometimes', 'array', 'min:1', 'max:100'],
+            'product_ids.*' => ['integer', 'distinct', 'exists:catalog_products,id'],
         ]);
 
         try {
@@ -24,6 +26,7 @@ class DraftOrderController extends Controller
                 (int) $payload['cart_id'],
                 $payload['city_code'] ?? null,
                 $payload['promo_code'] ?? null,
+                $payload['product_ids'] ?? null,
             );
         } catch (OrderConflict $exception) {
             return response()->json(['message' => $exception->getMessage()], 409);

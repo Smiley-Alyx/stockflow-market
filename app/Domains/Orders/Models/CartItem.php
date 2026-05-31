@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['cart_id', 'product_id', 'quantity'])]
+#[Fillable(['cart_id', 'product_id', 'quantity', 'is_selected', 'removed_at'])]
 class CartItem extends Model
 {
     protected $table = 'orders_cart_items';
@@ -37,6 +37,8 @@ class CartItem extends Model
     {
         return [
             'quantity' => 'integer',
+            'is_selected' => 'boolean',
+            'removed_at' => 'datetime',
         ];
     }
 }
