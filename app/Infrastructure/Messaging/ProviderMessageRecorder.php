@@ -32,7 +32,7 @@ class ProviderMessageRecorder
                 'correlation_id' => $correlationId,
                 'causation_id' => $causationId,
                 'idempotency_key' => $idempotencyKey,
-                'schema_version' => 'v1',
+                'schema_version' => 1,
                 'occurred_at' => now()->toISOString(),
                 'producer' => 'stockflow-market',
             ],

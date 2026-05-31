@@ -26,6 +26,7 @@ class CheckoutSagaTest extends TestCase
         $reservationMessage = $this->assertProviderMessage('inventory.reservation.requested.v1');
         $this->assertSame($reservationMessage->message_id, $reservationMessage->causation_id);
         $this->assertSame($reservationMessage->message_id, $reservationMessage->headers['causation_id']);
+        $this->assertSame(1, $reservationMessage->headers['schema_version']);
 
         $this->outcome($saga, 'inventory.reservation.confirmed.v1', [
             'reservation_id' => $reservation->reservation_id,
