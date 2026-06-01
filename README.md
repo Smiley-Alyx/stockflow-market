@@ -181,7 +181,7 @@ stockflow-market/
 RABBITMQ_ENABLED=true CLICKHOUSE_ENABLED=true docker compose --profile extended up -d
 ```
 
-Backend использует in-process публикацию outbox-событий по умолчанию. Переменная `STOCKFLOW_EVENT_BUS=rabbitmq` пока включает только circuit-breaker границу для тестирования поведения outbox при недоступности будущего transport, но не отправляет сообщения в RabbitMQ.
+Backend использует in-process публикацию общих доменных outbox-событий по умолчанию. Переменная `STOCKFLOW_EVENT_BUS=rabbitmq` пока включает для них только circuit-breaker границу для тестирования поведения outbox при недоступности будущего transport, но не отправляет эти сообщения в RabbitMQ. Provider saga использует отдельный RabbitMQ transport для request-событий и outcomes.
 
 Все четыре репозитория можно поднять на одном RabbitMQ одной командой:
 
