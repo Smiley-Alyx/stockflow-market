@@ -186,11 +186,11 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
     private function sort(string $sort): array
     {
         return match ($sort) {
-            'price_asc' => [['price.amount_minor' => ['order' => 'asc', 'missing' => '_last']], ['_id' => 'asc']],
-            'price_desc' => [['price.amount_minor' => ['order' => 'desc', 'missing' => '_last']], ['_id' => 'asc']],
-            'rating_asc' => [['rating' => 'asc'], ['_id' => 'asc']],
-            'rating_desc' => [['rating' => 'desc'], ['_id' => 'asc']],
-            default => [['published_at' => ['order' => 'desc', 'missing' => '_last']], ['_id' => 'asc']],
+            'price_asc' => [['price.amount_minor' => ['order' => 'asc', 'missing' => '_last']], ['id' => 'asc']],
+            'price_desc' => [['price.amount_minor' => ['order' => 'desc', 'missing' => '_last']], ['id' => 'asc']],
+            'rating_asc' => [['rating' => 'asc'], ['id' => 'asc']],
+            'rating_desc' => [['rating' => 'desc'], ['id' => 'asc']],
+            default => [['published_at' => ['order' => 'desc', 'missing' => '_last']], ['id' => 'asc']],
         };
     }
 

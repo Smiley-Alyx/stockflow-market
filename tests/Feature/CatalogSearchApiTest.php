@@ -145,7 +145,10 @@ class CatalogSearchApiTest extends TestCase
                 && in_array(['terms' => ['brand.slug.keyword' => ['acme']]], $body['query']['bool']['filter'], true)
                 && in_array(['term' => ['availability.city_codes.keyword' => 'waw']], $body['query']['bool']['filter'], true)
                 && $body['post_filter'] === ['range' => ['price.amount_minor' => ['gte' => 90000, 'lte' => 140000]]]
-                && $body['sort'][0] === ['price.amount_minor' => ['order' => 'asc', 'missing' => '_last']];
+                && $body['sort'] === [
+                    ['price.amount_minor' => ['order' => 'asc', 'missing' => '_last']],
+                    ['id' => 'asc'],
+                ];
         });
     }
 
