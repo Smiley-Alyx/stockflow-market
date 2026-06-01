@@ -15,6 +15,7 @@ const RESERVATION_CITY = __ENV.RESERVATION_CITY || '';
 const CHECKOUT_PRODUCT_ID = __ENV.CHECKOUT_PRODUCT_ID || '';
 const RESERVATION_QUANTITY = Number(__ENV.RESERVATION_QUANTITY || 1);
 const CHECKOUT_QUANTITY = Number(__ENV.CHECKOUT_QUANTITY || 1);
+let csrfToken = '';
 
 export const options = {
     scenarios: {
@@ -169,6 +170,7 @@ export function skuReservationRace(data) {
         headers: {
             'Content-Type': 'application/json',
             'Idempotency-Key': idempotencyKey,
+            ...csrfHeaders(),
         },
         responseCallback: http.expectedStatuses(201, 404, 409, 422, 429),
         tags: { flow: 'sku_reservation_race', endpoint: 'inventory_reservations' },
@@ -266,10 +268,27 @@ function extractProducts(payload) {
 
 function jsonParams(flow, endpoint) {
     return {
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeaders() },
         responseCallback: http.expectedStatuses(200, 201, 409, 429),
         tags: { flow, endpoint },
     };
+}
+
+function csrfHeaders() {
+    if (!csrfToken) {
+        const response = http.get(`${BASE_URL}/api/session/csrf`, {
+            responseCallback: http.expectedStatuses(200),
+            tags: { flow: 'session', endpoint: 'session_csrf' },
+        });
+
+        if (response.status !== 200) {
+            return {};
+        }
+
+        csrfToken = response.json('csrf_token');
+    }
+
+    return { 'X-CSRF-TOKEN': csrfToken };
 }
 
 function pick(items) {
