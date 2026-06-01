@@ -19,6 +19,8 @@ class CheckoutSagaReservation extends Model
 
     public const STATUS_RELEASED = 'released';
 
+    public const STATUS_RELEASE_FAILED = 'release_failed';
+
     protected $table = 'orders_checkout_saga_reservations';
 
     /**

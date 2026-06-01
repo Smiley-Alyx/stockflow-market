@@ -7,9 +7,15 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['order_id', 'correlation_id', 'payment_id', 'authorization_id', 'capture_id', 'status', 'failure_reason'])]
+#[Fillable(['order_id', 'correlation_id', 'payment_id', 'authorization_id', 'capture_id', 'refund_id', 'refund_status', 'status', 'failure_reason', 'compensation_failure_reason'])]
 class CheckoutSaga extends Model
 {
+    public const REFUND_STATUS_PENDING = 'pending';
+
+    public const REFUND_STATUS_COMPLETED = 'completed';
+
+    public const REFUND_STATUS_FAILED = 'failed';
+
     public const STATUS_RESERVING_STOCK = 'reserving_stock';
 
     public const STATUS_AUTHORIZING_PAYMENT = 'authorizing_payment';

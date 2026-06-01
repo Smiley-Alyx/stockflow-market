@@ -62,6 +62,11 @@ class CheckoutSagaTest extends TestCase
             'shipment_id' => $shipmentMessage->payload['shipment_id'],
             'tracking_number' => 'TRK-DEMO-001',
         ], $messageId);
+        $this->outcome($saga, 'delivery.shipment.status_changed.v1', [
+            'shipment_id' => $shipmentMessage->payload['shipment_id'],
+            'current_status' => 'label_generated',
+            'tracking_number' => 'TRK-DEMO-002',
+        ]);
 
         $this->assertDatabaseHas('orders_checkout_sagas', [
             'id' => $saga->id,
@@ -69,8 +74,8 @@ class CheckoutSagaTest extends TestCase
         ]);
         $this->assertDatabaseHas('orders_shipments', [
             'order_id' => $order->id,
-            'provider_status' => 'created',
-            'tracking_number' => 'TRK-DEMO-001',
+            'provider_status' => 'label_generated',
+            'tracking_number' => 'TRK-DEMO-002',
         ]);
         $this->assertSame(1, DB::table('messaging_inbox')->where('message_id', $messageId)->count());
     }
@@ -107,6 +112,101 @@ class CheckoutSagaTest extends TestCase
         $this->assertSame($reservations[0]->reservation_id, $release->payload['reservation_id']);
     }
 
+    public function test_provider_saga_compensates_payment_inventory_and_created_shipments_after_delivery_failure(): void
+    {
+        $order = $this->orderWithItems(shipmentCount: 2);
+        $saga = $this->app->make(CheckoutSagaService::class)->start($order->id);
+        $reservation = $saga->reservations->firstOrFail();
+
+        $this->outcome($saga, 'inventory.reservation.confirmed.v1', [
+            'reservation_id' => $reservation->reservation_id,
+        ]);
+        $this->outcome($saga, 'payment.authorization.approved.v1', [
+            'authorization_id' => 'auth_demo_001',
+        ]);
+        $this->outcome($saga, 'payment.capture.completed.v1', [
+            'capture_id' => 'cap_demo_001',
+        ]);
+
+        $shipments = ProviderOutboxMessage::query()
+            ->where('routing_key', 'delivery.shipment.requested.v1')
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(2, $shipments);
+
+        $this->outcome($saga, 'delivery.shipment.created.v1', [
+            'shipment_id' => $shipments[0]->payload['shipment_id'],
+            'tracking_number' => 'TRK-DEMO-001',
+        ]);
+        $this->outcome($saga, 'delivery.shipment.creation_failed.v1', [
+            'shipment_id' => $shipments[1]->payload['shipment_id'],
+            'failure_code' => 'address_invalid',
+        ]);
+
+        $refund = $this->assertProviderMessage('payment.refund.requested.v1');
+        $cancel = $this->assertProviderMessage('delivery.shipment.cancel_requested.v1');
+        $release = $this->assertProviderMessage('inventory.reservation.release.requested.v1');
+
+        $this->assertSame('pay_'.$order->id, $refund->payload['payment_id']);
+        $this->assertSame($shipments[0]->payload['shipment_id'], $cancel->payload['shipment_id']);
+        $this->assertSame($reservation->reservation_id, $release->payload['reservation_id']);
+
+        $this->outcome($saga, 'payment.refund.completed.v1', [
+            'refund_id' => 'ref_demo_001',
+        ]);
+        $this->outcome($saga, 'delivery.shipment.cancelled.v1', [
+            'shipment_id' => $cancel->payload['shipment_id'],
+        ]);
+        $this->outcome($saga, 'inventory.reservation.released.v1', [
+            'reservation_id' => $reservation->reservation_id,
+        ]);
+
+        $this->assertDatabaseHas('orders_checkout_sagas', [
+            'id' => $saga->id,
+            'status' => CheckoutSaga::STATUS_FAILED,
+            'failure_reason' => 'address_invalid',
+            'refund_id' => 'ref_demo_001',
+            'refund_status' => CheckoutSaga::REFUND_STATUS_COMPLETED,
+        ]);
+        $this->assertDatabaseHas('orders_shipments', [
+            'provider_shipment_id' => $cancel->payload['shipment_id'],
+            'provider_status' => 'cancelled',
+        ]);
+        $this->assertDatabaseHas('orders_checkout_saga_reservations', [
+            'reservation_id' => $reservation->reservation_id,
+            'status' => CheckoutSagaReservation::STATUS_RELEASED,
+        ]);
+    }
+
+    public function test_provider_saga_records_inventory_release_failure(): void
+    {
+        $order = $this->orderWithItems(2);
+        $saga = $this->app->make(CheckoutSagaService::class)->start($order->id);
+        $reservations = $saga->reservations;
+
+        $this->outcome($saga, 'inventory.reservation.confirmed.v1', [
+            'reservation_id' => $reservations[0]->reservation_id,
+        ]);
+        $this->outcome($saga, 'inventory.reservation.rejected.v1', [
+            'reservation_id' => $reservations[1]->reservation_id,
+            'reason' => 'INSUFFICIENT_STOCK',
+        ]);
+        $this->outcome($saga, 'inventory.reservation.release_failed.v1', [
+            'reservation_id' => $reservations[0]->reservation_id,
+            'reason' => 'RESERVATION_NOT_ACTIVE',
+        ]);
+
+        $this->assertDatabaseHas('orders_checkout_sagas', [
+            'id' => $saga->id,
+            'compensation_failure_reason' => 'RESERVATION_NOT_ACTIVE',
+        ]);
+        $this->assertDatabaseHas('orders_checkout_saga_reservations', [
+            'reservation_id' => $reservations[0]->reservation_id,
+            'status' => CheckoutSagaReservation::STATUS_RELEASE_FAILED,
+        ]);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -114,7 +214,7 @@ class CheckoutSagaTest extends TestCase
         config(['stockflow.provider_saga.enabled' => true]);
     }
 
-    private function orderWithItems(int $count = 1): Order
+    private function orderWithItems(int $count = 1, int $shipmentCount = 1): Order
     {
         $now = now();
         $categoryId = DB::table('catalog_categories')->insertGetId([
@@ -166,7 +266,9 @@ class CheckoutSagaTest extends TestCase
             ]);
         }
 
-        $order->shipments()->create(['delivery_service' => 'stockflow-express']);
+        for ($index = 1; $index <= $shipmentCount; $index++) {
+            $order->shipments()->create(['delivery_service' => 'stockflow-express']);
+        }
 
         return $order->load('items', 'shipments');
     }

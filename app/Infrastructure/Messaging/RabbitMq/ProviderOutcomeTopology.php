@@ -44,10 +44,15 @@ class ProviderOutcomeTopology
                 'payment.authorization.declined.v1',
                 'payment.capture.completed.v1',
                 'payment.capture.failed.v1',
+                'payment.refund.completed.v1',
+                'payment.refund.failed.v1',
             ],
             'stockflow.delivery' => [
                 'delivery.shipment.created.v1',
                 'delivery.shipment.creation_failed.v1',
+                'delivery.shipment.status_changed.v1',
+                'delivery.shipment.cancelled.v1',
+                'delivery.shipment.cancel_failed.v1',
             ],
         ];
     }

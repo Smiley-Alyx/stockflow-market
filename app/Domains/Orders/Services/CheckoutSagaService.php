@@ -88,12 +88,18 @@ class CheckoutSagaService
                 'inventory.reservation.confirmed.v1' => $this->reservationConfirmed($saga, $causationId, $payload),
                 'inventory.reservation.rejected.v1' => $this->fail($saga, $causationId, (string) ($payload['reason'] ?? 'inventory reservation rejected')),
                 'inventory.reservation.released.v1' => $this->reservationReleased($saga, $payload),
+                'inventory.reservation.release_failed.v1' => $this->reservationReleaseFailed($saga, $payload),
                 'payment.authorization.approved.v1' => $this->authorizationApproved($saga, $causationId, $payload),
                 'payment.authorization.declined.v1' => $this->fail($saga, $causationId, (string) ($payload['reason_code'] ?? 'payment authorization declined')),
                 'payment.capture.completed.v1' => $this->captureCompleted($saga, $causationId, $payload),
                 'payment.capture.failed.v1' => $this->fail($saga, $causationId, (string) ($payload['reason_code'] ?? 'payment capture failed')),
-                'delivery.shipment.created.v1' => $this->shipmentCreated($saga, $payload),
+                'payment.refund.completed.v1' => $this->refundCompleted($saga, $payload),
+                'payment.refund.failed.v1' => $this->refundFailed($saga, $payload),
+                'delivery.shipment.created.v1' => $this->shipmentCreated($saga, $causationId, $payload),
                 'delivery.shipment.creation_failed.v1' => $this->fail($saga, $causationId, (string) ($payload['failure_code'] ?? 'shipment creation failed')),
+                'delivery.shipment.status_changed.v1' => $this->shipmentStatusChanged($saga, $payload),
+                'delivery.shipment.cancelled.v1' => $this->shipmentCancelled($saga, $payload),
+                'delivery.shipment.cancel_failed.v1' => $this->shipmentCancelFailed($saga, $payload),
                 default => null,
             };
         });
@@ -244,19 +250,32 @@ class CheckoutSagaService
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function shipmentCreated(CheckoutSaga $saga, array $payload): void
+    private function shipmentCreated(CheckoutSaga $saga, string $causationId, array $payload): void
     {
-        if ($saga->status !== CheckoutSaga::STATUS_CREATING_SHIPMENTS) {
+        if (! in_array($saga->status, [CheckoutSaga::STATUS_CREATING_SHIPMENTS, CheckoutSaga::STATUS_FAILED], true)) {
             return;
         }
 
-        Shipment::query()
+        /** @var Shipment|null $shipment */
+        $shipment = Shipment::query()
             ->where('order_id', $saga->order_id)
             ->where('provider_shipment_id', (string) $payload['shipment_id'])
-            ->update([
-                'provider_status' => 'created',
-                'tracking_number' => $payload['tracking_number'] ?? null,
-            ]);
+            ->first();
+
+        if ($shipment === null || ! in_array($shipment->provider_status, ['pending', 'created'], true)) {
+            return;
+        }
+
+        $shipment->update([
+            'provider_status' => 'created',
+            'tracking_number' => $payload['tracking_number'] ?? null,
+        ]);
+
+        if ($saga->status === CheckoutSaga::STATUS_FAILED) {
+            $this->requestShipmentCancellation($saga, $shipment, $causationId);
+
+            return;
+        }
 
         $pending = Shipment::query()
             ->where('order_id', $saga->order_id)
@@ -276,6 +295,90 @@ class CheckoutSagaService
         $saga->reservations()
             ->where('reservation_id', (string) $payload['reservation_id'])
             ->update(['status' => CheckoutSagaReservation::STATUS_RELEASED]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function reservationReleaseFailed(CheckoutSaga $saga, array $payload): void
+    {
+        $saga->reservations()
+            ->where('reservation_id', (string) $payload['reservation_id'])
+            ->update(['status' => CheckoutSagaReservation::STATUS_RELEASE_FAILED]);
+
+        $this->recordCompensationFailure($saga, (string) ($payload['reason'] ?? 'inventory reservation release failed'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function refundCompleted(CheckoutSaga $saga, array $payload): void
+    {
+        if ($saga->refund_status !== CheckoutSaga::REFUND_STATUS_PENDING) {
+            return;
+        }
+
+        $saga->update([
+            'refund_id' => (string) $payload['refund_id'],
+            'refund_status' => CheckoutSaga::REFUND_STATUS_COMPLETED,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function refundFailed(CheckoutSaga $saga, array $payload): void
+    {
+        if ($saga->refund_status !== CheckoutSaga::REFUND_STATUS_PENDING) {
+            return;
+        }
+
+        $saga->update(['refund_status' => CheckoutSaga::REFUND_STATUS_FAILED]);
+        $this->recordCompensationFailure($saga, (string) ($payload['reason_code'] ?? 'payment refund failed'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function shipmentCancelled(CheckoutSaga $saga, array $payload): void
+    {
+        Shipment::query()
+            ->where('order_id', $saga->order_id)
+            ->where('provider_shipment_id', (string) $payload['shipment_id'])
+            ->where('provider_status', 'cancel_pending')
+            ->update(['provider_status' => 'cancelled']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function shipmentStatusChanged(CheckoutSaga $saga, array $payload): void
+    {
+        $changes = ['provider_status' => (string) $payload['current_status']];
+
+        if (array_key_exists('tracking_number', $payload)) {
+            $changes['tracking_number'] = $payload['tracking_number'];
+        }
+
+        Shipment::query()
+            ->where('order_id', $saga->order_id)
+            ->where('provider_shipment_id', (string) $payload['shipment_id'])
+            ->whereNotIn('provider_status', ['cancel_pending', 'cancelled', 'cancel_failed'])
+            ->update($changes);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function shipmentCancelFailed(CheckoutSaga $saga, array $payload): void
+    {
+        Shipment::query()
+            ->where('order_id', $saga->order_id)
+            ->where('provider_shipment_id', (string) $payload['shipment_id'])
+            ->where('provider_status', 'cancel_pending')
+            ->update(['provider_status' => 'cancel_failed']);
+
+        $this->recordCompensationFailure($saga, (string) ($payload['failure_code'] ?? 'shipment cancellation failed'));
     }
 
     private function fail(CheckoutSaga $saga, string $causationId, string $reason): void
@@ -309,6 +412,59 @@ class CheckoutSagaService
                 ],
             );
         }
+
+        foreach ($saga->order->shipments->where('provider_status', 'created') as $shipment) {
+            $this->requestShipmentCancellation($saga, $shipment, $causationId);
+        }
+
+        if ($saga->capture_id !== null && $saga->refund_status === null) {
+            $saga->update(['refund_status' => CheckoutSaga::REFUND_STATUS_PENDING]);
+
+            $this->messages->record(
+                exchange: 'stockflow.payment',
+                routingKey: 'payment.refund.requested.v1',
+                correlationId: $saga->correlation_id,
+                causationId: $causationId,
+                idempotencyKey: 'refund:'.$saga->payment_id,
+                payload: [
+                    'payment_id' => $saga->payment_id,
+                    'amount' => $this->amount($saga->order),
+                    'metadata' => ['order_id' => (string) $saga->order_id],
+                ],
+            );
+        }
+    }
+
+    private function requestShipmentCancellation(CheckoutSaga $saga, Shipment $shipment, string $causationId): void
+    {
+        if ($shipment->provider_status !== 'created') {
+            return;
+        }
+
+        $shipment->update(['provider_status' => 'cancel_pending']);
+
+        $this->messages->record(
+            exchange: 'stockflow.delivery',
+            routingKey: 'delivery.shipment.cancel_requested.v1',
+            correlationId: $saga->correlation_id,
+            causationId: $causationId,
+            idempotencyKey: 'shipment-cancel:'.$shipment->provider_shipment_id,
+            payload: [
+                'shipment_id' => $shipment->provider_shipment_id,
+                'order_id' => (string) $saga->order_id,
+                'reason' => 'checkout_saga_failed',
+                'metadata' => ['checkout_id' => 'checkout:'.$saga->order_id],
+            ],
+        );
+    }
+
+    private function recordCompensationFailure(CheckoutSaga $saga, string $reason): void
+    {
+        $saga->update([
+            'compensation_failure_reason' => $saga->compensation_failure_reason === null
+                ? $reason
+                : $saga->compensation_failure_reason.'; '.$reason,
+        ]);
     }
 
     /**
