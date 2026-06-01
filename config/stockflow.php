@@ -107,6 +107,9 @@ return [
 
     'messaging' => [
         'event_bus' => env('STOCKFLOW_EVENT_BUS', 'in_process'),
+        'inbox' => [
+            'processing_timeout_seconds' => (int) env('STOCKFLOW_INBOX_PROCESSING_TIMEOUT_SECONDS', 60),
+        ],
         'retry' => [
             'max_attempts' => (int) env('STOCKFLOW_MESSAGE_RETRY_ATTEMPTS', 5),
             'backoff_ms' => (int) env('STOCKFLOW_MESSAGE_RETRY_BACKOFF_MS', 250),

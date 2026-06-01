@@ -70,7 +70,7 @@ class InboxConsumer
                     ->lockForUpdate()
                     ->first();
 
-                if ($existing === null || $existing->status !== InboxMessage::STATUS_FAILED) {
+                if ($existing === null || ! $this->canRetry($existing)) {
                     return false;
                 }
 
@@ -81,5 +81,20 @@ class InboxConsumer
                 return true;
             });
         }
+    }
+
+    private function canRetry(InboxMessage $message): bool
+    {
+        if ($message->status === InboxMessage::STATUS_FAILED) {
+            return true;
+        }
+
+        return $message->status === InboxMessage::STATUS_PROCESSING
+            && $message->updated_at->lte(now()->subSeconds($this->processingTimeoutSeconds()));
+    }
+
+    private function processingTimeoutSeconds(): int
+    {
+        return max(1, (int) config('stockflow.messaging.inbox.processing_timeout_seconds'));
     }
 }
