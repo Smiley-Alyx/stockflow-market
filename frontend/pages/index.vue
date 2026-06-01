@@ -6,7 +6,6 @@ const customer = useCustomerState();
 const selectedCategorySlug = ref('');
 const searchInput = ref('');
 const searchQuery = ref('');
-const selectedProductSlug = ref<string | null>(null);
 const authMode = ref<'login' | 'register'>('login');
 const authName = ref('');
 const authEmail = ref('');
@@ -38,14 +37,6 @@ const {
         watch: [selectedCategorySlug, searchQuery],
     },
 );
-const { data: selectedProduct, pending: selectedProductPending } = await useAsyncData(
-    'selected-product',
-    async () => (selectedProductSlug.value ? catalogApi.fetchProduct(selectedProductSlug.value) : null),
-    {
-        watch: [selectedProductSlug],
-    },
-);
-
 const categoryOptions = computed(() => flattenCategories(categories.value ?? []).filter((category) => category.image_url));
 const topCategories = computed(() => categoryOptions.value.slice(0, 7));
 const featuredCategories = computed(() => categoryOptions.value.slice(0, 6));
@@ -74,11 +65,6 @@ const catalogStatus = computed(() => {
 
 const submitSearch = () => {
     searchQuery.value = searchInput.value.trim();
-};
-
-const showProduct = (product: CatalogProduct) => {
-    selectedProductSlug.value = product.slug;
-    nextTick(() => document.querySelector('#product-preview')?.scrollIntoView({ behavior: 'smooth' }));
 };
 
 const submitAuth = async () => {
@@ -265,12 +251,12 @@ main.market-shell
                     :class="{ active: customer.isFavorite(item.id) }"
                     @click="customer.toggleFavorite(item)"
                 ) {{ customer.isFavorite(item.id) ? '♥' : '♡' }}
-                button.product-card-media(type="button" @click="showProduct(item)")
+                NuxtLink.product-card-media(:to="item.url ?? `/api/catalog/products/${item.slug}`")
                     img(v-if="item.image_url" :src="item.image_url" :alt="item.name")
                     span(v-else) SF
                 .product-card-copy
                     small {{ item.category?.name ?? 'Каталог' }}
-                    button.product-card-title(type="button" @click="showProduct(item)") {{ item.name }}
+                    NuxtLink.product-card-title(:to="item.url ?? `/api/catalog/products/${item.slug}`") {{ item.name }}
                     .rating-line
                         span ★ {{ ratingLabel(item) }}
                         small {{ item.rating_count }} оценок
@@ -307,12 +293,12 @@ main.market-shell
                     :class="{ active: customer.isFavorite(item.id) }"
                     @click="customer.toggleFavorite(item)"
                 ) {{ customer.isFavorite(item.id) ? '♥' : '♡' }}
-                button.product-card-media(type="button" @click="showProduct(item)")
+                NuxtLink.product-card-media(:to="item.url ?? `/api/catalog/products/${item.slug}`")
                     img(v-if="item.image_url" :src="item.image_url" :alt="item.name")
                     span(v-else) SF
                 .product-card-copy
                     small {{ item.category?.name ?? 'Каталог' }}
-                    button.product-card-title(type="button" @click="showProduct(item)") {{ item.name }}
+                    NuxtLink.product-card-title(:to="item.url ?? `/api/catalog/products/${item.slug}`") {{ item.name }}
                     .rating-line
                         span ★ {{ ratingLabel(item) }}
                         small {{ item.rating_count }} оценок
@@ -324,25 +310,6 @@ main.market-shell
 
         p.empty-state(v-else-if="productListPending") Загружаем товары…
         p.empty-state(v-else) По выбранным условиям товаров не найдено.
-
-    section.product-preview#product-preview(v-if="selectedProduct || selectedProductPending")
-        p.empty-state(v-if="selectedProductPending") Загружаем карточку товара…
-        template(v-else-if="selectedProduct")
-            .preview-media
-                img(v-if="selectedProduct.image_url" :src="selectedProduct.image_url" :alt="selectedProduct.name")
-            .preview-copy
-                p.eyebrow {{ selectedProduct.category?.name ?? 'Каталог' }}
-                h2 {{ selectedProduct.name }}
-                p {{ selectedProduct.short_description }}
-                .preview-price {{ formatMoney(selectedProduct) }}
-                ul.preview-attributes
-                    li(v-for="attribute in selectedProduct.card_attributes" :key="attribute.name")
-                        span {{ attribute.name }}
-                        b {{ attribute.value }}
-                .hero-buttons
-                    button.hero-primary(type="button" @click="customer.addCartItem(selectedProduct)") Добавить в корзину
-                    button.hero-secondary(type="button" @click="customer.toggleFavorite(selectedProduct)")
-                        | {{ customer.isFavorite(selectedProduct.id) ? 'Убрать из избранного' : 'В избранное' }}
 
     section.city-banner
         .city-banner-copy

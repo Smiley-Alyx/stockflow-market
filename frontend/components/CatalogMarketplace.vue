@@ -444,12 +444,13 @@ main.catalog-shell
                         :aria-label="customer.isFavorite(item.id) ? 'Убрать из избранного' : 'Добавить в избранное'"
                         @click="customer.toggleFavorite(item)"
                     ) {{ customer.isFavorite(item.id) ? '♥' : '♡' }}
-                    .catalog-card-media
+                    NuxtLink.catalog-card-media(:to="item.url ?? `/api/catalog/products/${item.slug}`")
                         img(v-if="item.image_url" :src="item.image_url" :alt="item.name")
                         span(v-else) SF
                     .catalog-card-copy
                         small {{ item.category?.name ?? 'Каталог' }}
-                        h2 {{ item.name }}
+                        NuxtLink.catalog-card-title(:to="item.url ?? `/api/catalog/products/${item.slug}`")
+                            h2 {{ item.name }}
                         .rating-line
                             span ★ {{ ratingLabel(item) }}
                             small {{ item.rating_count }} оценок

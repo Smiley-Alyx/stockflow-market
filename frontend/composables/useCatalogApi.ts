@@ -47,11 +47,16 @@ export type CatalogProduct = {
         discount_amount_minor: number;
         discount_percent: number;
         currency: string;
+        city_code?: string | null;
     } | null;
     category: {
         id: number;
         name: string;
         slug: string;
+        path?: string;
+        url?: string;
+        image_url?: string | null;
+        breadcrumbs?: CatalogBreadcrumb[];
     } | null;
     brand: {
         id: number;
@@ -81,6 +86,14 @@ export type CatalogProduct = {
         url: string | null;
         mime_type: string | null;
         size: number | null;
+    }>;
+    offers: Array<{
+        id: number;
+        name: string;
+        sku: string;
+        status: 'active' | 'inactive';
+        image_url: string | null;
+        attributes: Record<string, string>;
     }>;
     warehouses: Array<{
         warehouse_id: number;
