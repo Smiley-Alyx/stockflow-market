@@ -43,7 +43,14 @@
 ## Ограничения общего стенда
 
 Общий compose поднимает runtime, broker topology, market relay, outcome consumer
-и три provider worker. Broker-level E2E сценарии запускаются командами:
+и три provider worker. Автономный broker-level E2E happy path сам поднимает
+стенд, прогоняет один checkout и останавливает созданные контейнеры:
+
+```bash
+./scripts/test-broker-checkout-e2e.sh
+```
+
+Для уже запущенного стенда broker-level E2E сценарии запускаются командами:
 
 ```bash
 ./scripts/test-provider-saga-e2e.sh

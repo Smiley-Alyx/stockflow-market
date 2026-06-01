@@ -194,6 +194,13 @@ docker compose -f docker-compose-all.yml up -d --build
 на `http://localhost:8083`. Подробности и команды проверки собраны в
 [`docs/demo.md`](docs/demo.md).
 
+Автономный broker-level E2E тест поднимает market, три provider mock и RabbitMQ,
+прогоняет один checkout и останавливает созданные контейнеры:
+
+```bash
+./scripts/test-broker-checkout-e2e.sh
+```
+
 Воспроизводимый сценарий `создать товар → событие → индексация → поиск → dead-letter/requeue` описан в [`docs/catalog-demo.md`](docs/catalog-demo.md).
 
 Законченный бизнес-сценарий `корзина → price snapshot → reserve stock → order created` описан в [`docs/checkout-demo.md`](docs/checkout-demo.md).

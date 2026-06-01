@@ -76,11 +76,13 @@ curl -s -X POST http://localhost:8083/debug/failure-mode \
 - sandbox providers готовы к автономной интеграции и failure testing;
 - market provider saga публикует requests через outbox relay и дедуплицирует
   outcomes через inbox;
-- следующий инженерный этап — автоматизированный broker-level E2E тест,
-  runbook outcome DLQ и alert thresholds для метрик saga.
+- broker-level E2E тест автоматически поднимает общий стенд и прогоняет один
+  checkout;
+- следующий инженерный этап — runbook outcome DLQ и alert thresholds для
+  метрик saga.
 
-Это важная граница: compose запускает всю экосистему и market-orchestrator, но
-broker-level E2E сценарий пока проверяется вручную через checkout API.
+Это важная граница: compose запускает всю экосистему и market-orchestrator, а
+broker-level E2E сценарий проверяет happy path через реальный RabbitMQ.
 
 ## Полезные команды
 
@@ -88,6 +90,7 @@ broker-level E2E сценарий пока проверяется вручную
 docker compose -f docker-compose-all.yml ps
 docker compose -f docker-compose-all.yml logs -f erp-mock payment-mock-worker delivery-mock-worker
 docker compose -f docker-compose-all.yml exec php php artisan messaging:provider-outcomes:dead-letter list --limit=20
+./scripts/test-broker-checkout-e2e.sh
 ./scripts/test-provider-saga-e2e.sh
 ./scripts/test-provider-saga-compensations-e2e.sh
 docker compose -f docker-compose-all.yml down
