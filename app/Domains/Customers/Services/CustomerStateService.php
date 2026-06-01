@@ -2,6 +2,7 @@
 
 namespace App\Domains\Customers\Services;
 
+use App\Domains\Catalog\Services\CatalogUrlService;
 use App\Domains\Customers\Models\Favorite;
 use App\Domains\Orders\Models\Cart;
 use App\Domains\Orders\Models\CartItem;
@@ -14,6 +15,7 @@ class CustomerStateService
 {
     public function __construct(
         private readonly PricingReadService $pricing,
+        private readonly CatalogUrlService $urls,
     ) {}
 
     /**
@@ -148,15 +150,20 @@ class CustomerStateService
      */
     public function state(User $user): array
     {
-        $cart = $this->cart($user)->load('items.product.imageFile');
-        $prices = $this->pricing->catalogPricesForProductIds($cart->items->pluck('product_id')->all());
+        $cart = $this->cart($user)->load('items.product.category', 'items.product.imageFile');
         $activeItems = $cart->items->whereNull('removed_at')->values();
         $removedItems = $cart->items->whereNotNull('removed_at')->values();
         $favorites = Favorite::query()
-            ->with('product')
+            ->with('product.category', 'product.imageFile')
             ->where('user_id', $user->id)
             ->orderBy('id')
             ->get();
+        $prices = $this->pricing->catalogPricesForProductIds(
+            $cart->items->pluck('product_id')
+                ->merge($favorites->pluck('product_id'))
+                ->unique()
+                ->all(),
+        );
 
         return [
             'cart' => [
@@ -166,7 +173,9 @@ class CustomerStateService
                 'summary' => $this->cartSummary($activeItems, $prices),
             ],
             'favorites' => $favorites
-                ->map(fn (Favorite $favorite): array => $this->productPayload($favorite->product))
+                ->map(fn (Favorite $favorite): array => $this->productPayload($favorite->product, [
+                    'price' => $prices[$favorite->product_id] ?? null,
+                ]))
                 ->values()
                 ->all(),
         ];
@@ -230,6 +239,7 @@ class CustomerStateService
         return array_merge([
             'product_id' => $product?->id,
             'slug' => $product?->slug,
+            'url' => $product?->category ? $this->urls->productUrl($product->category, $product->slug) : null,
             'sku' => $product?->sku,
             'product_name' => $product?->name,
             'image_url' => $product?->imageFile?->url(),

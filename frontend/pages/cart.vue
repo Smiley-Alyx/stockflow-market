@@ -125,11 +125,11 @@ main.market-page-shell
                         :aria-label="`Выбрать ${item.product_name}`"
                         @change="toggleItem(item.product_id, $event)"
                     )
-                    NuxtLink.cart-product-image(:to="`/catalog/${item.slug}/`")
+                    NuxtLink.cart-product-image(:to="item.url ?? '/catalog/'")
                         img(v-if="item.image_url" :src="item.image_url" :alt="item.product_name")
                         span(v-else) SF
                     .cart-product-copy
-                        NuxtLink.cart-product-name(:to="`/catalog/${item.slug}/`") {{ item.product_name }}
+                        NuxtLink.cart-product-name(:to="item.url ?? '/catalog/'") {{ item.product_name }}
                         code {{ item.sku }}
                         b(v-if="item.price") {{ formatMoney(item.price.amount_minor, item.price.currency) }}
                         small(v-else) Цена не указана

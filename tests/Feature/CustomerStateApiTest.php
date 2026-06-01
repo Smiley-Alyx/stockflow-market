@@ -50,6 +50,7 @@ class CustomerStateApiTest extends TestCase
     public function test_authenticated_customer_can_update_cart_and_favorites(): void
     {
         $product = $this->createProduct('Wireless Scanner', 'wireless-scanner', 'SCAN-001');
+        $this->createPrice($product, 'retail', 1000);
 
         $this->postJson('/api/session/register', [
             'name' => 'Alexandra',
@@ -64,7 +65,9 @@ class CustomerStateApiTest extends TestCase
 
         $this->putJson('/api/customer-state/favorites/'.$product->id)
             ->assertOk()
-            ->assertJsonPath('data.favorites.0.product_id', $product->id);
+            ->assertJsonPath('data.favorites.0.product_id', $product->id)
+            ->assertJsonPath('data.favorites.0.url', '/catalog/devices/wireless-scanner/')
+            ->assertJsonPath('data.favorites.0.price.amount_minor', 1000);
 
         $this->deleteJson('/api/customer-state/cart/items/'.$product->id)
             ->assertOk()

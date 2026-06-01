@@ -64,7 +64,12 @@ const catalogStatus = computed(() => {
 });
 
 const submitSearch = () => {
-    searchQuery.value = searchInput.value.trim();
+    const query = searchInput.value.trim();
+
+    navigateTo({
+        path: '/search/',
+        query: query ? { q: query } : {},
+    });
 };
 
 const submitAuth = async () => {
@@ -151,7 +156,7 @@ main.market-shell
                 button(type="submit") Найти
 
             nav.header-actions(aria-label="Быстрые действия")
-                a.action-link(href="#account")
+                NuxtLink.action-link(to="/favorites/")
                     span.action-icon ♡
                     span
                         small Избранное

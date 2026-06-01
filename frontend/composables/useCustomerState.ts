@@ -5,6 +5,7 @@ type CustomerPrice = CatalogProduct['price'];
 type CustomerProduct = {
     product_id: number;
     slug: string;
+    url: string | null;
     sku: string;
     product_name: string;
     image_url: string | null;
@@ -522,6 +523,7 @@ function normalizeCustomerProduct(product: Partial<CustomerProduct> & Pick<Custo
     return {
         product_id: product.product_id,
         slug: product.slug,
+        url: product.url ?? null,
         sku: product.sku,
         product_name: product.product_name,
         image_url: product.image_url ?? null,
@@ -537,6 +539,7 @@ function toCustomerProduct(product: CatalogProduct | CustomerProduct): CustomerP
     return {
         product_id: product.id,
         slug: product.slug,
+        url: product.url,
         sku: product.sku,
         product_name: product.name,
         image_url: product.image_url,

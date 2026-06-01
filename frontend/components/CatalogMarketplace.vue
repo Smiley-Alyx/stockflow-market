@@ -9,6 +9,9 @@ import type {
 
 defineOptions({ name: 'CatalogMarketplace' });
 
+const props = defineProps<{
+    searchPage?: boolean;
+}>();
 const route = useRoute();
 const catalogApi = useCatalogApi();
 const customer = useCustomerState();
@@ -50,7 +53,7 @@ const pageNumbers = computed(() => {
 
     return Array.from({ length: last - first + 1 }, (_, index) => first + index);
 });
-const currentCategoryName = computed(() => meta.value?.breadcrumbs.at(-1)?.name ?? 'Все товары');
+const currentCategoryName = computed(() => props.searchPage ? 'Поиск' : meta.value?.breadcrumbs.at(-1)?.name ?? 'Все товары');
 const activeFilterCount = computed(
     () =>
         Object.values(selectedFilters.value.filters).reduce((total, values) => total + values.length, 0) +
@@ -75,7 +78,19 @@ watch(
     },
 );
 
-const submitSearch = () => updateQuery({ q: searchInput.value.trim() || undefined, page: undefined });
+const submitSearch = () => {
+    const query = searchInput.value.trim();
+
+    if (props.searchPage) {
+        updateQuery({ q: query || undefined, page: undefined });
+        return;
+    }
+
+    navigateTo({
+        path: '/search/',
+        query: query ? { q: query } : {},
+    });
+};
 
 const updateSort = (event: Event) => {
     updateQuery({ sort: (event.target as HTMLSelectElement).value, page: undefined });
@@ -330,7 +345,7 @@ main.catalog-shell
                 button(type="submit") Найти
 
             nav.header-actions(aria-label="Быстрые действия")
-                NuxtLink.action-link(to="/#account")
+                NuxtLink.action-link(to="/favorites/")
                     span.action-icon ♡
                     span
                         small Избранное
@@ -350,6 +365,9 @@ main.catalog-shell
         NuxtLink(to="/") Главная
         span /
         NuxtLink(to="/catalog/") Каталог
+        template(v-if="searchPage")
+            span /
+            span Поиск
         template(v-for="crumb in meta?.breadcrumbs ?? []" :key="crumb.id")
             span /
             NuxtLink(:to="crumb.url") {{ crumb.name }}
@@ -358,7 +376,7 @@ main.catalog-shell
         div
             p.eyebrow StockFlow Market
             h1 {{ currentCategoryName }}
-            p(v-if="meta?.query") Поиск по запросу «{{ meta.query }}»
+            p(v-if="meta?.query") Результаты по запросу «{{ meta.query }}»
             p(v-else) Выбирайте товары с актуальными ценами и остатками на складах.
         .catalog-title-stat
             strong {{ meta?.total ?? 0 }}

@@ -75,7 +75,7 @@ const submitSearch = () => {
     const query = searchInput.value.trim();
 
     navigateTo({
-        path: '/catalog/',
+        path: '/search/',
         query: query ? { q: query } : {},
     });
 };
@@ -169,7 +169,7 @@ main.product-page-shell
                 button(type="submit") Найти
 
             nav.header-actions(aria-label="Быстрые действия")
-                NuxtLink.action-link(to="/#account")
+                NuxtLink.action-link(to="/favorites/")
                     span.action-icon ♡
                     span
                         small Избранное
