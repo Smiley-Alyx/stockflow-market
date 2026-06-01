@@ -33,6 +33,7 @@ inbox и выполняет компенсации release, refund и shipment c
 | [`docs/architecture.md`](docs/architecture.md) | Контекст четырёх систем, границы интеграции и trade-offs |
 | [`docs/delivery-flow.md`](docs/delivery-flow.md) | Сквозной checkout sequence и компенсирующие действия |
 | [`docs/failure-modes.md`](docs/failure-modes.md) | Failure scenarios и таблица гарантий |
+| [`docs/provider-outcome-dlq-runbook.md`](docs/provider-outcome-dlq-runbook.md) | Поиск, диагностика и requeue provider outcome DLQ |
 | [`docs/demo.md`](docs/demo.md) | Пятиминутный сценарий демонстрации техлиду |
 
 ## Текущий статус

@@ -78,8 +78,8 @@ curl -s -X POST http://localhost:8083/debug/failure-mode \
   outcomes через inbox;
 - broker-level E2E тест автоматически поднимает общий стенд и прогоняет один
   checkout;
-- следующий инженерный этап — runbook outcome DLQ и alert thresholds для
-  метрик saga.
+- runbook outcome DLQ описывает поиск, диагностику и ограниченный requeue;
+- следующий инженерный этап — alert thresholds для метрик saga.
 
 Это важная граница: compose запускает всю экосистему и market-orchestrator, а
 broker-level E2E сценарий проверяет happy path через реальный RabbitMQ.
@@ -95,3 +95,6 @@ docker compose -f docker-compose-all.yml exec php php artisan messaging:provider
 ./scripts/test-provider-saga-compensations-e2e.sh
 docker compose -f docker-compose-all.yml down
 ```
+
+Полный порядок разбора outcome DLQ находится в
+[`provider-outcome-dlq-runbook.md`](provider-outcome-dlq-runbook.md).

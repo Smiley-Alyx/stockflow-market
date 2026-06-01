@@ -109,4 +109,6 @@ ERP использует `8083` только в общем стенде: в со
 Для усиления end-to-end checkout нужны:
 
 1. Grafana-панели и alert thresholds для saga outcomes, компенсаций и stale claim recovery.
-2. Runbook для разбора и повторной постановки provider outcome DLQ.
+
+Runbook для разбора и повторной постановки provider outcome DLQ находится в
+[`provider-outcome-dlq-runbook.md`](provider-outcome-dlq-runbook.md).

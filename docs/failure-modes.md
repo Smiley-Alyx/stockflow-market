@@ -69,3 +69,6 @@ docker compose -f docker-compose-all.yml exec php \
 docker compose -f docker-compose-all.yml exec php \
   php artisan messaging:provider-outcomes:dead-letter requeue --limit=20
 ```
+
+Порядок поиска, диагностики и безопасного requeue описан в
+[`provider-outcome-dlq-runbook.md`](provider-outcome-dlq-runbook.md).
