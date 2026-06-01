@@ -40,17 +40,40 @@ flowchart TD
     capture --> shipment["Create shipment"]
 
     auth -. "declined" .-> release["Release stock"]
-    order -. "failed" .-> voidAuth["Cancel authorization"]
-    voidAuth --> release
+    order -. "failed" .-> release
+    order -. "authorization not captured" .-> authTtl["PSP releases hold after TTL"]
     capture -. "failed" .-> release
     shipment -. "failed" .-> refund["Refund payment"]
     refund --> release
 ```
 
-Payment mock сейчас поддерживает refund, но отдельного message-контракта void для
-не captured authorization нет. До реализации market-orchestrator это нужно
-зафиксировать как контрактное решение: добавить void/cancel authorization либо
-использовать bounded authorization TTL на стороне PSP.
+### TTL authorization вместо void
+
+Для v1 выбран bounded authorization TTL на стороне PSP. Отдельного
+`payment.authorization.void.requested.v1` и outcome-событий void в контракте
+нет.
+
+- authorization hold живёт не больше `15 минут` после
+  `payment.authorization.approved.v1`;
+- если capture не выполнен за это время, PSP автоматически освобождает hold;
+- если market обнаружил, что не может продолжить checkout после authorization,
+  он должен сразу опубликовать release inventory и не ждать истечения payment
+  TTL;
+- если задержанный `payment.capture.requested.v1` приходит после истечения TTL,
+  PSP отвечает `payment.capture.failed.v1` с причиной истёкшей authorization, а
+  market освобождает inventory;
+- refund используется только после успешного capture.
+
+Текущий sandbox payment mock освобождает hold при capture failure, но не
+моделирует фоновое истечение `15 минут`. Это упрощение sandbox, а не открытый
+выбор протокола: production PSP boundary должен гарантировать TTL
+не captured authorization.
+
+В текущем market-orchestrator confirmed order и
+`payment.capture.requested.v1` записываются в одной DB-транзакции после
+authorization outcome. TTL остаётся страховкой provider boundary для
+запоздалого capture, внешнего сбоя и будущего выделения order creation в
+отдельный шаг.
 
 ## Routing keys
 
@@ -76,8 +99,9 @@ stateDiagram-v2
     AuthorizingPayment --> CreatingOrder: authorization approved
     AuthorizingPayment --> ReleasingInventory: authorization declined
     CreatingOrder --> CapturingPayment: order persisted
+    CreatingOrder --> ReleasingInventory: order failed; authorization expires by PSP TTL
     CapturingPayment --> CreatingShipment: capture completed
-    CapturingPayment --> ReleasingInventory: capture failed
+    CapturingPayment --> ReleasingInventory: capture failed or authorization TTL expired
     CreatingShipment --> FulfillmentPending: shipment created
     CreatingShipment --> RefundingPayment: shipment failed
     RefundingPayment --> ReleasingInventory: refund completed

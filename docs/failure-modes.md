@@ -7,6 +7,8 @@
 | ERP отклонил резерв | Заказ не подтверждается | Ничего освобождать не нужно |
 | ERP временно недоступен | Request проходит retry и затем DLQ | После восстановления оператор делает requeue |
 | Payment authorization declined | Checkout отменяется | Market публикует release резерва |
+| Market не продолжил checkout после authorization | Payment hold не остаётся бессрочным | Market должен опубликовать release резерва, PSP освобождает hold по TTL `15 минут` |
+| Capture пришёл после authorization TTL | PSP отклоняет запоздалый capture | Market публикует release резерва |
 | Capture failed | Заказ не переходит в paid | Market публикует release резерва |
 | Shipment creation failed после capture | Fulfillment не стартует | Market публикует refund, затем release резерва |
 | Дублированный request | Provider replay-ит сохранённый результат | Side effect выполняется один раз |
