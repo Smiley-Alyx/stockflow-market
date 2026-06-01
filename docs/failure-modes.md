@@ -43,8 +43,15 @@
 ## Ограничения общего стенда
 
 Общий compose поднимает runtime, broker topology, market relay, outcome consumer
-и три provider worker. Автоматизированный broker-level E2E тест пока не добавлен:
-для проверки используйте checkout API и fault injection endpoints моков.
+и три provider worker. Broker-level E2E сценарии запускаются командами:
+
+```bash
+./scripts/test-provider-saga-e2e.sh
+./scripts/test-provider-saga-compensations-e2e.sh
+```
+
+Второй сценарий проверяет освобождение ERP-резерва после отказа capture, а также
+refund и освобождение резерва после отказа создания shipment.
 
 Market outcome DLQ можно просмотреть и вернуть в обработку ограниченным batch:
 

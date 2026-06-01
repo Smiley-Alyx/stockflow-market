@@ -108,6 +108,5 @@ ERP использует `8083` только в общем стенде: в со
 
 Для усиления end-to-end checkout нужны:
 
-1. Broker-level интеграционные тесты компенсаций на общем стенде.
-2. Grafana-панели и alert thresholds для saga outcomes, компенсаций и stale claim recovery.
-3. Runbook для разбора и повторной постановки provider outcome DLQ.
+1. Grafana-панели и alert thresholds для saga outcomes, компенсаций и stale claim recovery.
+2. Runbook для разбора и повторной постановки provider outcome DLQ.

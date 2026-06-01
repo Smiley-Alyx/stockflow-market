@@ -89,5 +89,6 @@ docker compose -f docker-compose-all.yml ps
 docker compose -f docker-compose-all.yml logs -f erp-mock payment-mock-worker delivery-mock-worker
 docker compose -f docker-compose-all.yml exec php php artisan messaging:provider-outcomes:dead-letter list --limit=20
 ./scripts/test-provider-saga-e2e.sh
+./scripts/test-provider-saga-compensations-e2e.sh
 docker compose -f docker-compose-all.yml down
 ```
