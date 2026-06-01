@@ -45,3 +45,13 @@
 Общий compose поднимает runtime, broker topology, market relay, outcome consumer
 и три provider worker. Автоматизированный broker-level E2E тест пока не добавлен:
 для проверки используйте checkout API и fault injection endpoints моков.
+
+Market outcome DLQ можно просмотреть и вернуть в обработку ограниченным batch:
+
+```bash
+docker compose -f docker-compose-all.yml exec php \
+  php artisan messaging:provider-outcomes:dead-letter list --limit=20
+
+docker compose -f docker-compose-all.yml exec php \
+  php artisan messaging:provider-outcomes:dead-letter requeue --limit=20
+```

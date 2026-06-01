@@ -77,7 +77,7 @@ curl -s -X POST http://localhost:8083/debug/failure-mode \
 - market provider saga публикует requests через outbox relay и дедуплицирует
   outcomes через inbox;
 - следующий инженерный этап — автоматизированный broker-level E2E тест,
-  операторский requeue outcome DLQ и alert thresholds для метрик saga.
+  runbook outcome DLQ и alert thresholds для метрик saga.
 
 Это важная граница: compose запускает всю экосистему и market-orchestrator, но
 broker-level E2E сценарий пока проверяется вручную через checkout API.
@@ -87,5 +87,6 @@ broker-level E2E сценарий пока проверяется вручную
 ```bash
 docker compose -f docker-compose-all.yml ps
 docker compose -f docker-compose-all.yml logs -f erp-mock payment-mock-worker delivery-mock-worker
+docker compose -f docker-compose-all.yml exec php php artisan messaging:provider-outcomes:dead-letter list --limit=20
 docker compose -f docker-compose-all.yml down
 ```
