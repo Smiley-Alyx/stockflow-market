@@ -298,6 +298,16 @@ curl http://localhost:8080/metrics
 
 Dashboard содержит панели для p95 latency по endpoint, глубины очередей, dead-letter count, reservation conflicts rate и Elasticsearch indexing failures rate. Эти метрики покрывают текущий async pipeline и дают базу для будущих alert rules по росту dead-letter, очередей и latency.
 
+### Screenshots локального стенда
+
+Grafana dashboard `StockFlow Observability` после запуска локального стенда:
+
+![Grafana dashboard StockFlow Observability](docs/screenshots/grafana-stockflow-observability.png)
+
+RabbitMQ Management UI с основными, retry и DLQ-очередями provider saga:
+
+![RabbitMQ Management UI с очередями provider saga](docs/screenshots/rabbitmq-management-queues.png)
+
 ## Search dead-letter операции
 
 Документы, которые не удалось проиндексировать после retry-порога, сохраняются в Redis-backed dead-letter хранилище. Это приближает локальный контур к production-подобному операционному сценарию, но не заменяет проверку под реальной нагрузкой и отказами. По умолчанию используется ключ `stockflow:search:dead-letter`; CLI-контракт остаётся прежним: оператор работает с числовым `ID`, фильтрами и теми же action `list` / `requeue`.
