@@ -18,14 +18,14 @@ class MarketplaceSeederTest extends TestCase
 
         $this->assertDatabaseCount('catalog_categories', 12);
         $this->assertDatabaseCount('catalog_brands', 6);
-        $this->assertDatabaseCount('catalog_products', 20);
-        $this->assertDatabaseCount('catalog_product_projections', 20);
+        $this->assertDatabaseCount('catalog_products', 2000);
+        $this->assertDatabaseCount('catalog_product_projections', 2000);
         $this->assertDatabaseCount('inventory_warehouses', 7);
-        $this->assertDatabaseCount('inventory_stock_items', 140);
-        $this->assertDatabaseCount('pricing_product_prices', 76);
+        $this->assertDatabaseCount('inventory_stock_items', 14000);
+        $this->assertDatabaseCount('pricing_product_prices', 7567);
         $this->assertDatabaseCount('pricing_promotions', 3);
         $this->assertDatabaseCount('homepage_blocks', 6);
-        $this->assertDatabaseCount('storage_files', 61);
+        $this->assertDatabaseCount('storage_files', 68);
 
         $headphonesId = (int) DB::table('catalog_products')
             ->where('slug', 'headphones-wave')
@@ -39,6 +39,11 @@ class MarketplaceSeederTest extends TestCase
         $this->assertDatabaseHas('catalog_product_offers', [
             'product_id' => $headphonesId,
             'sku' => 'AUR-WAVE-ANC-GR',
+        ]);
+        $this->assertDatabaseHas('catalog_product_attributes', [
+            'product_id' => $headphonesId,
+            'name' => 'connection',
+            'value' => 'Bluetooth 5.3',
         ]);
         $this->assertFileExists(public_path('images/seed/product-headphones-wave.svg'));
 

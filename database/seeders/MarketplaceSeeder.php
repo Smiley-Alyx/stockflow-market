@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Hash;
 
 class MarketplaceSeeder extends Seeder
 {
+    private const PRODUCT_COUNT = 2000;
+
     /** @var array<string, int> */
     private array $fileIds = [];
 
@@ -23,6 +25,9 @@ class MarketplaceSeeder extends Seeder
 
     /** @var array<string, int> */
     private array $productIds = [];
+
+    /** @var array<int, string> */
+    private array $productSkus = [];
 
     /** @var array<string, int> */
     private array $warehouseIds = [];
@@ -95,18 +100,18 @@ class MarketplaceSeeder extends Seeder
     private function seedCategories(): void
     {
         $categories = [
-            ['electronics', null, 'Электроника', 'Устройства для дома, работы и отдыха.', ['Бренд'], ['Бренд'], '#14213D', '#FCA311'],
-            ['smart-home', 'electronics', 'Умный дом', 'Техника, которая помогает управлять домом.', ['Бренд', 'Подключение', 'Цвет'], ['Подключение', 'Цвет'], '#003049', '#669BBC'],
-            ['audio', 'electronics', 'Аудио', 'Наушники и акустика для музыки и звонков.', ['Бренд', 'Подключение', 'Цвет'], ['Подключение', 'Автономность'], '#2B2D42', '#EF233C'],
-            ['home', null, 'Дом и кухня', 'Полезные вещи для уютного и организованного дома.', ['Бренд'], ['Бренд'], '#344E41', '#DAD7CD'],
-            ['kitchen', 'home', 'Кухня', 'Техника и аксессуары для ежедневной готовки.', ['Бренд', 'Материал', 'Мощность'], ['Материал', 'Мощность'], '#6A040F', '#F48C06'],
-            ['interior', 'home', 'Интерьер', 'Свет, текстиль и системы хранения.', ['Бренд', 'Материал', 'Цвет'], ['Материал', 'Цвет'], '#606C38', '#DDA15E'],
-            ['workshop', null, 'Мастерская', 'Инструменты для ремонта и домашних проектов.', ['Бренд'], ['Бренд'], '#3D405B', '#F2CC8F'],
-            ['power-tools', 'workshop', 'Электроинструменты', 'Аккумуляторный инструмент и оснастка.', ['Бренд', 'Напряжение', 'Комплектация'], ['Напряжение', 'Комплектация'], '#264653', '#E9C46A'],
-            ['sport', null, 'Спорт', 'Инвентарь для тренировок дома и на улице.', ['Бренд'], ['Бренд'], '#1D3557', '#A8DADC'],
-            ['fitness', 'sport', 'Фитнес', 'Базовый инвентарь для регулярных тренировок.', ['Бренд', 'Материал', 'Вес'], ['Материал', 'Вес'], '#386641', '#A7C957'],
-            ['office', null, 'Офис', 'Организация рабочего места и учебы.', ['Бренд'], ['Бренд'], '#5A189A', '#E0AAFF'],
-            ['desk', 'office', 'Рабочее место', 'Аксессуары для удобного рабочего стола.', ['Бренд', 'Материал', 'Цвет'], ['Материал', 'Цвет'], '#3C096C', '#FFB703'],
+            ['electronics', null, 'Электроника', 'Устройства для дома, работы и отдыха.', [], [], '#14213D', '#FCA311'],
+            ['smart-home', 'electronics', 'Умный дом', 'Техника, которая помогает управлять домом.', ['connection', 'color'], ['connection', 'color'], '#003049', '#669BBC'],
+            ['audio', 'electronics', 'Аудио', 'Наушники и акустика для музыки и звонков.', ['connection', 'color', 'battery_life'], ['connection', 'battery_life'], '#2B2D42', '#EF233C'],
+            ['home', null, 'Дом и кухня', 'Полезные вещи для уютного и организованного дома.', [], [], '#344E41', '#DAD7CD'],
+            ['kitchen', 'home', 'Кухня', 'Техника и аксессуары для ежедневной готовки.', ['material', 'power'], ['material', 'power'], '#6A040F', '#F48C06'],
+            ['interior', 'home', 'Интерьер', 'Свет, текстиль и системы хранения.', ['material', 'color'], ['material', 'color'], '#606C38', '#DDA15E'],
+            ['workshop', null, 'Мастерская', 'Инструменты для ремонта и домашних проектов.', [], [], '#3D405B', '#F2CC8F'],
+            ['power-tools', 'workshop', 'Электроинструменты', 'Аккумуляторный инструмент и оснастка.', ['voltage', 'kit'], ['voltage', 'kit'], '#264653', '#E9C46A'],
+            ['sport', null, 'Спорт', 'Инвентарь для тренировок дома и на улице.', [], [], '#1D3557', '#A8DADC'],
+            ['fitness', 'sport', 'Фитнес', 'Базовый инвентарь для регулярных тренировок.', ['material', 'weight'], ['material', 'weight'], '#386641', '#A7C957'],
+            ['office', null, 'Офис', 'Организация рабочего места и учебы.', [], [], '#5A189A', '#E0AAFF'],
+            ['desk', 'office', 'Рабочее место', 'Аксессуары для удобного рабочего стола.', ['material', 'color'], ['material', 'color'], '#3C096C', '#FFB703'],
         ];
 
         foreach ($categories as [$slug, $parentSlug, $name, $description, $filters, $cardAttributes, $primary, $accent]) {
@@ -135,7 +140,7 @@ class MarketplaceSeeder extends Seeder
     {
         foreach ($this->products() as $index => $product) {
             $slug = $product['slug'];
-            $imageFileId = $this->svgFile("product-{$slug}", $product['name'], $product['sku'], $product['colors'][0], $product['colors'][1]);
+            $imageFileId = $this->svgFile($product['image'] ?? "product-{$slug}", $product['image_title'] ?? $product['name'], $product['sku'], $product['colors'][0], $product['colors'][1]);
 
             DB::table('catalog_products')->updateOrInsert(
                 ['slug' => $slug],
@@ -150,7 +155,7 @@ class MarketplaceSeeder extends Seeder
                     'rating' => $product['rating'],
                     'rating_count' => $product['rating_count'],
                     'status' => 'published',
-                    'published_at' => now()->subDays(30 - $index),
+                    'published_at' => now()->subDays($index % 90),
                     'updated_at' => now(),
                     'created_at' => now(),
                 ],
@@ -158,9 +163,13 @@ class MarketplaceSeeder extends Seeder
 
             $productId = (int) DB::table('catalog_products')->where('slug', $slug)->value('id');
             $this->productIds[$slug] = $productId;
+            $this->productSkus[$productId] = $product['sku'];
             $this->seedAttributes($productId, $product['attributes']);
             $this->seedOffers($productId, $product);
-            $this->seedGallery($productId, $product);
+
+            if ($product['gallery'] ?? true) {
+                $this->seedGallery($productId, $product);
+            }
         }
     }
 
@@ -259,65 +268,83 @@ class MarketplaceSeeder extends Seeder
     private function seedStock(): void
     {
         $warehouseCodes = array_keys($this->warehouseIds);
+        $rows = [];
 
         foreach (array_values($this->productIds) as $productIndex => $productId) {
-            $sku = (string) DB::table('catalog_products')->where('id', $productId)->value('sku');
-
             foreach ($warehouseCodes as $warehouseIndex => $warehouseCode) {
                 $quantity = (($productIndex + 3) * ($warehouseIndex + 5)) % 34;
 
-                DB::table('inventory_stock_items')->updateOrInsert(
-                    ['warehouse_id' => $this->warehouseIds[$warehouseCode], 'product_id' => $productId],
-                    [
-                        'sku' => $sku,
-                        'on_hand_quantity' => $quantity,
-                        'reserved_quantity' => 0,
-                        'updated_at' => now(),
-                        'created_at' => now(),
-                    ],
-                );
+                $rows[] = [
+                    'warehouse_id' => $this->warehouseIds[$warehouseCode],
+                    'product_id' => $productId,
+                    'sku' => $this->productSkus[$productId],
+                    'on_hand_quantity' => $quantity,
+                    'reserved_quantity' => 0,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ];
             }
+        }
+
+        foreach (array_chunk($rows, 500) as $chunk) {
+            DB::table('inventory_stock_items')->upsert(
+                $chunk,
+                ['warehouse_id', 'product_id'],
+                ['sku', 'on_hand_quantity', 'reserved_quantity', 'updated_at'],
+            );
         }
     }
 
     private function seedPrices(): void
     {
+        $rows = [];
+
         foreach ($this->products() as $index => $product) {
             $productId = $this->productIds[$product['slug']];
             $retail = $product['price'];
 
-            $this->price($productId, 'retail', null, 1, $retail);
-            $this->price($productId, 'wholesale', null, 1, (int) round($retail * 0.84));
-            $this->price($productId, 'partner', null, 1, (int) round($retail * 0.77));
+            $rows[] = $this->price($productId, 'retail', null, 1, $retail);
+            $rows[] = $this->price($productId, 'wholesale', null, 1, (int) round($retail * 0.84));
+            $rows[] = $this->price($productId, 'partner', null, 1, (int) round($retail * 0.77));
 
             if ($index % 3 === 0) {
-                $this->price($productId, 'sale', null, 1, (int) round($retail * 0.90));
+                $rows[] = $this->price($productId, 'sale', null, 1, (int) round($retail * 0.90));
             }
 
             if ($index % 4 === 0) {
-                $this->price($productId, 'retail', 'waw', 1, $retail - 500);
+                $rows[] = $this->price($productId, 'retail', 'waw', 1, $retail - 500);
             }
 
             if ($index % 5 === 0) {
-                $this->price($productId, 'retail', 'krk', 1, $retail + 300);
+                $rows[] = $this->price($productId, 'retail', 'krk', 1, $retail + 300);
             }
+        }
+
+        DB::table('pricing_product_prices')->whereIn('product_id', array_values($this->productIds))->delete();
+
+        foreach (array_chunk($rows, 500) as $chunk) {
+            DB::table('pricing_product_prices')->insert($chunk);
         }
     }
 
-    private function price(int $productId, string $type, ?string $cityCode, int $version, int $amount): void
+    /**
+     * @return array<string, mixed>
+     */
+    private function price(int $productId, string $type, ?string $cityCode, int $version, int $amount): array
     {
-        DB::table('pricing_product_prices')->updateOrInsert(
-            ['product_id' => $productId, 'price_type' => $type, 'city_code' => $cityCode, 'price_version' => $version],
-            [
-                'amount_minor' => $amount,
-                'currency' => 'PLN',
-                'is_active' => true,
-                'active_from' => now()->subDays(14),
-                'active_until' => null,
-                'updated_at' => now(),
-                'created_at' => now(),
-            ],
-        );
+        return [
+            'product_id' => $productId,
+            'price_type' => $type,
+            'city_code' => $cityCode,
+            'price_version' => $version,
+            'amount_minor' => $amount,
+            'currency' => 'PLN',
+            'is_active' => true,
+            'active_from' => now()->subDays(14),
+            'active_until' => null,
+            'updated_at' => now(),
+            'created_at' => now(),
+        ];
     }
 
     private function seedPromotions(): void
@@ -460,7 +487,7 @@ SVG;
      */
     private function products(): array
     {
-        return [
+        return array_merge([
             $this->product('smart-hub-mini', 'Aurora Smart Hub Mini', 'AUR-HUB-MINI', 'smart-home', 'aurora', 29900, 'Компактный центр управления умным домом.', 'Подключает датчики, розетки и сценарии в одном приложении.', ['Подключение' => 'Wi-Fi, Zigbee', 'Цвет' => 'Белый', 'Гарантия' => '24 месяца'], 4.82, 126, ['#3B1C5A', '#C77DFF']),
             $this->product('smart-plug-duo', 'Aurora Smart Plug Duo', 'AUR-PLUG-DUO', 'smart-home', 'aurora', 15900, 'Комплект из двух умных розеток.', 'Удаленное включение, расписания и контроль энергопотребления.', ['Подключение' => 'Wi-Fi', 'Цвет' => 'Белый', 'Комплектация' => '2 розетки'], 4.74, 89, ['#274C77', '#A3CEF1']),
             $this->product('headphones-wave', 'Aurora Wave ANC', 'AUR-WAVE-ANC', 'audio', 'aurora', 54900, 'Беспроводные наушники с шумоподавлением.', 'До 36 часов музыки и комфортная посадка для долгих поездок.', ['Подключение' => 'Bluetooth 5.3', 'Автономность' => '36 часов', 'Цвет' => 'Графит'], 4.91, 214, ['#22223B', '#9A8C98'], [
@@ -484,7 +511,50 @@ SVG;
             $this->product('cork-desk-mat', 'Paperfox Cork Desk Mat', 'PAP-MAT-CORK', 'desk', 'paperfox', 9900, 'Пробковый коврик для рабочего стола.', 'Защищает поверхность стола и делает рабочее место аккуратнее.', ['Материал' => 'Пробка', 'Цвет' => 'Натуральный', 'Размер' => '80 x 40 см'], 4.72, 68, ['#7F4F24', '#DDA15E']),
             $this->product('notebook-grid-trio', 'Paperfox Grid Notebook Trio', 'PAP-NOTE-3', 'desk', 'paperfox', 5900, 'Набор тетрадей в точку для планирования.', 'Три спокойных оттенка и плотная бумага для заметок и схем.', ['Материал' => 'Бумага', 'Цвет' => 'Ассорти', 'Комплектация' => '3 тетради'], 4.61, 51, ['#7209B7', '#F7B801']),
             $this->product('monitor-stand-oak', 'Paperfox Monitor Stand Oak', 'PAP-STAND-OAK', 'desk', 'paperfox', 19900, 'Подставка для монитора с местом для мелочей.', 'Поднимает экран на удобную высоту и помогает организовать стол.', ['Материал' => 'Дуб, металл', 'Цвет' => 'Натуральный', 'Ширина' => '52 см'], 4.87, 119, ['#6F4518', '#BC8A5F']),
+        ], $this->generatedProducts());
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function generatedProducts(): array
+    {
+        $templates = [
+            ['smart-home', 'aurora', 'Датчик климата', 'AUR-CLIMATE', 12900, ['connection' => 'Zigbee', 'color' => 'Белый', 'room' => 'Для дома'], ['#003049', '#669BBC']],
+            ['audio', 'aurora', 'Портативная колонка', 'AUR-PORTABLE', 21900, ['connection' => 'Bluetooth 5.3', 'battery_life' => '18 часов', 'color' => 'Темно-синий'], ['#023047', '#219EBC']],
+            ['kitchen', 'nordwerk', 'Погружной блендер', 'NOR-BLENDER', 26900, ['material' => 'Сталь, пластик', 'power' => '900 Вт', 'kit' => '3 насадки'], ['#6A040F', '#F48C06']],
+            ['interior', 'mellow', 'Настенная полка', 'MEL-SHELF', 11900, ['material' => 'Дерево', 'color' => 'Натуральный', 'width' => '60 см'], ['#606C38', '#DDA15E']],
+            ['power-tools', 'vertex', 'Набор сверл', 'VER-DRILLS', 15900, ['voltage' => 'Для 18 В', 'kit' => '18 предметов', 'material' => 'Сталь'], ['#264653', '#E9C46A']],
+            ['fitness', 'trailhead', 'Массажный ролик', 'TRA-ROLLER', 9900, ['material' => 'EVA', 'weight' => '650 г', 'color' => 'Синий'], ['#386641', '#A7C957']],
+            ['desk', 'paperfox', 'Лоток для документов', 'PAP-TRAY', 7900, ['material' => 'Металл', 'color' => 'Графит', 'kit' => '2 уровня'], ['#3C096C', '#FFB703']],
         ];
+        $products = [];
+
+        for ($index = 20; $index < self::PRODUCT_COUNT; $index++) {
+            [$category, $brand, $name, $skuPrefix, $price, $attributes, $colors] = $templates[$index % count($templates)];
+            $number = str_pad((string) ($index + 1), 4, '0', STR_PAD_LEFT);
+
+            $products[] = $this->product(
+                slug: "catalog-{$category}-{$number}",
+                name: "{$name} {$number}",
+                sku: "{$skuPrefix}-{$number}",
+                category: $category,
+                brand: $brand,
+                price: $price + ($index % 17) * 300,
+                short: "{$name} из расширенного каталога.",
+                description: "Серийная модель {$number} для проверки поиска, фильтрации, сортировки и складских сценариев.",
+                attributes: $attributes,
+                rating: 3.80 + ($index % 116) / 100,
+                ratingCount: 12 + ($index * 7) % 480,
+                colors: $colors,
+            ) + [
+                'gallery' => false,
+                'image' => "series-{$category}",
+                'image_title' => $name,
+            ];
+        }
+
+        return $products;
     }
 
     /**
@@ -495,8 +565,36 @@ SVG;
      */
     private function product(string $slug, string $name, string $sku, string $category, string $brand, int $price, string $short, string $description, array $attributes, float $rating, int $ratingCount, array $colors, array $offers = []): array
     {
+        $attributes = collect($attributes)
+            ->mapWithKeys(fn (string $value, string $name): array => [$this->attributeKey($name) => $value])
+            ->all();
+
         return compact('slug', 'name', 'sku', 'category', 'brand', 'price', 'short', 'description', 'attributes', 'rating', 'ratingCount', 'colors', 'offers') + [
             'rating_count' => $ratingCount,
         ];
+    }
+
+    private function attributeKey(string $name): string
+    {
+        return [
+            'Автономность' => 'battery_life',
+            'Вес' => 'weight',
+            'Гарантия' => 'warranty',
+            'Диаметр' => 'diameter',
+            'Кейс' => 'case',
+            'Комплектация' => 'kit',
+            'Крутящий момент' => 'torque',
+            'Материал' => 'material',
+            'Мощность' => 'power',
+            'Напряжение' => 'voltage',
+            'Объем' => 'volume',
+            'Отделения' => 'sections',
+            'Подключение' => 'connection',
+            'Режимы' => 'modes',
+            'Размер' => 'size',
+            'Совместимость' => 'compatibility',
+            'Цвет' => 'color',
+            'Ширина' => 'width',
+        ][$name] ?? $name;
     }
 }
