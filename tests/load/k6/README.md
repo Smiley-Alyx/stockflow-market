@@ -60,6 +60,7 @@ price for the selected product, and reservation needs available stock for the
 selected SKU. Reservation conflicts are expected under contention and are
 tracked as a separate metric.
 
-## Performance evidence
+## Данные о производительности
 
-- [Local k6 baseline: 2026-06-01](results/2026-06-01-local-baseline.md)
+- [Локальный k6 baseline: 2026-06-01](results/2026-06-01-local-baseline.md):
+  профиль, p95, RPS, размер dataset, hardware и ограничения интерпретации.

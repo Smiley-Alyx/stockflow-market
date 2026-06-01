@@ -367,6 +367,20 @@ k6 run tests/load/k6/stockflow.js
 
 Зафиксированный локальный baseline с условиями запуска, метриками и ограничениями интерпретации: [`tests/load/k6/results/2026-06-01-local-baseline.md`](tests/load/k6/results/2026-06-01-local-baseline.md).
 
+Краткая сводка performance evidence для ревизии `16bba09`:
+
+| Параметр | Значение |
+| --- | --- |
+| k6-профиль | Одновременные catalog browse, reservation race, search queries и checkout burst; до `410` VUs |
+| HTTP throughput | `50.52 req/s` |
+| Request duration p95 | `8.17s` |
+| Подготовленный dataset | `1` товар, `1` retail price, `100000` единиц остатка, `4` search queries |
+| Hardware | AMD Ryzen 5 5500U, `6` ядер / `12` потоков, `15.0 GiB` RAM |
+
+Это точка насыщения локального Docker Compose стенда, а не оценка production
+capacity. Полный профиль, нарушенные пороги и ограничения dataset описаны в
+baseline.
+
 ## Инженерные решения
 
 - Репозиторий остаётся monorepo, пока сервисы находятся в активной фазе проектирования.
