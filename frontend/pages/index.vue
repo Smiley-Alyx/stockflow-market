@@ -76,11 +76,6 @@ const submitSearch = () => {
     searchQuery.value = searchInput.value.trim();
 };
 
-const selectCategory = (categorySlug = '') => {
-    selectedCategorySlug.value = categorySlug;
-    document.querySelector('#catalog')?.scrollIntoView({ behavior: 'smooth' });
-};
-
 const showProduct = (product: CatalogProduct) => {
     selectedProductSlug.value = product.slug;
     nextTick(() => document.querySelector('#product-preview')?.scrollIntoView({ behavior: 'smooth' }));
@@ -182,13 +177,12 @@ main.market-shell
                         b {{ customer.cartCount }}
 
         nav.category-nav(aria-label="Категории каталога")
-            button.category-nav-all(type="button" @click="selectCategory()") Все категории
-            button(
+            NuxtLink.category-nav-all(to="/catalog/") Все категории
+            NuxtLink(
                 v-for="category in topCategories"
                 :key="category.id"
-                type="button"
+                :to="category.url ?? '/catalog/'"
                 :class="{ active: selectedCategorySlug === category.slug }"
-                @click="selectCategory(category.slug)"
             ) {{ category.name }}
 
     section.market-hero
@@ -197,7 +191,7 @@ main.market-shell
             h1 {{ banner?.content.headline ?? 'Полезные товары для жизни и работы' }}
             p {{ banner?.content.text ?? 'Выбирайте товары с актуальными остатками на складах вашего города.' }}
             .hero-buttons
-                button.hero-primary(type="button" @click="selectCategory()")
+                NuxtLink.hero-primary(to="/catalog/")
                     | {{ banner?.content.button_label ?? 'Смотреть каталог' }}
                 a.hero-secondary(href="#categories") Выбрать категорию
             ul.hero-points
@@ -239,14 +233,13 @@ main.market-shell
             div
                 p.eyebrow Покупайте по разделам
                 h2 Популярные категории
-            button.text-button(type="button" @click="selectCategory()") Смотреть весь каталог
+            NuxtLink.text-button(to="/catalog/") Смотреть весь каталог
 
         .category-showcase
-            button.category-tile(
+            NuxtLink.category-tile(
                 v-for="category in featuredCategories"
                 :key="category.id"
-                type="button"
-                @click="selectCategory(category.slug)"
+                :to="category.url ?? '/catalog/'"
             )
                 img(v-if="category.image_url" :src="category.image_url" :alt="category.name")
                 span
@@ -262,7 +255,7 @@ main.market-shell
             div
                 p.eyebrow {{ shelf.subtitle }}
                 h2 {{ shelf.title }}
-            button.text-button(type="button" @click="selectCategory()") Смотреть ещё
+            NuxtLink.text-button(to="/catalog/") Смотреть ещё
 
         .product-grid
             article.market-product-card(v-for="item in shelf.products" :key="item.id")

@@ -2,13 +2,15 @@ type ApiResource<T> = {
     data: T;
 };
 
-type ApiPaginatedResource<T> = ApiResource<T> & {
-    meta: {
-        current_page: number;
-        last_page: number;
-        per_page: number;
-        total: number;
-    };
+type ApiPaginatedResource<T, M = PaginationMeta> = ApiResource<T> & {
+    meta: M;
+};
+
+type PaginationMeta = {
+    current_page: number;
+    last_page?: number;
+    per_page: number;
+    total: number;
 };
 
 export type CatalogCategory = {
@@ -117,9 +119,44 @@ export type HomepageBlock = {
     };
 };
 
+export type CatalogFilterValue = {
+    value: string;
+    count: number;
+    url: string;
+};
+
+export type CatalogBreadcrumb = {
+    id: number;
+    name: string;
+    slug: string;
+    url: string;
+};
+
+export type CatalogMeta = PaginationMeta & {
+    query: string | null;
+    category: string | null;
+    category_path: string | null;
+    canonical_url: string;
+    breadcrumbs: CatalogBreadcrumb[];
+    filter_url: string;
+    price_range: {
+        min: number | null;
+        max: number | null;
+        selected_min: number | null;
+        selected_max: number | null;
+        url: string;
+        url_template: string;
+    };
+    city_code: string | null;
+    sort: 'newest' | 'price_asc' | 'price_desc' | 'rating_asc' | 'rating_desc';
+    filters: Record<string, CatalogFilterValue[]>;
+    status?: 'degraded';
+    reason?: string;
+};
+
 export type CatalogProductList = {
     products: CatalogProduct[];
-    meta: ApiPaginatedResource<CatalogProduct[]>['meta'];
+    meta: CatalogMeta;
 };
 
 export const useCatalogApi = () => {
@@ -153,10 +190,21 @@ export const useCatalogApi = () => {
         }
     };
 
-    const fetchProducts = async (
-        params: { category?: string; q?: string; sort?: string; page?: number; per_page?: number } = {},
-    ) => {
-        const response = await $fetch<ApiPaginatedResource<CatalogProduct[]>>('/api/catalog/products', {
+    const fetchProducts = async (params: CatalogQueryParams = {}) => {
+        const response = await $fetch<ApiPaginatedResource<CatalogProduct[], CatalogMeta>>('/api/catalog/products', {
+            baseURL: apiBase,
+            query: params,
+        });
+
+        return {
+            products: response.data,
+            meta: response.meta,
+        };
+    };
+
+    const fetchCatalogPath = async (path = '', params: CatalogQueryParams = {}) => {
+        const endpoint = path ? `/catalog/${path.replace(/^\/+|\/+$/g, '')}/` : '/api/catalog/products';
+        const response = await $fetch<ApiPaginatedResource<CatalogProduct[], CatalogMeta>>(endpoint, {
             baseURL: apiBase,
             query: params,
         });
@@ -179,8 +227,19 @@ export const useCatalogApi = () => {
         fetchCategoryTree,
         fetchProduct,
         fetchProducts,
+        fetchCatalogPath,
         fetchHomepage,
     };
+};
+
+export type CatalogQueryParams = {
+    category?: string;
+    q?: string;
+    sort?: string;
+    page?: number;
+    per_page?: number;
+    in_stock?: boolean | number;
+    city_code?: string;
 };
 
 function isNotFoundError(error: unknown): boolean {
