@@ -154,7 +154,7 @@ class InventoryRoutingService
             ->when(isset($criteria['product_id']), fn (Builder $query): Builder => $query->where('product_id', (int) $criteria['product_id']))
             ->when(isset($criteria['sku']), fn (Builder $query): Builder => $query->where('sku', $criteria['sku']))
             ->where('inventory_warehouses.is_active', true)
-            ->orderByRaw($this->cityPreferenceOrder($criteria))
+            ->when(isset($criteria['city_code']), fn (Builder $query): Builder => $query->orderByRaw($this->cityPreferenceOrder($criteria)))
             ->orderByRaw($strategy === self::STRATEGY_FALLBACK ? 'on_hand_quantity - reserved_quantity DESC' : 'inventory_stock_items.id ASC')
             ->orderBy('inventory_stock_items.id')
             ->lockForUpdate()
@@ -168,10 +168,6 @@ class InventoryRoutingService
      */
     private function cityPreferenceOrder(array $criteria): string
     {
-        if (! isset($criteria['city_code'])) {
-            return '0';
-        }
-
         return 'CASE WHEN inventory_warehouses.city_code = '.DB::getPdo()->quote((string) $criteria['city_code']).' THEN 0 ELSE 1 END';
     }
 

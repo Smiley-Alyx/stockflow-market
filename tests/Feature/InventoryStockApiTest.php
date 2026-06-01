@@ -447,6 +447,22 @@ class InventoryStockApiTest extends TestCase
         $this->assertSame(3, $krakowStock->fresh()->reserved_quantity);
     }
 
+    public function test_reservation_api_selects_available_warehouse_without_city(): void
+    {
+        $stockItem = $this->createStockItem(onHand: 10);
+
+        $this->withHeader('Idempotency-Key', 'api-reserve-without-city')
+            ->postJson('/api/inventory/reservations', [
+                'sku' => $stockItem->sku,
+                'quantity' => 3,
+                'reservation_expires_at' => now()->addMinutes(10)->toJSON(),
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.stock_item_id', $stockItem->id);
+
+        $this->assertSame(3, $stockItem->fresh()->reserved_quantity);
+    }
+
     public function test_reservation_api_falls_back_to_another_city_when_nearest_lacks_stock(): void
     {
         $product = $this->createProduct();
