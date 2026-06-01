@@ -19,6 +19,8 @@ class ProviderOutboxPublisher
 
     public function publishPending(int $limit = 100): int
     {
+        $this->recoverStaleProcessing();
+
         if (! $this->circuitBreaker->allows('rabbitmq')) {
             return 0;
         }
@@ -26,6 +28,7 @@ class ProviderOutboxPublisher
         $published = 0;
         $connection = $this->connections->create();
         $channel = $connection->channel();
+        $channel->confirm_select();
 
         try {
             foreach ($this->pending($limit) as $message) {
@@ -64,6 +67,10 @@ class ProviderOutboxPublisher
             $locked->update([
                 'status' => ProviderOutboxMessage::STATUS_PROCESSING,
                 'attempts' => $locked->attempts + 1,
+                'headers' => [
+                    ...$locked->headers,
+                    'retry_count' => $locked->attempts,
+                ],
             ]);
 
             return $locked;
@@ -86,6 +93,7 @@ class ProviderOutboxPublisher
                 $claimed->exchange,
                 $claimed->routing_key,
             );
+            $channel->wait_for_pending_acks($this->publisherConfirmTimeoutSeconds());
 
             $claimed->update([
                 'status' => ProviderOutboxMessage::STATUS_PUBLISHED,
@@ -103,6 +111,29 @@ class ProviderOutboxPublisher
 
             throw $exception;
         }
+    }
+
+    private function recoverStaleProcessing(): void
+    {
+        ProviderOutboxMessage::query()
+            ->where('status', ProviderOutboxMessage::STATUS_PROCESSING)
+            ->where('updated_at', '<=', now()->subSeconds($this->processingTimeoutSeconds()))
+            ->update([
+                'status' => ProviderOutboxMessage::STATUS_FAILED,
+                'available_at' => now(),
+                'last_error' => 'Recovered stale processing claim.',
+                'updated_at' => now(),
+            ]);
+    }
+
+    private function processingTimeoutSeconds(): int
+    {
+        return max(1, (int) config('stockflow.provider_saga.outbox.processing_timeout_seconds'));
+    }
+
+    private function publisherConfirmTimeoutSeconds(): int
+    {
+        return max(1, (int) config('stockflow.provider_saga.outbox.publisher_confirm_timeout_seconds'));
     }
 
     /**
