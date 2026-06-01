@@ -17,6 +17,7 @@ export type CatalogCategory = {
     slug: string;
     url: string | null;
     description: string | null;
+    image_url: string | null;
     children: CatalogCategory[];
 };
 
@@ -29,6 +30,8 @@ export type CatalogProduct = {
     description: string | null;
     short_description: string | null;
     image_url: string | null;
+    rating: number | null;
+    rating_count: number;
     status: 'draft' | 'published' | 'archived';
     availability: {
         in_stock: boolean;
@@ -88,6 +91,32 @@ export type CatalogProduct = {
     }>;
 };
 
+export type HomepageCity = {
+    code: string;
+    name: string;
+    warehouses: Array<{
+        id: number;
+        code: string;
+        name: string;
+    }>;
+};
+
+export type HomepageBlock = {
+    id: number;
+    type: 'banner' | 'recommended_products' | 'bestseller_products' | 'new_products' | 'cities' | 'description';
+    title: string;
+    position: number;
+    content: {
+        headline?: string;
+        text?: string;
+        button_label?: string;
+        button_url?: string;
+        image_url?: string | null;
+        products?: CatalogProduct[];
+        cities?: HomepageCity[];
+    };
+};
+
 export type CatalogProductList = {
     products: CatalogProduct[];
     meta: ApiPaginatedResource<CatalogProduct[]>['meta'];
@@ -124,7 +153,9 @@ export const useCatalogApi = () => {
         }
     };
 
-    const fetchProducts = async (params: { category?: string; page?: number; per_page?: number } = {}) => {
+    const fetchProducts = async (
+        params: { category?: string; q?: string; sort?: string; page?: number; per_page?: number } = {},
+    ) => {
         const response = await $fetch<ApiPaginatedResource<CatalogProduct[]>>('/api/catalog/products', {
             baseURL: apiBase,
             query: params,
@@ -136,10 +167,19 @@ export const useCatalogApi = () => {
         };
     };
 
+    const fetchHomepage = async () => {
+        const response = await $fetch<ApiResource<HomepageBlock[]>>('/api/homepage', {
+            baseURL: apiBase,
+        });
+
+        return response.data;
+    };
+
     return {
         fetchCategoryTree,
         fetchProduct,
         fetchProducts,
+        fetchHomepage,
     };
 };
 

@@ -9,6 +9,11 @@ export default defineNuxtConfig({
             apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8080',
         },
     },
+    routeRules: {
+        '/images/**': {
+            proxy: `${process.env.NUXT_API_BASE || process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8080'}/images/**`,
+        },
+    },
     app: {
         head: {
             title: 'StockFlow Market',

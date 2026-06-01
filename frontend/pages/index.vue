@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import type { CatalogCategory } from '~/composables/useCatalogApi';
+import type { CatalogCategory, CatalogProduct, HomepageBlock } from '~/composables/useCatalogApi';
 
 const catalogApi = useCatalogApi();
 const customer = useCustomerState();
-const productSlug = ref('wireless-scanner');
-const productSlugInput = ref(productSlug.value);
 const selectedCategorySlug = ref('');
+const searchInput = ref('');
+const searchQuery = ref('');
+const selectedProductSlug = ref<string | null>(null);
 const authMode = ref<'login' | 'register'>('login');
 const authName = ref('');
 const authEmail = ref('');
@@ -13,9 +14,13 @@ const authPassword = ref('');
 const authError = ref('');
 const authPending = ref(false);
 
-const { data: categories, error: categoriesError, pending: categoriesPending } = await useAsyncData(
+const { data: categories, error: categoriesError } = await useAsyncData(
     'catalog-categories',
     () => catalogApi.fetchCategoryTree(),
+);
+const { data: homepage, error: homepageError } = await useAsyncData(
+    'homepage-blocks',
+    () => catalogApi.fetchHomepage(),
 );
 const {
     data: productList,
@@ -26,72 +31,59 @@ const {
     () =>
         catalogApi.fetchProducts({
             category: selectedCategorySlug.value || undefined,
+            q: searchQuery.value || undefined,
             per_page: 12,
         }),
     {
-        watch: [selectedCategorySlug],
+        watch: [selectedCategorySlug, searchQuery],
     },
 );
-const {
-    data: product,
-    error: productError,
-    pending: productPending,
-    refresh: refreshProduct,
-} = await useAsyncData('catalog-product', () => catalogApi.fetchProduct(productSlug.value), {
-    watch: [productSlug],
-});
-
-const visibleCategories = computed(() => categories.value?.slice(0, 4) ?? []);
-const categoryOptions = computed(() => flattenCategories(categories.value ?? []));
-const categoryCount = computed(() => countCategories(categories.value ?? []));
-const selectedCategory = computed(
-    () => categoryOptions.value.find((category) => category.slug === selectedCategorySlug.value) ?? null,
+const { data: selectedProduct, pending: selectedProductPending } = await useAsyncData(
+    'selected-product',
+    async () => (selectedProductSlug.value ? catalogApi.fetchProduct(selectedProductSlug.value) : null),
+    {
+        watch: [selectedProductSlug],
+    },
 );
+
+const categoryOptions = computed(() => flattenCategories(categories.value ?? []).filter((category) => category.image_url));
+const topCategories = computed(() => categoryOptions.value.slice(0, 7));
+const featuredCategories = computed(() => categoryOptions.value.slice(0, 6));
 const products = computed(() => productList.value?.products ?? []);
 const productTotal = computed(() => productList.value?.meta.total ?? 0);
-const publishedCount = computed(() => (productListPending.value ? '...' : productTotal.value.toString()));
-const catalogStatus = computed(() => {
-    if (categoriesError.value || productListError.value) {
-        return 'API offline';
-    }
-
-    return categoriesPending.value || productListPending.value ? 'API loading' : 'API ready';
-});
-
-const productStatus = computed(() => {
-    if (productPending.value) {
-        return 'Загрузка';
-    }
-
-    if (productError.value) {
-        return 'Ошибка API';
-    }
-
-    return product.value?.status ?? 'Не найден';
-});
-const selectedImageUrl = ref<string | null>(null);
-
-watch(
-    product,
-    (nextProduct) => {
-        selectedImageUrl.value = nextProduct?.image_url ?? nextProduct?.gallery[0]?.url ?? null;
-    },
-    { immediate: true },
+const banner = computed(() => blockByType('banner'));
+const cities = computed(() => blockByType('cities')?.content.cities ?? []);
+const description = computed(() => blockByType('description'));
+const shelves = computed(() =>
+    [
+        { type: 'recommended_products', title: 'Для вас', subtitle: 'Подборка полезных товаров на каждый день' },
+        { type: 'bestseller_products', title: 'Хиты продаж', subtitle: 'То, что уже выбирают чаще всего' },
+        { type: 'new_products', title: 'Новинки', subtitle: 'Свежие поступления в каталоге' },
+    ].map((shelf) => ({
+        ...shelf,
+        products: blockByType(shelf.type)?.content.products ?? [],
+    })),
 );
-
-const loadProduct = async () => {
-    const nextSlug = productSlugInput.value.trim();
-
-    if (!nextSlug) {
-        return;
+const catalogStatus = computed(() => {
+    if (categoriesError.value || homepageError.value || productListError.value) {
+        return 'Часть данных недоступна';
     }
 
-    if (nextSlug === productSlug.value) {
-        await refreshProduct();
-        return;
-    }
+    return 'Каталог обновлён';
+});
 
-    productSlug.value = nextSlug;
+const submitSearch = () => {
+    searchQuery.value = searchInput.value.trim();
+};
+
+const selectCategory = (categorySlug = '') => {
+    selectedCategorySlug.value = categorySlug;
+    document.querySelector('#catalog')?.scrollIntoView({ behavior: 'smooth' });
+};
+
+const showProduct = (product: CatalogProduct) => {
+    selectedProductSlug.value = product.slug;
+    nextTick(() => document.querySelector('#product-preview')?.scrollIntoView({ behavior: 'smooth' }));
 };
 
 const submitAuth = async () => {
@@ -123,40 +115,34 @@ const logout = async () => {
     }
 };
 
-function countCategories(nodes: CatalogCategory[]): number {
-    return nodes.reduce((total, category) => total + 1 + countCategories(category.children), 0);
+function blockByType(type: string): HomepageBlock | undefined {
+    return homepage.value?.find((block) => block.type === type);
 }
 
 function flattenCategories(nodes: CatalogCategory[]): CatalogCategory[] {
     return nodes.flatMap((category) => [category, ...flattenCategories(category.children)]);
 }
 
-function formatMoney(amountMinor: number, currency: string): string {
-    return new Intl.NumberFormat('ru-RU', {
-        style: 'currency',
-        currency,
-    }).format(amountMinor / 100);
-}
-
-function formatFileSize(size: number | null): string {
-    if (size === null) {
-        return '';
+function formatMoney(product: CatalogProduct): string {
+    if (!product.price) {
+        return 'Уточнить цену';
     }
 
-    return size < 1024 ? `${size} Б` : `${(size / 1024).toFixed(1)} КБ`;
+    return new Intl.NumberFormat('ru-RU', {
+        style: 'currency',
+        currency: product.price.currency,
+        maximumFractionDigits: 0,
+    }).format(product.price.amount_minor / 100);
 }
 
-function documentType(type: string): string {
-    return {
-        instruction: 'Инструкция',
-        certificate: 'Сертификат',
-        attachment: 'Файл',
-    }[type] ?? 'Файл';
+function ratingLabel(product: CatalogProduct): string {
+    return product.rating ? product.rating.toFixed(1) : 'Новинка';
 }
 
 onMounted(() => customer.initialize());
 
 useHead({
+    title: 'StockFlow Market — товары для дома, работы и отдыха',
     htmlAttrs: {
         lang: 'ru',
     },
@@ -164,259 +150,272 @@ useHead({
 </script>
 
 <template lang="pug">
-main.shell
-    section.overview
-        header.topbar
-            .brand-block
-                .brand
-                    span.brand-mark SF
-                    span StockFlow Market
-                p Gateway shell
+main.market-shell
+    header.market-header
+        .header-main
+            NuxtLink.market-logo(to="/")
+                span.brand-mark SF
+                span
+                    b StockFlow
+                    small market
 
-            .topbar-actions
-                NuxtLink.counter(to="/cart/") Корзина {{ customer.cartCount }}
-                span.counter Избранное {{ customer.favoriteCount }}
-                a(href="/api/catalog/products?per_page=10") Catalog API
-                span.status(:class="{ 'status-muted': categoriesError || productListError }")
-                    | {{ catalogStatus }}
+            form.market-search(@submit.prevent="submitSearch")
+                input(
+                    v-model="searchInput"
+                    type="search"
+                    name="q"
+                    placeholder="Найти товары, бренды и категории"
+                    aria-label="Поиск по каталогу"
+                )
+                button(type="submit") Найти
 
-        .hero
-            .hero-copy
-                p.eyebrow Marketplace operations
-                h1 Каталог, остатки и поиск в одном рабочем контуре
-                p.lede.
-                    Минимальный SSR-интерфейс для проверки публичного слоя StockFlow Market и будущих
-                    операционных сценариев.
+            nav.header-actions(aria-label="Быстрые действия")
+                a.action-link(href="#account")
+                    span.action-icon ♡
+                    span
+                        small Избранное
+                        b {{ customer.favoriteCount }}
+                NuxtLink.action-link(to="/cart/")
+                    span.action-icon ◼
+                    span
+                        small Корзина
+                        b {{ customer.cartCount }}
 
-            .metrics(aria-label="Состояние витрины")
-                article
-                    span Каталог
-                    strong {{ categoryCount }}
-                article
-                    span Опубликовано
-                    strong {{ publishedCount }}
-                article
-                    span Товар
-                    strong {{ productStatus }}
-                article
-                    span Rendering
-                    strong SSR
+        nav.category-nav(aria-label="Категории каталога")
+            button.category-nav-all(type="button" @click="selectCategory()") Все категории
+            button(
+                v-for="category in topCategories"
+                :key="category.id"
+                type="button"
+                :class="{ active: selectedCategorySlug === category.slug }"
+                @click="selectCategory(category.slug)"
+            ) {{ category.name }}
 
-    section.content-grid(aria-label="Операционные данные")
-        article.panel.product-card-panel
-            .panel-heading
-                h2 Категории
-                span read API
+    section.market-hero
+        .hero-marketplace-copy
+            p.eyebrow {{ banner?.title ?? 'StockFlow Market' }}
+            h1 {{ banner?.content.headline ?? 'Полезные товары для жизни и работы' }}
+            p {{ banner?.content.text ?? 'Выбирайте товары с актуальными остатками на складах вашего города.' }}
+            .hero-buttons
+                button.hero-primary(type="button" @click="selectCategory()")
+                    | {{ banner?.content.button_label ?? 'Смотреть каталог' }}
+                a.hero-secondary(href="#categories") Выбрать категорию
+            ul.hero-points
+                li Быстрая доставка
+                li Проверенные бренды
+                li 7 складов
 
-            .filter-row(aria-label="Фильтр каталога")
-                button(
+        .hero-marketplace-media
+            img(v-if="banner?.content.image_url" :src="banner.content.image_url" alt="")
+            .hero-offer
+                span Выгодно
+                strong до −20%
+                small на товары недели
+
+    section.service-strip(aria-label="Преимущества магазина")
+        article
+            span.service-icon 24
+            div
+                strong Доставка от 24 часов
+                small Со склада в вашем городе
+        article
+            span.service-icon ✓
+            div
+                strong Только нужное
+                small Отобранные товары и бренды
+        article
+            span.service-icon 7
+            div
+                strong 7 точек выдачи
+                small В пяти городах Польши
+        article
+            span.service-icon ↺
+            div
+                strong Простой возврат
+                small Без лишних вопросов
+
+    section.market-section#categories
+        .section-heading
+            div
+                p.eyebrow Покупайте по разделам
+                h2 Популярные категории
+            button.text-button(type="button" @click="selectCategory()") Смотреть весь каталог
+
+        .category-showcase
+            button.category-tile(
+                v-for="category in featuredCategories"
+                :key="category.id"
+                type="button"
+                @click="selectCategory(category.slug)"
+            )
+                img(v-if="category.image_url" :src="category.image_url" :alt="category.name")
+                span
+                    strong {{ category.name }}
+                    small {{ category.description }}
+
+    section.market-section.product-shelf(
+        v-for="shelf in shelves"
+        :key="shelf.type"
+        :aria-label="shelf.title"
+    )
+        .section-heading
+            div
+                p.eyebrow {{ shelf.subtitle }}
+                h2 {{ shelf.title }}
+            button.text-button(type="button" @click="selectCategory()") Смотреть ещё
+
+        .product-grid
+            article.market-product-card(v-for="item in shelf.products" :key="item.id")
+                button.favorite-button(
                     type="button"
-                    :class="{ active: selectedCategorySlug === '' }"
-                    @click="selectedCategorySlug = ''"
-                ) Все
-                button(
-                    v-for="category in categoryOptions.slice(0, 5)"
-                    :key="category.id"
+                    :aria-label="customer.isFavorite(item.id) ? 'Убрать из избранного' : 'Добавить в избранное'"
+                    :class="{ active: customer.isFavorite(item.id) }"
+                    @click="customer.toggleFavorite(item)"
+                ) {{ customer.isFavorite(item.id) ? '♥' : '♡' }}
+                button.product-card-media(type="button" @click="showProduct(item)")
+                    img(v-if="item.image_url" :src="item.image_url" :alt="item.name")
+                    span(v-else) SF
+                .product-card-copy
+                    small {{ item.category?.name ?? 'Каталог' }}
+                    button.product-card-title(type="button" @click="showProduct(item)") {{ item.name }}
+                    .rating-line
+                        span ★ {{ ratingLabel(item) }}
+                        small {{ item.rating_count }} оценок
+                    .product-card-bottom
+                        div
+                            strong {{ formatMoney(item) }}
+                            small(v-if="item.availability.in_stock") В наличии
+                        button.cart-add(type="button" aria-label="Добавить в корзину" @click="customer.addCartItem(item)") +
+
+    section.market-section.catalog-panel#catalog
+        .catalog-panel-heading
+            div
+                p.eyebrow {{ catalogStatus }}
+                h2 Каталог товаров
+                p(v-if="searchQuery") Результаты поиска по запросу «{{ searchQuery }}»
+                p(v-else) {{ productTotal }} товаров с актуальными остатками
+            button.text-button(v-if="selectedCategorySlug || searchQuery" type="button" @click="selectedCategorySlug = ''; searchInput = ''; searchQuery = ''")
+                | Сбросить фильтры
+
+        .filter-row
+            button(type="button" :class="{ active: !selectedCategorySlug }" @click="selectedCategorySlug = ''") Все
+            button(
+                v-for="category in topCategories"
+                :key="category.id"
+                type="button"
+                :class="{ active: selectedCategorySlug === category.slug }"
+                @click="selectedCategorySlug = category.slug"
+            ) {{ category.name }}
+
+        .product-grid(v-if="products.length")
+            article.market-product-card(v-for="item in products" :key="item.id")
+                button.favorite-button(
                     type="button"
-                    :class="{ active: selectedCategorySlug === category.slug }"
-                    @click="selectedCategorySlug = category.slug"
-                ) {{ category.name }}
+                    :class="{ active: customer.isFavorite(item.id) }"
+                    @click="customer.toggleFavorite(item)"
+                ) {{ customer.isFavorite(item.id) ? '♥' : '♡' }}
+                button.product-card-media(type="button" @click="showProduct(item)")
+                    img(v-if="item.image_url" :src="item.image_url" :alt="item.name")
+                    span(v-else) SF
+                .product-card-copy
+                    small {{ item.category?.name ?? 'Каталог' }}
+                    button.product-card-title(type="button" @click="showProduct(item)") {{ item.name }}
+                    .rating-line
+                        span ★ {{ ratingLabel(item) }}
+                        small {{ item.rating_count }} оценок
+                    .product-card-bottom
+                        div
+                            strong {{ formatMoney(item) }}
+                            small(v-if="item.availability.in_stock") В наличии
+                        button.cart-add(type="button" aria-label="Добавить в корзину" @click="customer.addCartItem(item)") +
 
-            ul.category-list(v-if="visibleCategories.length")
-                li(v-for="category in visibleCategories" :key="category.id")
-                    div
-                        span {{ category.name }}
-                        small {{ category.children.length }} вложенных
-                    code {{ category.slug }}
+        p.empty-state(v-else-if="productListPending") Загружаем товары…
+        p.empty-state(v-else) По выбранным условиям товаров не найдено.
 
-            p.empty-state(v-else)
-                | Категории появятся после миграций, сидов и доступности backend API.
+    section.product-preview#product-preview(v-if="selectedProduct || selectedProductPending")
+        p.empty-state(v-if="selectedProductPending") Загружаем карточку товара…
+        template(v-else-if="selectedProduct")
+            .preview-media
+                img(v-if="selectedProduct.image_url" :src="selectedProduct.image_url" :alt="selectedProduct.name")
+            .preview-copy
+                p.eyebrow {{ selectedProduct.category?.name ?? 'Каталог' }}
+                h2 {{ selectedProduct.name }}
+                p {{ selectedProduct.short_description }}
+                .preview-price {{ formatMoney(selectedProduct) }}
+                ul.preview-attributes
+                    li(v-for="attribute in selectedProduct.card_attributes" :key="attribute.name")
+                        span {{ attribute.name }}
+                        b {{ attribute.value }}
+                .hero-buttons
+                    button.hero-primary(type="button" @click="customer.addCartItem(selectedProduct)") Добавить в корзину
+                    button.hero-secondary(type="button" @click="customer.toggleFavorite(selectedProduct)")
+                        | {{ customer.isFavorite(selectedProduct.id) ? 'Убрать из избранного' : 'В избранное' }}
 
-        article.panel.product-list-panel
-            .panel-heading
-                h2 Витрина
-                span {{ selectedCategory?.name ?? 'все категории' }}
+    section.city-banner
+        .city-banner-copy
+            p.eyebrow Получайте быстрее
+            h2 Склады рядом с вами
+            p Выбирайте товары с актуальными остатками и забирайте заказ в удобном городе.
+        ul.city-list
+            li(v-for="city in cities" :key="city.code")
+                strong {{ city.name }}
+                span {{ city.warehouses.length }} {{ city.warehouses.length === 1 ? 'склад' : 'склада' }}
 
-            ul.product-list(v-if="products.length")
-                li(v-for="item in products" :key="item.id")
-                    button.product-select(type="button" @click="productSlugInput = item.slug; productSlug = item.slug")
-                        span {{ item.category?.name ?? 'Без категории' }}
-                        strong {{ item.name }}
-                        code {{ item.sku }}
-                    .product-actions
-                        button(type="button" @click="customer.addCartItem(item)") В корзину
-                        button(type="button" @click="customer.toggleFavorite(item)")
-                            | {{ customer.isFavorite(item.id) ? 'Убрать из избранного' : 'В избранное' }}
+    section.brand-story
+        div
+            p.eyebrow О магазине
+            h2 {{ description?.title ?? 'StockFlow Market' }}
+        p {{ description?.content.text }}
+        .story-metrics
+            article
+                strong 2 000+
+                span товаров
+            article
+                strong 5
+                span городов
+            article
+                strong 7
+                span складов
 
-            p.empty-state(v-else-if="productListError")
-                | Backend API недоступен для списка опубликованных товаров.
+    section.account-zone#account
+        .account-intro
+            p.eyebrow Личный кабинет
+            h2 {{ customer.user.value ? `Здравствуйте, ${customer.user.value.name}` : 'Сохраняйте покупки и избранное' }}
+            p(v-if="customer.user.value") Корзина и избранное синхронизированы с вашим аккаунтом.
+            p(v-else) Войдите, чтобы корзина была доступна на любом устройстве.
+        button.secondary-button(v-if="customer.user.value" type="button" @click="logout") Выйти
+        form.account-inline-form(v-else @submit.prevent="submitAuth")
+            input(
+                v-if="authMode === 'register'"
+                v-model="authName"
+                type="text"
+                name="name"
+                placeholder="Имя"
+                autocomplete="name"
+                required
+            )
+            input(v-model="authEmail" type="email" name="email" placeholder="Email" autocomplete="email" required)
+            input(
+                v-model="authPassword"
+                type="password"
+                name="password"
+                placeholder="Пароль"
+                :autocomplete="authMode === 'register' ? 'new-password' : 'current-password'"
+                minlength="8"
+                required
+            )
+            button.hero-primary(type="submit" :disabled="authPending")
+                | {{ authMode === 'register' ? 'Создать аккаунт' : 'Войти' }}
+            button.text-button(type="button" @click="authMode = authMode === 'login' ? 'register' : 'login'")
+                | {{ authMode === 'login' ? 'Регистрация' : 'Уже есть аккаунт' }}
+        p.form-error(v-if="authError") {{ authError }}
 
-            p.empty-state(v-else)
-                | Опубликованные товары появятся после наполнения каталога.
-
-        article.panel
-            .panel-heading
-                h2 Товар
-                span read API
-
-            form.lookup-form(@submit.prevent="loadProduct")
-                label(for="product-slug") Slug товара
-                div
-                    input(id="product-slug" v-model="productSlugInput" name="product-slug" autocomplete="off")
-                    button(type="submit" :disabled="productPending") Найти
-
-            .product-card(v-if="product")
-                .product-media
-                    .product-main-image
-                        img(v-if="selectedImageUrl" :src="selectedImageUrl" :alt="product.name")
-                        span(v-else) Изображение не загружено
-                    .product-gallery(v-if="product.image_url || product.gallery.length")
-                        button(
-                            v-if="product.image_url"
-                            type="button"
-                            :class="{ active: selectedImageUrl === product.image_url }"
-                            @click="selectedImageUrl = product.image_url"
-                        )
-                            img(:src="product.image_url" :alt="product.name")
-                        button(
-                            v-for="image in product.gallery"
-                            :key="image.id"
-                            type="button"
-                            :class="{ active: selectedImageUrl === image.url }"
-                            @click="selectedImageUrl = image.url"
-                        )
-                            img(v-if="image.url" :src="image.url" :alt="image.title ?? product.name")
-
-                .product-core
-                    span.product-category {{ product.category?.name ?? 'Без категории' }}
-                    h3 {{ product.name }}
-                    p.product-brand(v-if="product.brand") Бренд: {{ product.brand.name }}
-                    code Артикул: {{ product.sku }}
-                    p.product-short {{ product.short_description ?? 'Краткое описание товара не заполнено.' }}
-                    .product-price(v-if="product.price")
-                        strong {{ formatMoney(product.price.amount_minor, product.price.currency) }}
-                        del(v-if="product.price.has_discount")
-                            | {{ formatMoney(product.price.original_amount_minor, product.price.currency) }}
-                        span(v-if="product.price.has_discount") −{{ product.price.discount_percent }}%
-                    p.empty-state(v-else) Цена пока не указана.
-                    dl.attribute-list.compact(v-if="product.card_attributes.length")
-                        template(v-for="attribute in product.card_attributes" :key="attribute.name")
-                            dt {{ attribute.name }}
-                            dd {{ attribute.value }}
-                    .product-actions
-                        button(type="button" @click="customer.addCartItem(product)") Добавить в корзину
-                        button(type="button" @click="customer.toggleFavorite(product)")
-                            | {{ customer.isFavorite(product.id) ? 'Убрать из избранного' : 'В избранное' }}
-
-                section.product-details
-                    h3 Описание
-                    p {{ product.description ?? 'Описание товара не заполнено.' }}
-
-                section.product-details(v-if="product.attributes.length")
-                    h3 Характеристики
-                    dl.attribute-list
-                        template(v-for="attribute in product.attributes" :key="attribute.name")
-                            dt {{ attribute.name }}
-                            dd {{ attribute.value }}
-
-                section.product-details
-                    h3 Наличие на складах
-                    ul.warehouse-list(v-if="product.warehouses.length")
-                        li(v-for="warehouse in product.warehouses" :key="warehouse.warehouse_id")
-                            div
-                                strong {{ warehouse.warehouse_name }}
-                                span {{ warehouse.city_name }}
-                            b(:class="{ available: warehouse.in_stock }")
-                                | {{ warehouse.in_stock ? `${warehouse.available_quantity} шт.` : 'Нет в наличии' }}
-                    p.empty-state(v-else) Информация по складам пока отсутствует.
-
-                section.product-details(v-if="product.documents.length")
-                    h3 Документы
-                    ul.document-list
-                        li(v-for="document in product.documents" :key="document.id")
-                            a(:href="document.url ?? undefined" target="_blank" rel="noreferrer")
-                                strong {{ documentType(document.type) }}
-                                span {{ document.title }}
-                                small(v-if="document.size") {{ formatFileSize(document.size) }}
-
-            p.empty-state(v-else-if="productError")
-                | Backend API недоступен для запроса выбранного товара.
-
-            p.empty-state(v-else)
-                | Товар не найден или backend API пока недоступен для выбранного slug.
-
-        article.panel
-            .panel-heading
-                h2 Корзина
-                span {{ customer.user.value ? 'аккаунт' : 'локально' }}
-
-            ul.customer-list(v-if="customer.state.value.cart.items.length")
-                li(v-for="item in customer.state.value.cart.items" :key="item.product_id")
-                    div
-                        strong {{ item.product_name }}
-                        code {{ item.sku }}
-                    .quantity-actions
-                        button(type="button" @click="customer.setCartItem(item, item.quantity - 1)") −
-                        span {{ item.quantity }}
-                        button(type="button" @click="customer.setCartItem(item, item.quantity + 1)") +
-                        button.danger(type="button" @click="customer.removeCartItem(item.product_id)") Удалить
-
-            p.empty-state(v-else) Корзина пока пуста.
-
-        article.panel
-            .panel-heading
-                h2 Избранное
-                span {{ customer.favoriteCount }}
-
-            ul.customer-list(v-if="customer.state.value.favorites.length")
-                li(v-for="item in customer.state.value.favorites" :key="item.product_id")
-                    div
-                        strong {{ item.product_name }}
-                        code {{ item.sku }}
-                    button.danger(type="button" @click="customer.toggleFavorite(item)") Убрать
-
-            p.empty-state(v-else) В избранном пока ничего нет.
-
-        article.panel.account-panel
-            .panel-heading
-                h2 Аккаунт
-                span {{ customer.user.value ? 'серверное хранение' : 'гостевой режим' }}
-
-            template(v-if="customer.user.value")
-                p.account-user
-                    strong {{ customer.user.value.name }}
-                    span {{ customer.user.value.email }}
-                p.account-note Корзина и избранное доступны после входа с другого устройства.
-                button.primary-button(type="button" @click="logout") Выйти
-
-            template(v-else)
-                .mode-switch
-                    button(type="button" :class="{ active: authMode === 'login' }" @click="authMode = 'login'")
-                        | Вход
-                    button(type="button" :class="{ active: authMode === 'register' }" @click="authMode = 'register'")
-                        | Регистрация
-                form.auth-form(@submit.prevent="submitAuth")
-                    input(
-                        v-if="authMode === 'register'"
-                        v-model="authName"
-                        type="text"
-                        name="name"
-                        autocomplete="name"
-                        placeholder="Имя"
-                        required
-                    )
-                    input(v-model="authEmail" type="email" name="email" autocomplete="email" placeholder="Email" required)
-                    input(
-                        v-model="authPassword"
-                        type="password"
-                        name="password"
-                        :autocomplete="authMode === 'register' ? 'new-password' : 'current-password'"
-                        placeholder="Пароль"
-                        minlength="8"
-                        required
-                    )
-                    button.primary-button(type="submit" :disabled="authPending")
-                        | {{ authMode === 'register' ? 'Зарегистрироваться' : 'Войти' }}
-                p.account-note Гостевые позиции будут перенесены в аккаунт после входа.
-                p.form-error(v-if="authError") {{ authError }}
+    footer.market-footer
+        NuxtLink.market-logo(to="/")
+            span.brand-mark SF
+            span
+                b StockFlow
+                small market
+        p Товары для дома, работы и отдыха с актуальными остатками на складах.
+        NuxtLink(to="/cart/") Перейти в корзину
 </template>
