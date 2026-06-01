@@ -8,6 +8,7 @@ use App\Domains\Inventory\Models\StockItem;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Search\DeadLetters\SearchIndexDeadLetterStore;
 use App\Domains\Search\Jobs\IndexSearchDocument;
+use App\Infrastructure\Observability\MetricsCollector;
 use App\Infrastructure\Search\DeadLetters\ArraySearchIndexDeadLetterStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -91,5 +92,22 @@ class MetricsEndpointTest extends TestCase
         $this->get('/metrics')
             ->assertOk()
             ->assertSee('stockflow_inventory_reservation_conflicts_total{reason="insufficient_stock"} 1', false);
+    }
+
+    public function test_provider_saga_and_stale_claim_counters_are_exported(): void
+    {
+        $metrics = $this->app->make(MetricsCollector::class);
+        $metrics->increment('stockflow_checkout_sagas_total', ['outcome' => 'completed']);
+        $metrics->increment('stockflow_checkout_saga_compensations_total', [
+            'operation' => 'payment_refund',
+            'outcome' => 'requested',
+        ]);
+        $metrics->increment('stockflow_messaging_stale_claim_recoveries_total', ['store' => 'provider_outbox']);
+
+        $this->get('/metrics')
+            ->assertOk()
+            ->assertSee('stockflow_checkout_sagas_total{outcome="completed"} 1', false)
+            ->assertSee('stockflow_checkout_saga_compensations_total{operation="payment_refund",outcome="requested"} 1', false)
+            ->assertSee('stockflow_messaging_stale_claim_recoveries_total{store="provider_outbox"} 1', false);
     }
 }

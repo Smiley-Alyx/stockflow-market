@@ -57,6 +57,18 @@ class PrometheusExporter
         $lines[] = '# TYPE stockflow_search_indexing_failures_total counter';
         $lines = array_merge($lines, $this->counterSamples('stockflow_search_indexing_failures_total'));
 
+        $lines[] = '# HELP stockflow_checkout_sagas_total Checkout provider sagas by outcome.';
+        $lines[] = '# TYPE stockflow_checkout_sagas_total counter';
+        $lines = array_merge($lines, $this->counterSamples('stockflow_checkout_sagas_total'));
+
+        $lines[] = '# HELP stockflow_checkout_saga_compensations_total Checkout saga compensations by operation and outcome.';
+        $lines[] = '# TYPE stockflow_checkout_saga_compensations_total counter';
+        $lines = array_merge($lines, $this->counterSamples('stockflow_checkout_saga_compensations_total'));
+
+        $lines[] = '# HELP stockflow_messaging_stale_claim_recoveries_total Recovered stale messaging claims by store.';
+        $lines[] = '# TYPE stockflow_messaging_stale_claim_recoveries_total counter';
+        $lines = array_merge($lines, $this->counterSamples('stockflow_messaging_stale_claim_recoveries_total'));
+
         return implode("\n", $lines)."\n";
     }
 

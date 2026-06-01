@@ -110,4 +110,4 @@ ERP использует `8083` только в общем стенде: в со
 
 1. Broker-level интеграционные тесты happy path и компенсаций на общем стенде.
 2. Операторская команда просмотра и requeue для market outcome DLQ.
-3. Метрики задержки saga, компенсаций и stale claim recovery.
+3. Grafana-панели и alert thresholds для saga outcomes, компенсаций и stale claim recovery.

@@ -12,6 +12,7 @@ use App\Domains\Orders\Models\Order;
 use App\Domains\Orders\Models\Shipment;
 use App\Infrastructure\Messaging\DomainEventRecorder;
 use App\Infrastructure\Messaging\ProviderMessageRecorder;
+use App\Infrastructure\Observability\MetricsCollector;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -20,6 +21,7 @@ class CheckoutSagaService
     public function __construct(
         private readonly ProviderMessageRecorder $messages,
         private readonly DomainEventRecorder $events,
+        private readonly MetricsCollector $metrics,
     ) {}
 
     public function start(int $orderId): CheckoutSaga
@@ -66,6 +68,8 @@ class CheckoutSagaService
                     ],
                 );
             }
+
+            $this->metrics->increment('stockflow_checkout_sagas_total', ['outcome' => 'started']);
 
             return $saga->load('reservations');
         });
@@ -208,6 +212,7 @@ class CheckoutSagaService
 
         if ($order->shipments->isEmpty()) {
             $saga->update(['status' => CheckoutSaga::STATUS_COMPLETED]);
+            $this->metrics->increment('stockflow_checkout_sagas_total', ['outcome' => 'completed']);
 
             return;
         }
@@ -284,6 +289,7 @@ class CheckoutSagaService
 
         if (! $pending) {
             $saga->update(['status' => CheckoutSaga::STATUS_COMPLETED]);
+            $this->metrics->increment('stockflow_checkout_sagas_total', ['outcome' => 'completed']);
         }
     }
 
@@ -306,7 +312,7 @@ class CheckoutSagaService
             ->where('reservation_id', (string) $payload['reservation_id'])
             ->update(['status' => CheckoutSagaReservation::STATUS_RELEASE_FAILED]);
 
-        $this->recordCompensationFailure($saga, (string) ($payload['reason'] ?? 'inventory reservation release failed'));
+        $this->recordCompensationFailure($saga, 'inventory_release', (string) ($payload['reason'] ?? 'inventory reservation release failed'));
     }
 
     /**
@@ -334,7 +340,7 @@ class CheckoutSagaService
         }
 
         $saga->update(['refund_status' => CheckoutSaga::REFUND_STATUS_FAILED]);
-        $this->recordCompensationFailure($saga, (string) ($payload['reason_code'] ?? 'payment refund failed'));
+        $this->recordCompensationFailure($saga, 'payment_refund', (string) ($payload['reason_code'] ?? 'payment refund failed'));
     }
 
     /**
@@ -378,7 +384,7 @@ class CheckoutSagaService
             ->where('provider_status', 'cancel_pending')
             ->update(['provider_status' => 'cancel_failed']);
 
-        $this->recordCompensationFailure($saga, (string) ($payload['failure_code'] ?? 'shipment cancellation failed'));
+        $this->recordCompensationFailure($saga, 'shipment_cancel', (string) ($payload['failure_code'] ?? 'shipment cancellation failed'));
     }
 
     private function fail(CheckoutSaga $saga, string $causationId, string $reason): void
@@ -391,6 +397,7 @@ class CheckoutSagaService
             'status' => CheckoutSaga::STATUS_FAILED,
             'failure_reason' => $reason,
         ]);
+        $this->metrics->increment('stockflow_checkout_sagas_total', ['outcome' => 'failed']);
 
         if (! in_array($saga->order->status, [Order::STATUS_PAID, Order::STATUS_CANCELLED, Order::STATUS_EXPIRED], true)) {
             $saga->order->update(['status' => Order::STATUS_RESERVATION_FAILED]);
@@ -411,6 +418,10 @@ class CheckoutSagaService
                     'reason' => 'checkout_saga_failed',
                 ],
             );
+            $this->metrics->increment('stockflow_checkout_saga_compensations_total', [
+                'operation' => 'inventory_release',
+                'outcome' => 'requested',
+            ]);
         }
 
         foreach ($saga->order->shipments->where('provider_status', 'created') as $shipment) {
@@ -432,6 +443,10 @@ class CheckoutSagaService
                     'metadata' => ['order_id' => (string) $saga->order_id],
                 ],
             );
+            $this->metrics->increment('stockflow_checkout_saga_compensations_total', [
+                'operation' => 'payment_refund',
+                'outcome' => 'requested',
+            ]);
         }
     }
 
@@ -456,14 +471,22 @@ class CheckoutSagaService
                 'metadata' => ['checkout_id' => 'checkout:'.$saga->order_id],
             ],
         );
+        $this->metrics->increment('stockflow_checkout_saga_compensations_total', [
+            'operation' => 'shipment_cancel',
+            'outcome' => 'requested',
+        ]);
     }
 
-    private function recordCompensationFailure(CheckoutSaga $saga, string $reason): void
+    private function recordCompensationFailure(CheckoutSaga $saga, string $operation, string $reason): void
     {
         $saga->update([
             'compensation_failure_reason' => $saga->compensation_failure_reason === null
                 ? $reason
                 : $saga->compensation_failure_reason.'; '.$reason,
+        ]);
+        $this->metrics->increment('stockflow_checkout_saga_compensations_total', [
+            'operation' => $operation,
+            'outcome' => 'failed',
         ]);
     }
 

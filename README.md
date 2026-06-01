@@ -62,7 +62,7 @@ inbox и выполняет компенсации release, refund и shipment c
 - добавлена scheduled-команда истечения активных inventory-резервов с метрикой количества истёкших резервов;
 - добавлена операционная команда `search:dead-letter` для просмотра и ручного возврата документов поисковой индексации из отдельного dead-letter backend;
 - поиск умеет возвращать деградированный ответ при недоступности Elasticsearch;
-- добавлен Prometheus-compatible `/metrics` endpoint и локальный Prometheus/Grafana стек для latency, очередей, dead-letter, reservation conflicts и ошибок индексации;
+- добавлен Prometheus-compatible `/metrics` endpoint и локальный Prometheus/Grafana стек для latency, очередей, dead-letter, reservation conflicts, saga outcomes, компенсаций и stale messaging claims;
 - добавлен `config/stockflow.php` для runtime-настроек таймаутов, кеша, очередей, retry и backpressure limits;
 - описан первый ADR по переходной архитектуре Laravel gateway + service workspace;
 - добавлен архитектурный тест, который проверяет наличие сервисной структуры.

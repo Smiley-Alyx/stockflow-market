@@ -3,6 +3,7 @@
 namespace App\Infrastructure\Messaging\RabbitMq;
 
 use App\Infrastructure\Messaging\ProviderOutboxMessage;
+use App\Infrastructure\Observability\MetricsCollector;
 use App\Infrastructure\Resilience\CircuitBreaker;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,7 @@ class ProviderOutboxPublisher
     public function __construct(
         private readonly RabbitMqConnectionFactory $connections,
         private readonly CircuitBreaker $circuitBreaker,
+        private readonly MetricsCollector $metrics,
     ) {}
 
     public function publishPending(int $limit = 100): int
@@ -115,7 +117,7 @@ class ProviderOutboxPublisher
 
     private function recoverStaleProcessing(): void
     {
-        ProviderOutboxMessage::query()
+        $recovered = ProviderOutboxMessage::query()
             ->where('status', ProviderOutboxMessage::STATUS_PROCESSING)
             ->where('updated_at', '<=', now()->subSeconds($this->processingTimeoutSeconds()))
             ->update([
@@ -124,6 +126,10 @@ class ProviderOutboxPublisher
                 'last_error' => 'Recovered stale processing claim.',
                 'updated_at' => now(),
             ]);
+
+        if ($recovered > 0) {
+            $this->metrics->increment('stockflow_messaging_stale_claim_recoveries_total', ['store' => 'provider_outbox'], $recovered);
+        }
     }
 
     private function processingTimeoutSeconds(): int

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Infrastructure\Messaging\InboxConsumer;
 use App\Infrastructure\Messaging\InboxMessage;
+use App\Infrastructure\Observability\MetricsCollector;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -50,5 +51,9 @@ class InboxConsumerTest extends TestCase
             'status' => InboxMessage::STATUS_PROCESSED,
             'last_error' => null,
         ]);
+        $this->assertSame(1, $this->app->make(MetricsCollector::class)->value(
+            'stockflow_messaging_stale_claim_recoveries_total',
+            ['store' => 'inbox'],
+        ));
     }
 }

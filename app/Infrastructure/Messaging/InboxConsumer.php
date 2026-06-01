@@ -2,6 +2,7 @@
 
 namespace App\Infrastructure\Messaging;
 
+use App\Infrastructure\Observability\MetricsCollector;
 use Closure;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -9,6 +10,8 @@ use Throwable;
 
 class InboxConsumer
 {
+    public function __construct(private readonly MetricsCollector $metrics) {}
+
     /**
      * @template TReturn
      *
@@ -72,6 +75,10 @@ class InboxConsumer
 
                 if ($existing === null || ! $this->canRetry($existing)) {
                     return false;
+                }
+
+                if ($existing->status === InboxMessage::STATUS_PROCESSING) {
+                    $this->metrics->increment('stockflow_messaging_stale_claim_recoveries_total', ['store' => 'inbox']);
                 }
 
                 $existing->status = InboxMessage::STATUS_PROCESSING;

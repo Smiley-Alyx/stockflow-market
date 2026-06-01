@@ -8,6 +8,7 @@ use App\Domains\Orders\Models\Order;
 use App\Domains\Orders\Services\CheckoutSagaService;
 use App\Infrastructure\Messaging\ProviderOutboxMessage;
 use App\Infrastructure\Messaging\RabbitMq\ProviderOutcomeProcessor;
+use App\Infrastructure\Observability\MetricsCollector;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -78,6 +79,8 @@ class CheckoutSagaTest extends TestCase
             'tracking_number' => 'TRK-DEMO-002',
         ]);
         $this->assertSame(1, DB::table('messaging_inbox')->where('message_id', $messageId)->count());
+        $this->assertSame(1, $this->metric('stockflow_checkout_sagas_total', ['outcome' => 'started']));
+        $this->assertSame(1, $this->metric('stockflow_checkout_sagas_total', ['outcome' => 'completed']));
     }
 
     public function test_provider_saga_releases_confirmed_reservations_after_inventory_rejection(): void
@@ -177,6 +180,19 @@ class CheckoutSagaTest extends TestCase
             'reservation_id' => $reservation->reservation_id,
             'status' => CheckoutSagaReservation::STATUS_RELEASED,
         ]);
+        $this->assertSame(1, $this->metric('stockflow_checkout_sagas_total', ['outcome' => 'failed']));
+        $this->assertSame(1, $this->metric('stockflow_checkout_saga_compensations_total', [
+            'operation' => 'inventory_release',
+            'outcome' => 'requested',
+        ]));
+        $this->assertSame(1, $this->metric('stockflow_checkout_saga_compensations_total', [
+            'operation' => 'payment_refund',
+            'outcome' => 'requested',
+        ]));
+        $this->assertSame(1, $this->metric('stockflow_checkout_saga_compensations_total', [
+            'operation' => 'shipment_cancel',
+            'outcome' => 'requested',
+        ]));
     }
 
     public function test_provider_saga_records_inventory_release_failure(): void
@@ -205,6 +221,10 @@ class CheckoutSagaTest extends TestCase
             'reservation_id' => $reservations[0]->reservation_id,
             'status' => CheckoutSagaReservation::STATUS_RELEASE_FAILED,
         ]);
+        $this->assertSame(1, $this->metric('stockflow_checkout_saga_compensations_total', [
+            'operation' => 'inventory_release',
+            'outcome' => 'failed',
+        ]));
     }
 
     protected function setUp(): void
@@ -293,5 +313,13 @@ class CheckoutSagaTest extends TestCase
             ->firstOrFail();
 
         return $message;
+    }
+
+    /**
+     * @param  array<string, string>  $labels
+     */
+    private function metric(string $name, array $labels): int
+    {
+        return $this->app->make(MetricsCollector::class)->value($name, $labels);
     }
 }

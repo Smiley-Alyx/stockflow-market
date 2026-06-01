@@ -6,6 +6,7 @@ use App\Infrastructure\Messaging\ProviderMessageRecorder;
 use App\Infrastructure\Messaging\ProviderOutboxMessage;
 use App\Infrastructure\Messaging\RabbitMq\ProviderOutboxPublisher;
 use App\Infrastructure\Messaging\RabbitMq\RabbitMqConnectionFactory;
+use App\Infrastructure\Observability\MetricsCollector;
 use App\Infrastructure\Resilience\CircuitBreaker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -44,6 +45,10 @@ class ProviderOutboxPublisherTest extends TestCase
             'status' => ProviderOutboxMessage::STATUS_FAILED,
             'last_error' => 'Recovered stale processing claim.',
         ]);
+        $this->assertSame(1, $this->app->make(MetricsCollector::class)->value(
+            'stockflow_messaging_stale_claim_recoveries_total',
+            ['store' => 'provider_outbox'],
+        ));
     }
 
     public function test_provider_outbox_waits_for_confirmation_and_increments_retry_header(): void
@@ -102,6 +107,7 @@ class ProviderOutboxPublisherTest extends TestCase
         return new ProviderOutboxPublisher(
             $connections ?? Mockery::mock(RabbitMqConnectionFactory::class),
             $this->app->make(CircuitBreaker::class),
+            $this->app->make(MetricsCollector::class),
         );
     }
 }
