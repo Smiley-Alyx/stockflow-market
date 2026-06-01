@@ -227,7 +227,13 @@ docker compose up -d --build
 docker compose exec php composer install
 docker compose exec php php artisan key:generate
 docker compose exec php php artisan migrate
+docker compose exec php php artisan db:seed
 ```
+
+`db:seed` создает каталог из 2000 товаров, склады, цены и контент главной
+страницы. После наполнения команда автоматически ставит весь каталог в очередь
+индексации Elasticsearch. Прогресс обработки виден через
+`docker compose logs -f search-index-worker`.
 
 После базового запуска:
 

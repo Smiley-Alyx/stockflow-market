@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'seed' => [
+        'search_index' => (bool) env('STOCKFLOW_SEED_SEARCH_INDEX', true),
+    ],
+
     'runtime' => [
         'service_name' => env('STOCKFLOW_SERVICE_NAME', 'gateway'),
         'request_timeout_ms' => (int) env('STOCKFLOW_REQUEST_TIMEOUT_MS', 2500),

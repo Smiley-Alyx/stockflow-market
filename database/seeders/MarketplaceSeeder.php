@@ -6,6 +6,7 @@ use App\Domains\Catalog\Read\CatalogCacheKeys;
 use App\Domains\Catalog\Read\CatalogProjectionService;
 use App\Domains\Pricing\Models\Promotion;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
@@ -51,6 +52,10 @@ class MarketplaceSeeder extends Seeder
 
         foreach ($this->productIds as $productId) {
             app(CatalogProjectionService::class)->syncProduct($productId);
+        }
+
+        if (config('stockflow.seed.search_index')) {
+            Artisan::call('search:index:rebuild');
         }
     }
 
