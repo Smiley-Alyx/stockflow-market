@@ -73,13 +73,14 @@ curl -s -X POST http://localhost:8083/debug/failure-mode \
 
 Сформулируйте явно:
 
-- sandbox providers уже готовы к автономной интеграции и failure testing;
-- market checkout сейчас работает как внутренний Laravel-срез;
-- следующий инженерный этап — outbox relay, saga state и idempotent consumers
-  outcomes в `stockflow-market`.
+- sandbox providers готовы к автономной интеграции и failure testing;
+- market provider saga публикует requests через outbox relay и дедуплицирует
+  outcomes через inbox;
+- следующий инженерный этап — автоматизированный broker-level E2E тест,
+  outcome DLQ policy и операционные метрики saga.
 
-Это важная граница: compose запускает всю экосистему, но не выдаёт
-автоматический end-to-end checkout до появления market-orchestrator.
+Это важная граница: compose запускает всю экосистему и market-orchestrator, но
+broker-level E2E сценарий пока проверяется вручную через checkout API.
 
 ## Полезные команды
 

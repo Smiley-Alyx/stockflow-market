@@ -18,11 +18,11 @@
 
 | Гарантия | ERP mock | Payment mock | Delivery mock | Market |
 | --- | --- | --- | --- | --- |
-| At-least-once delivery | Да, durable queue + retry | Да, durable queue + retry | Да, durable queue + retry | Планируется для provider consumers |
-| Idempotency | Да, in-memory store | Да, domain records + published event store | Да, in-memory records + published event store | Внутренние order/inventory операции есть; inbox для provider outcomes планируется |
+| At-least-once delivery | Да, durable queue + retry | Да, durable queue + retry | Да, durable queue + retry | Да, durable outcomes queue + requeue |
+| Idempotency | Да, in-memory store | Да, domain records + published event store | Да, in-memory records + published event store | Да, inbox по `message_id` и idempotent saga transitions |
 | DLQ | Да, отдельные DLQ по reservation flow | Да, `stockflow.payment.requests.dlq` | Да, `stockflow.delivery.requests.dlq` | Search DLQ есть; provider DLQ consumer policy планируется |
-| Retry | TTL retry queues, по умолчанию 3 попытки | Retry queue, по умолчанию 3 попытки | Retry queue, по умолчанию 3 попытки | Outbox retry boundary есть, provider relay планируется |
-| Correlation tracing | `correlation_id`, `causation_id` | `correlation_id`, `causation_id` | `correlation_id`, `causation_id` | Должен сохранять один `correlation_id` на saga |
+| Retry | TTL retry queues, по умолчанию 3 попытки | Retry queue, по умолчанию 3 попытки | Retry queue, по умолчанию 3 попытки | Да, outbox relay с backoff и stale claim recovery |
+| Correlation tracing | `correlation_id`, `causation_id` | `correlation_id`, `causation_id` | `correlation_id`, `causation_id` | Да, один `correlation_id` на saga |
 
 ## Инъекция отказов
 
@@ -42,7 +42,6 @@
 
 ## Ограничения общего стенда
 
-Общий compose доказывает совместимость runtime и broker topology. Он пока не
-является автоматическим end-to-end checkout: market publisher и outcome consumers
-ещё не реализованы. Для показа provider messaging используйте контрактные примеры
-из репозиториев моков или их integration suites.
+Общий compose поднимает runtime, broker topology, market relay, outcome consumer
+и три provider worker. Автоматизированный broker-level E2E тест пока не добавлен:
+для проверки используйте checkout API и fault injection endpoints моков.

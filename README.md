@@ -9,7 +9,7 @@ StockFlow Market — инженерный pet-проект маркетплей�
 
 | Репозиторий | RabbitMQ exchange | Ответственность |
 | --- | --- | --- |
-| **[stockflow-market](https://github.com/Smiley-Alyx/stockflow-market)** | orchestration boundary | Checkout, заказы, каталог и будущая оркестрация provider-событий |
+| **[stockflow-market](https://github.com/Smiley-Alyx/stockflow-market)** | orchestration boundary | Checkout, заказы, каталог и оркестрация provider-событий |
 | [stockflow-erp-mock](https://github.com/Smiley-Alyx/stockflow-erp-mock) | `stockflow.inventory` | Резервирование и освобождение складских остатков |
 | [stockflow-payment-mock](https://github.com/Smiley-Alyx/stockflow-payment-mock) | `stockflow.payment` | Авторизация, capture и refund платежей |
 | [stockflow-delivery-mock](https://github.com/Smiley-Alyx/stockflow-delivery-mock) | `stockflow.delivery` | Создание, отмена и изменение статуса отправлений |
@@ -17,16 +17,16 @@ StockFlow Market — инженерный pet-проект маркетплей�
 ```mermaid
 flowchart LR
     client["Nuxt frontend / API client"] --> market["stockflow-market<br/>checkout · orders · fulfillment"]
-    market -. "следующий этап: provider orchestration" .-> rabbit["RabbitMQ<br/>topic exchanges"]
+    market <-->|"transactional outbox relay / outcomes"| rabbit["RabbitMQ<br/>topic exchanges"]
     rabbit <-->|"reserve / release"| inventory["stockflow-erp-mock<br/>stockflow.inventory"]
     rabbit <-->|"authorize / capture / refund"| payment["stockflow-payment-mock<br/>stockflow.payment"]
     rabbit <-->|"create / cancel shipment"| delivery["stockflow-delivery-mock<br/>stockflow.delivery"]
 ```
 
-Моки уже реализуют версионированные AsyncAPI-контракты, idempotency, retry, DLQ,
-failure injection и correlation headers. В `stockflow-market` текущий checkout
-пока резервирует остатки внутри Laravel-среза: публикация provider requests и
-обработка outcomes остаются следующим этапом интеграции.
+Моки реализуют версионированные AsyncAPI-контракты, idempotency, retry, DLQ,
+failure injection и correlation headers. В `stockflow-market` provider saga
+публикует requests через transactional outbox relay, дедуплицирует outcomes через
+inbox и выполняет компенсации release, refund и shipment cancel.
 
 | Документ | Содержание |
 | --- | --- |
@@ -56,6 +56,7 @@ failure injection и correlation headers. В `stockflow-market` текущий c
 - добавлен первый search read endpoint поверх Elasticsearch для индексированных товаров;
 - добавлен локальный ClickHouse для будущих аналитических read-моделей и событийных витрин;
 - реализован checkout-срез `cart → draft order → price snapshot → async inventory reservation → paid / cancelled / expired`;
+- добавлена provider saga `reserve → authorize → capture → shipment` с outbox relay, inbox-дедупликацией и компенсациями;
 - добавлены маршрутизация резервов по складам, архивирование складских движений и географический фильтр остатков;
 - цены поддерживают городские переопределения, версии, интервалы активности и промокоды; заказ сохраняет снимок выбранной цены и скидки;
 - добавлена scheduled-команда истечения активных inventory-резервов с метрикой количества истёкших резервов;
@@ -159,7 +160,7 @@ stockflow-market/
 | `elasticsearch` | поисковый движок | базовый | `http://localhost:9200` |
 | `prometheus` | сбор метрик gateway | базовый | `http://localhost:9090` |
 | `grafana` | дашборды наблюдаемости | базовый | `http://localhost:3001` |
-| `rabbitmq` | будущий transport доменных событий | `extended` | `localhost:5672`, UI `http://localhost:15672` |
+| `rabbitmq` | transport provider saga и будущих доменных событий | `extended` | `localhost:5672`, UI `http://localhost:15672` |
 | `clickhouse` | будущие аналитические витрины | `extended` | HTTP `http://localhost:8123`, native `localhost:9000` |
 
 ## Сценарии инфраструктуры
@@ -171,7 +172,7 @@ stockflow-market/
 | Elasticsearch | индексация каталога, поисковый read endpoint и деградированный ответ при недоступности | используется |
 | Prometheus | scrape `/metrics` с latency, очередями, конфликтами резервов и ошибками индексации | используется |
 | Grafana | автоматически provisioned dashboard `StockFlow Observability` поверх Prometheus | используется |
-| RabbitMQ | опциональная readiness и circuit-breaker граница для будущего event transport; открытый circuit оставляет события в outbox | профиль `extended`, transport ещё не подключён |
+| RabbitMQ | provider outbox relay, outcome consumer и circuit breaker; открытый circuit оставляет события в outbox | профиль `extended`, используется provider saga |
 | ClickHouse | опциональная readiness-проверка и локальное хранилище для будущих аналитических read-моделей | профиль `extended`, проекция ещё не реализована |
 
 Расширенный профиль запускается явно:

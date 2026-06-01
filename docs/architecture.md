@@ -16,7 +16,7 @@ StockFlow состоит из основного marketplace-репозитор�
 flowchart TB
     client["Frontend / API client"] --> market["stockflow-market<br/>Laravel gateway + modular monolith"]
     market --> outbox[("Marketplace outbox")]
-    outbox -. "следующий этап интеграции" .-> rabbit["RabbitMQ"]
+    outbox --> rabbit["RabbitMQ"]
 
     rabbit --> inventory["stockflow-erp-mock"]
     rabbit --> payment["stockflow-payment-mock"]
@@ -35,10 +35,10 @@ flowchart TB
 Моки готовы к автономному запуску и ручному контрактному тестированию через общий
 RabbitMQ. Они объявляют topic exchanges, входящие очереди, retry queues и DLQ.
 
-В `stockflow-market` уже реализованы draft order, price snapshot, checkout
-configuration, внутреннее резервирование остатков и lifecycle заказа. При этом
-provider orchestration через RabbitMQ ещё не подключена: market не публикует
-inventory/payment/delivery requests и не потребляет их outcomes.
+В `stockflow-market` реализованы draft order, price snapshot, checkout
+configuration, внутреннее резервирование остатков и lifecycle заказа. Provider
+saga публикует inventory/payment/delivery requests через transactional outbox
+relay и потребляет outcomes через inbox-дедупликацию.
 
 Это разделяет два уровня демонстрации:
 
@@ -46,11 +46,11 @@ inventory/payment/delivery requests и не потребляет их outcomes.
 | --- | --- |
 | Marketplace slice | HTTP checkout и внутренний order/inventory lifecycle |
 | Provider sandbox | RabbitMQ-контракты, retries, DLQ, idempotency и failure injection в каждом моке |
-| End-to-end orchestration | Архитектурно описана, требует market publisher, consumers и saga state |
+| End-to-end orchestration | Реализованы market publisher, outcome consumer, saga state и компенсации |
 
 ## Целевая оркестрация checkout
 
-Marketplace должен хранить saga state по `order_id` и выполнять шаги
+Marketplace хранит saga state по `order_id` и выполняет шаги
 последовательно:
 
 1. Опубликовать `inventory.reservation.requested.v1`.
@@ -106,10 +106,8 @@ ERP использует `8083` только в общем стенде: в со
 
 ## Следующий этап реализации
 
-Для реального end-to-end checkout в market нужны:
+Для усиления end-to-end checkout нужны:
 
-1. RabbitMQ publisher с transactional outbox relay.
-2. Consumers outcomes от ERP, payment и delivery.
-3. Таблица saga state с optimistic locking.
-4. Inbox-дедупликация по `message_id` и idempotent transition handlers.
-5. Интеграционные тесты happy path и компенсаций на общем broker.
+1. Broker-level интеграционные тесты happy path и компенсаций на общем стенде.
+2. DLQ-политика и операторский requeue для market outcome consumer.
+3. Метрики задержки saga, компенсаций и stale claim recovery.
