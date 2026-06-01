@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const route = useRoute();
 const customer = useCustomerState();
+const searchInput = ref('');
 const orderId = computed(() => Number(route.query.order));
 const paymentMethod = ref('');
 const commonDeliveryService = ref('');
@@ -54,6 +55,15 @@ const shipments = computed(() => {
 
     return groups;
 });
+
+const submitSearch = () => {
+    const query = searchInput.value.trim();
+
+    navigateTo({
+        path: '/search/',
+        query: query ? { q: query } : {},
+    });
+};
 
 watch(
     checkout,
@@ -125,22 +135,59 @@ useHead({
 </script>
 
 <template lang="pug">
-main.shell.cart-shell
-    header.cart-header
-        NuxtLink.brand(to="/")
-            span.brand-mark SF
-            span StockFlow Market
-        NuxtLink.back-link(to="/cart/") Вернуться в корзину
+main.market-page-shell
+    header.market-header
+        .header-main
+            NuxtLink.market-logo(to="/")
+                span.brand-mark SF
+                span
+                    b StockFlow
+                    small market
+            form.market-search(@submit.prevent="submitSearch")
+                input(
+                    v-model="searchInput"
+                    type="search"
+                    name="q"
+                    placeholder="Найти товары, бренды и категории"
+                    aria-label="Поиск по каталогу"
+                )
+                button(type="submit") Найти
+            nav.header-actions(aria-label="Быстрые действия")
+                NuxtLink.action-link(to="/favorites/")
+                    span.action-icon ♡
+                    span
+                        small Избранное
+                        b {{ customer.favoriteCount }}
+                NuxtLink.action-link(to="/cart/")
+                    span.action-icon ◼
+                    span
+                        small Корзина
+                        b {{ customer.cartCount }}
+        nav.category-nav(aria-label="Разделы магазина")
+            NuxtLink.category-nav-all(to="/catalog/") Все категории
+            NuxtLink(to="/catalog/") Каталог
+            NuxtLink(to="/favorites/") Избранное
 
-    section.cart-title
+    section.catalog-breadcrumbs(aria-label="Хлебные крошки")
+        NuxtLink(to="/") Главная
+        span /
+        NuxtLink(to="/cart/") Корзина
+        span /
+        span Оформление
+
+    section.market-page-heading
         div
             p.eyebrow Заказ №{{ orderId }}
             h1 Оформление заказа
-            p.lede Укажите адрес, способ оплаты и распределите товары по доставкам.
+            p Укажите получателя, выберите оплату и удобную службу доставки.
+        ol.checkout-steps
+            li.active 1. Корзина
+            li.active 2. Доставка и оплата
+            li 3. Готово
 
     p.form-error(v-if="error") Не удалось загрузить заказ.
 
-    form.checkout-layout(v-else-if="order" @submit.prevent="submit")
+    form.checkout-layout.market-page-content(v-else-if="order" @submit.prevent="submit")
         .checkout-main
             section.panel.checkout-section
                 .panel-heading
@@ -171,7 +218,7 @@ main.shell.cart-shell
 
             section.panel.checkout-section
                 .panel-heading
-                    h2 Платёжная система
+                    h2 Способ оплаты
                     span Один способ для заказа
                 .checkout-options
                     label(v-for="option in options.payment_methods" :key="option.code")
@@ -208,11 +255,20 @@ main.shell.cart-shell
 
         aside.panel.cart-summary-panel
             .panel-heading
-                h2 Итого
+                h2 Ваш заказ
                 span {{ order.items.length }} поз.
             strong.checkout-total {{ formatMoney(order.total_amount_minor, order.currency) }}
-            p.account-note Доставок после разделения: {{ shipments.length }}
-            button.primary-button(type="submit" :disabled="submitPending") Оформить заказ
+            p.account-note {{ order.items.reduce((total, item) => total + item.quantity, 0) }} товаров, доставок после разделения: {{ shipments.length }}
+            button.primary-button(type="submit" :disabled="submitPending") Подтвердить заказ
             p.checkout-message(v-if="submitMessage") {{ submitMessage }}
             p.form-error(v-if="submitError") {{ submitError }}
+
+    footer.market-footer
+        NuxtLink.market-logo(to="/")
+            span.brand-mark SF
+            span
+                b StockFlow
+                small market
+        p Безопасное оформление заказа с выбором доставки и оплаты.
+        NuxtLink(to="/cart/") Вернуться в корзину
 </template>

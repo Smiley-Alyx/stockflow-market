@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const customer = useCustomerState();
+const searchInput = ref('');
 const checkoutPending = ref(false);
 const checkoutError = ref('');
 
@@ -14,6 +15,15 @@ const toggleAll = (event: Event) => {
 
 const toggleItem = (productId: number, event: Event) => {
     customer.selectCartItem(productId, (event.target as HTMLInputElement).checked);
+};
+
+const submitSearch = () => {
+    const query = searchInput.value.trim();
+
+    navigateTo({
+        path: '/search/',
+        query: query ? { q: query } : {},
+    });
 };
 
 const checkout = async (selectedOnly: boolean) => {
@@ -52,24 +62,55 @@ useHead({
 </script>
 
 <template lang="pug">
-main.shell.cart-shell
-    header.cart-header
-        NuxtLink.brand(to="/")
-            span.brand-mark SF
-            span StockFlow Market
-        NuxtLink.back-link(to="/") Вернуться в каталог
+main.market-page-shell
+    header.market-header
+        .header-main
+            NuxtLink.market-logo(to="/")
+                span.brand-mark SF
+                span
+                    b StockFlow
+                    small market
+            form.market-search(@submit.prevent="submitSearch")
+                input(
+                    v-model="searchInput"
+                    type="search"
+                    name="q"
+                    placeholder="Найти товары, бренды и категории"
+                    aria-label="Поиск по каталогу"
+                )
+                button(type="submit") Найти
+            nav.header-actions(aria-label="Быстрые действия")
+                NuxtLink.action-link(to="/favorites/")
+                    span.action-icon ♡
+                    span
+                        small Избранное
+                        b {{ customer.favoriteCount }}
+                NuxtLink.action-link(to="/cart/")
+                    span.action-icon ◼
+                    span
+                        small Корзина
+                        b {{ customer.cartCount }}
+        nav.category-nav(aria-label="Разделы магазина")
+            NuxtLink.category-nav-all(to="/catalog/") Все категории
+            NuxtLink(to="/catalog/") Каталог
+            NuxtLink(to="/favorites/") Избранное
 
-    section.cart-title
+    section.catalog-breadcrumbs(aria-label="Хлебные крошки")
+        NuxtLink(to="/") Главная
+        span /
+        span Корзина
+
+    section.market-page-heading
         div
             p.eyebrow Оформление заказа
             h1 Корзина
-            p.lede Выберите нужные товары или оформите заказ целиком.
+            p Проверьте количество товаров и выберите позиции для покупки.
         span.cart-mode {{ customer.user.value ? 'Корзина аккаунта' : 'Гостевая корзина' }}
 
-    section.cart-layout
+    section.cart-layout.market-page-content
         article.panel.cart-items-panel
             .panel-heading
-                h2 Товары
+                h2 Товары в корзине
                 span {{ cart.summary.items_count }} шт.
 
             label.select-all(v-if="cart.items.length")
@@ -84,11 +125,11 @@ main.shell.cart-shell
                         :aria-label="`Выбрать ${item.product_name}`"
                         @change="toggleItem(item.product_id, $event)"
                     )
-                    .cart-product-image
+                    NuxtLink.cart-product-image(:to="`/catalog/${item.slug}/`")
                         img(v-if="item.image_url" :src="item.image_url" :alt="item.product_name")
                         span(v-else) SF
                     .cart-product-copy
-                        strong {{ item.product_name }}
+                        NuxtLink.cart-product-name(:to="`/catalog/${item.slug}/`") {{ item.product_name }}
                         code {{ item.sku }}
                         b(v-if="item.price") {{ formatMoney(item.price.amount_minor, item.price.currency) }}
                         small(v-else) Цена не указана
@@ -98,11 +139,14 @@ main.shell.cart-shell
                         button(type="button" @click="customer.setCartItem(item, item.quantity + 1)") +
                     button.cart-remove(type="button" @click="customer.removeCartItem(item.product_id)") Убрать
 
-            p.empty-state(v-else) Корзина пока пуста. Добавьте товары из каталога.
+            .market-empty-state(v-else)
+                strong Корзина пока пуста
+                p Добавьте товары из каталога, чтобы оформить доставку.
+                NuxtLink.hero-primary(to="/catalog/") Перейти в каталог
 
             template(v-if="cart.removed_items.length")
                 .removed-heading
-                    h2 Удалённые товары
+                    h2 Недавно удалённые
                     span Можно восстановить
                 ul.removed-list
                     li(v-for="item in cart.removed_items" :key="item.product_id")
@@ -111,26 +155,47 @@ main.shell.cart-shell
                             code {{ item.sku }}
                         button(type="button" @click="customer.restoreCartItem(item.product_id)") Восстановить
 
-        aside.panel.cart-summary-panel
-            .panel-heading
-                h2 Итого
-                span {{ cart.summary.selected_items_count }} шт. выбрано
-            dl.cart-totals
-                dt Все товары
-                dd {{ formatMoney(cart.summary.amount_minor, cart.summary.currency) }}
-                dt Выбрано
-                dd {{ formatMoney(cart.summary.selected_amount_minor, cart.summary.currency) }}
-            button.primary-button(
-                type="button"
-                :disabled="checkoutPending || cart.summary.selected_items_count === 0"
-                @click="checkout(true)"
-            ) Купить выбранное
-            button.secondary-button(
-                type="button"
-                :disabled="checkoutPending || cart.items.length === 0"
-                @click="checkout(false)"
-            ) Купить всё
-            p.account-note(v-if="!customer.user.value")
-                | Корзина сохранена в этом браузере. После входа товары будут перенесены в аккаунт.
-            p.form-error(v-if="checkoutError") {{ checkoutError }}
+        aside.cart-side-column
+            section.panel.cart-summary-panel
+                .panel-heading
+                    h2 Ваш заказ
+                    span {{ cart.summary.selected_items_count }} шт. выбрано
+                dl.cart-totals
+                    dt Все товары
+                    dd {{ formatMoney(cart.summary.amount_minor, cart.summary.currency) }}
+                    dt К оплате
+                    dd {{ formatMoney(cart.summary.selected_amount_minor, cart.summary.currency) }}
+                button.primary-button(
+                    type="button"
+                    :disabled="checkoutPending || cart.summary.selected_items_count === 0"
+                    @click="checkout(true)"
+                ) Перейти к оформлению
+                button.secondary-button(
+                    type="button"
+                    :disabled="checkoutPending || cart.items.length === 0"
+                    @click="checkout(false)"
+                ) Оформить все товары
+                p.account-note(v-if="!customer.user.value")
+                    | Корзина сохранена в этом браузере. После входа товары будут перенесены в аккаунт.
+                p.form-error(v-if="checkoutError") {{ checkoutError }}
+
+            section.cart-benefits
+                article
+                    b 24
+                    span Доставка от 24 часов
+                article
+                    b ✓
+                    span Оплата при оформлении
+                article
+                    b ↺
+                    span Простой возврат
+
+    footer.market-footer
+        NuxtLink.market-logo(to="/")
+            span.brand-mark SF
+            span
+                b StockFlow
+                small market
+        p Товары для дома, работы и отдыха с актуальными остатками на складах.
+        NuxtLink(to="/catalog/") Вернуться в каталог
 </template>
