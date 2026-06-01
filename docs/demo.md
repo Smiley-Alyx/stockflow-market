@@ -77,7 +77,7 @@ curl -s -X POST http://localhost:8083/debug/failure-mode \
 - market provider saga публикует requests через outbox relay и дедуплицирует
   outcomes через inbox;
 - следующий инженерный этап — автоматизированный broker-level E2E тест,
-  outcome DLQ policy и операционные метрики saga.
+  операторский requeue outcome DLQ и операционные метрики saga.
 
 Это важная граница: compose запускает всю экосистему и market-orchestrator, но
 broker-level E2E сценарий пока проверяется вручную через checkout API.

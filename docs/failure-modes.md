@@ -20,7 +20,7 @@
 | --- | --- | --- | --- | --- |
 | At-least-once delivery | Да, durable queue + retry | Да, durable queue + retry | Да, durable queue + retry | Да, durable outcomes queue + requeue |
 | Idempotency | Да, in-memory store | Да, domain records + published event store | Да, in-memory records + published event store | Да, inbox по `message_id` и idempotent saga transitions |
-| DLQ | Да, отдельные DLQ по reservation flow | Да, `stockflow.payment.requests.dlq` | Да, `stockflow.delivery.requests.dlq` | Search DLQ есть; provider DLQ consumer policy планируется |
+| DLQ | Да, отдельные DLQ по reservation flow | Да, `stockflow.payment.requests.dlq` | Да, `stockflow.delivery.requests.dlq` | Да, `stockflow.market.provider.outcomes.dlq` для provider outcomes |
 | Retry | TTL retry queues, по умолчанию 3 попытки | Retry queue, по умолчанию 3 попытки | Retry queue, по умолчанию 3 попытки | Да, outbox relay с backoff и stale claim recovery |
 | Correlation tracing | `correlation_id`, `causation_id` | `correlation_id`, `causation_id` | `correlation_id`, `causation_id` | Да, один `correlation_id` на saga |
 

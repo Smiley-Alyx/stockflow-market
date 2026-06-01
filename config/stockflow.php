@@ -86,6 +86,10 @@ return [
             'password' => env('RABBITMQ_PASSWORD', 'secret'),
             'vhost' => env('RABBITMQ_VHOST', '/'),
             'outcomes_queue' => env('STOCKFLOW_PROVIDER_OUTCOMES_QUEUE', 'stockflow.market.provider.outcomes'),
+            'outcomes_retry_queue' => env('STOCKFLOW_PROVIDER_OUTCOMES_RETRY_QUEUE', 'stockflow.market.provider.outcomes.retry'),
+            'outcomes_dead_letter_queue' => env('STOCKFLOW_PROVIDER_OUTCOMES_DLQ', 'stockflow.market.provider.outcomes.dlq'),
+            'outcomes_retry_delay_ms' => (int) env('STOCKFLOW_PROVIDER_OUTCOMES_RETRY_DELAY_MS', 2000),
+            'outcomes_max_retry_count' => (int) env('STOCKFLOW_PROVIDER_OUTCOMES_MAX_RETRY_COUNT', 3),
         ],
     ],
 

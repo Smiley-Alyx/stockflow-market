@@ -4,6 +4,8 @@ namespace App\Infrastructure\Messaging\RabbitMq;
 
 use PhpAmqpLib\Exception\AMQPTimeoutException;
 use PhpAmqpLib\Message\AMQPMessage;
+use PhpAmqpLib\Wire\AMQPTable;
+use Throwable;
 
 class ProviderOutcomeConsumer
 {
@@ -34,15 +36,7 @@ class ProviderOutcomeConsumer
                 exclusive: false,
                 nowait: false,
                 callback: function (AMQPMessage $message): void {
-                    try {
-                        $headers = $message->get('application_headers')->getNativeData();
-                        $payload = json_decode($message->getBody(), true, flags: JSON_THROW_ON_ERROR);
-
-                        $this->processor->process((string) $message->getRoutingKey(), $headers, $payload);
-                        $message->ack();
-                    } catch (\Throwable) {
-                        $message->nack(requeue: true);
-                    }
+                    $this->consumeMessage($message);
                 },
             );
 
@@ -57,6 +51,64 @@ class ProviderOutcomeConsumer
             $channel->close();
             $connection->close();
         }
+    }
+
+    public function consumeMessage(AMQPMessage $message): void
+    {
+        try {
+            $headers = $this->headers($message);
+            $payload = json_decode($message->getBody(), true, flags: JSON_THROW_ON_ERROR);
+
+            $this->processor->process((string) $message->getRoutingKey(), $headers, $payload);
+            $message->ack();
+        } catch (Throwable) {
+            try {
+                $this->retryOrDeadLetter($message);
+                $message->ack();
+            } catch (Throwable) {
+                $message->nack(requeue: true);
+            }
+        }
+    }
+
+    private function retryOrDeadLetter(AMQPMessage $message): void
+    {
+        $headers = $this->headers($message);
+        $retryCount = (int) ($headers['retry_count'] ?? 0);
+        $headers['retry_count'] = $retryCount + 1;
+        $exchange = $retryCount < $this->maxRetryCount()
+            ? $this->topology->retryExchange()
+            : $this->topology->deadLetterExchange();
+
+        $message->getChannel()->basic_publish(
+            new AMQPMessage(
+                $message->getBody(),
+                [
+                    'content_type' => 'application/json',
+                    'delivery_mode' => AMQPMessage::DELIVERY_MODE_PERSISTENT,
+                    'application_headers' => new AMQPTable($headers),
+                ],
+            ),
+            $exchange,
+            (string) $message->getRoutingKey(),
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function headers(AMQPMessage $message): array
+    {
+        if (! $message->has('application_headers')) {
+            return [];
+        }
+
+        return $message->get('application_headers')->getNativeData();
+    }
+
+    private function maxRetryCount(): int
+    {
+        return max(0, (int) config('stockflow.provider_saga.rabbitmq.outcomes_max_retry_count'));
     }
 
     private function registerSignalHandlers(): void
