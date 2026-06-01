@@ -38,8 +38,9 @@ class CheckoutSagaTest extends TestCase
 
         $this->outcome($saga, 'payment.authorization.approved.v1', [
             'authorization_id' => 'auth_demo_001',
-        ]);
-        $this->assertProviderMessage('payment.capture.requested.v1');
+        ], 'msg_demo_auth_001');
+        $captureMessage = $this->assertProviderMessage('payment.capture.requested.v1');
+        $this->assertSame('msg_demo_auth_001', $captureMessage->causation_id);
         $this->assertDatabaseHas('orders_orders', [
             'id' => $order->id,
             'status' => Order::STATUS_CONFIRMED,
