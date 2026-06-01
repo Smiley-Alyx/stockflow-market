@@ -357,6 +357,8 @@ k6 run tests/load/k6/stockflow.js
 
 Сценарии используют `BASE_URL=http://localhost:8080` по умолчанию. Для стабильного прогона на подготовленной базе можно явно передать `RESERVATION_SKU`, `CHECKOUT_PRODUCT_ID` и `SEARCH_QUERIES`; полный список параметров описан в `tests/load/k6/README.md`.
 
+Зафиксированный локальный baseline с условиями запуска, метриками и ограничениями интерпретации: [`tests/load/k6/results/2026-06-01-local-baseline.md`](tests/load/k6/results/2026-06-01-local-baseline.md).
+
 ## Инженерные решения
 
 - Репозиторий остаётся monorepo, пока сервисы находятся в активной фазе проектирования.

@@ -59,3 +59,7 @@ The script expects an already populated catalog. Checkout also needs an active
 price for the selected product, and reservation needs available stock for the
 selected SKU. Reservation conflicts are expected under contention and are
 tracked as a separate metric.
+
+## Performance evidence
+
+- [Local k6 baseline: 2026-06-01](results/2026-06-01-local-baseline.md)
