@@ -70,5 +70,7 @@ class ArchitectureStructureTest extends TestCase
         $this->assertSame(2, substr_count($compose, 'profiles: ["extended"]'));
         $this->assertStringContainsString('CLICKHOUSE_DB: stockflow', $compose);
         $this->assertStringContainsString('clickhouse-data:', $compose);
+        $this->assertStringContainsString('./docker/clickhouse/initdb:/docker-entrypoint-initdb.d:ro', $compose);
+        $this->assertFileExists(base_path('docker/clickhouse/initdb/001_inventory_stock_movements.sql'));
     }
 }

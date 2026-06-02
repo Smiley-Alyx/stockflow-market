@@ -19,6 +19,7 @@ class RuntimeConfigurationTest extends TestCase
         $this->assertFalse(config('stockflow.dependencies.clickhouse.enabled'));
         $this->assertSame(9000, config('stockflow.dependencies.clickhouse.native_port'));
         $this->assertSame('stockflow', config('stockflow.dependencies.clickhouse.database'));
+        $this->assertSame(1000, config('stockflow.analytics.stock_movements.rebuild_batch_size'));
         $this->assertSame(300, config('stockflow.catalog.cache.product_ttl_seconds'));
         $this->assertSame('search-indexing', config('stockflow.search.indexing.queue'));
         $this->assertSame('search-indexing-dead-letter', config('stockflow.search.indexing.dead_letter_queue'));
@@ -43,6 +44,7 @@ class RuntimeConfigurationTest extends TestCase
         $this->assertStringContainsString('CLICKHOUSE_ENABLED=false', $envExample);
         $this->assertStringContainsString('CLICKHOUSE_NATIVE_PORT=', $envExample);
         $this->assertStringContainsString('CLICKHOUSE_DATABASE=', $envExample);
+        $this->assertStringContainsString('STOCKFLOW_ANALYTICS_STOCK_MOVEMENT_REBUILD_BATCH_SIZE=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_SEARCH_INDEX_MAX_IN_FLIGHT=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_SEARCH_INDEX_DEAD_LETTER_QUEUE=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_SEARCH_INDEX_DEAD_LETTER_BACKEND=', $envExample);

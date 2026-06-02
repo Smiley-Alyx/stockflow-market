@@ -76,6 +76,12 @@ return [
         ],
     ],
 
+    'analytics' => [
+        'stock_movements' => [
+            'rebuild_batch_size' => (int) env('STOCKFLOW_ANALYTICS_STOCK_MOVEMENT_REBUILD_BATCH_SIZE', 1000),
+        ],
+    ],
+
     'provider_saga' => [
         'enabled' => (bool) env('STOCKFLOW_PROVIDER_SAGA_ENABLED', false),
         'payment_token' => env('STOCKFLOW_PROVIDER_SAGA_PAYMENT_TOKEN', 'tok_approved_visa'),

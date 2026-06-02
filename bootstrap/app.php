@@ -5,6 +5,7 @@ use App\Console\Commands\ExpireInventoryReservationsCommand;
 use App\Console\Commands\PublishOutboxCommand;
 use App\Console\Commands\RebuildCatalogProjectionsCommand;
 use App\Console\Commands\RebuildSearchIndexCommand;
+use App\Console\Commands\RebuildStockMovementAnalyticsCommand;
 use App\Console\Commands\SearchDeadLetterCommand;
 use App\Http\Middleware\RecordHttpMetrics;
 use Illuminate\Console\Scheduling\Schedule;
@@ -25,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
         PublishOutboxCommand::class,
         RebuildCatalogProjectionsCommand::class,
         RebuildSearchIndexCommand::class,
+        RebuildStockMovementAnalyticsCommand::class,
         SearchDeadLetterCommand::class,
     ])
     ->withSchedule(function (Schedule $schedule): void {

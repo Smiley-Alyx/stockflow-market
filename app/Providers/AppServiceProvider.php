@@ -8,6 +8,7 @@ use App\Domains\Catalog\Events\ProductUpdated;
 use App\Domains\Catalog\Listeners\InvalidateCatalogProductsOnStockChanged;
 use App\Domains\Catalog\Search\CatalogProductSearch;
 use App\Domains\Inventory\Events\StockChanged;
+use App\Domains\Inventory\Listeners\ProjectStockMovementAnalytics;
 use App\Domains\Orders\Events\OrderConfirmationRequested;
 use App\Domains\Orders\Listeners\ReserveInventoryForOrder;
 use App\Domains\Orders\Listeners\StartCheckoutSaga;
@@ -58,6 +59,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(ProductUpdated::class, RequestProductIndexing::class);
         Event::listen(ProductArchived::class, RequestProductIndexDeletion::class);
         Event::listen(StockChanged::class, InvalidateCatalogProductsOnStockChanged::class);
+        Event::listen(StockChanged::class, ProjectStockMovementAnalytics::class);
         Event::listen(OrderConfirmationRequested::class, ReserveInventoryForOrder::class);
         Event::listen(OrderConfirmationRequested::class, StartCheckoutSaga::class);
         Event::listen(SearchIndexRequested::class, DispatchSearchIndexJob::class);
