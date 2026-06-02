@@ -1,35 +1,35 @@
-# k6 load scenarios
+# Нагрузочные сценарии k6
 
-This folder contains scale-oriented k6 scenarios for the public StockFlow API:
+В этой директории собраны k6-сценарии для проверки публичного StockFlow API под нагрузкой:
 
-- mass catalog browsing: product list pages plus product detail reads;
-- concurrent reservation of one SKU: many requests race on the same stock item;
-- search queries: mixed query terms against the search read endpoint;
-- checkout burst: cart item creation, draft order creation, and confirmation spikes.
+- массовый просмотр каталога: страницы списка товаров и чтение карточек;
+- конкурентное резервирование одного SKU: параллельные запросы к одной складской позиции;
+- поисковые запросы: набор разных фраз для search read endpoint;
+- checkout burst: всплески создания позиций корзины, черновиков заказов и подтверждений.
 
-## Run
+## Запуск
 
-Start the local stack and prepare data first:
+Сначала запустите локальный стек и подготовьте данные:
 
 ```bash
 docker compose up -d --build
 docker compose exec php php artisan migrate --force
 ```
 
-Run all scenarios against the local gateway:
+Запустите все сценарии для локального gateway:
 
 ```bash
 k6 run tests/load/k6/stockflow.js
 ```
 
-Or run with Docker when k6 is not installed locally:
+Если k6 не установлен локально, используйте Docker:
 
 ```bash
 docker run --rm --network host -i grafana/k6 run - < tests/load/k6/stockflow.js
 ```
 
-Run with explicit data when the first catalog product is not suitable for checkout
-or reservation:
+Передайте данные явно, если первый товар каталога не подходит для checkout или
+резервирования:
 
 ```bash
 BASE_URL=http://localhost:8080 \
@@ -39,28 +39,29 @@ SEARCH_QUERIES=scanner,wireless,barcode \
 k6 run tests/load/k6/stockflow.js
 ```
 
-## Useful knobs
+## Параметры
 
-| Variable | Default | Purpose |
+| Переменная | Значение по умолчанию | Назначение |
 | --- | ---: | --- |
-| `BASE_URL` | `http://localhost:8080` | API gateway base URL |
-| `CATALOG_VUS` | `40` | Peak VUs for catalog browsing |
-| `CATALOG_PAGES` | `8` | Product list pages to rotate through |
-| `RESERVATION_SKU` | first catalog SKU | SKU used for the reservation race |
-| `RESERVATION_RATE` | `25` | Reservation requests per second |
-| `RESERVATION_QUANTITY` | `1` | Quantity per reservation request |
-| `SEARCH_QUERIES` | `scanner,wireless,market,sku` | Comma-separated search terms |
-| `SEARCH_RATE` | `35` | Peak search requests per second |
-| `CHECKOUT_PRODUCT_ID` | first catalog product | Product used for checkout burst |
-| `CHECKOUT_BURST_RATE` | `30` | Peak checkout starts per second |
-| `CHECKOUT_QUANTITY` | `1` | Quantity per cart item |
+| `BASE_URL` | `http://localhost:8080` | Базовый URL API gateway |
+| `CATALOG_VUS` | `40` | Максимальное количество VUs для просмотра каталога |
+| `CATALOG_PAGES` | `8` | Количество страниц списка товаров для перебора |
+| `RESERVATION_SKU` | первый SKU каталога | SKU для конкурентного резервирования |
+| `RESERVATION_RATE` | `25` | Количество запросов резервирования в секунду |
+| `RESERVATION_QUANTITY` | `1` | Количество единиц товара в одном запросе резервирования |
+| `SEARCH_QUERIES` | `scanner,wireless,market,sku` | Поисковые фразы через запятую |
+| `SEARCH_RATE` | `35` | Максимальное количество поисковых запросов в секунду |
+| `CHECKOUT_PRODUCT_ID` | первый товар каталога | Товар для checkout burst |
+| `CHECKOUT_BURST_RATE` | `30` | Максимальное количество запусков checkout в секунду |
+| `CHECKOUT_QUANTITY` | `1` | Количество единиц товара в позиции корзины |
 
-The script expects an already populated catalog. Checkout also needs an active
-price for the selected product, and reservation needs available stock for the
-selected SKU. Reservation conflicts are expected under contention and are
-tracked as a separate metric.
+Сценарий ожидает уже наполненный каталог. Для checkout также нужна активная цена
+выбранного товара, а для резервирования — доступный остаток выбранного SKU.
+Конфликты резервирования при конкуренции ожидаемы и учитываются отдельной
+метрикой.
 
 ## Данные о производительности
 
 - [Локальный k6 baseline: 2026-06-01](results/2026-06-01-local-baseline.md):
-  профиль, p95, RPS, размер dataset, hardware и ограничения интерпретации.
+  профиль, p95, RPS, размер dataset, аппаратная конфигурация и ограничения
+  интерпретации.

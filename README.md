@@ -1,8 +1,8 @@
 # StockFlow Market
 
-StockFlow Market — инженерный pet-проект маркетплейса с микросервисным направлением вокруг Laravel, PostgreSQL, Redis, RabbitMQ, Elasticsearch, ClickHouse и заготовки Nuxt SSR frontend. Проект развивается как highload-oriented backend case: в нём последовательно прорабатываются каталог, остатки, заказы, цены, поиск, асинхронные события и локальная инфраструктура. Сейчас это фундамент и набор сквозных backend-срезов, а не завершённая production-система или готовый микросервисный маркетплейс.
+StockFlow Market — инженерный pet-проект маркетплейса с микросервисным направлением вокруг Laravel, PostgreSQL, Redis, RabbitMQ, Elasticsearch, ClickHouse и Nuxt SSR frontend. Проект развивается как backend-case с акцентом на высокую нагрузку: в нём последовательно прорабатываются каталог, остатки, заказы, цены, поиск, асинхронные события и локальная инфраструктура. Сейчас это фундамент и набор сквозных backend-срезов, а не завершённая production-система или готовый микросервисный маркетплейс.
 
-## What this demonstrates for employers
+## Что демонстрирует проект
 
 - Умение провести бизнес-сценарий checkout через границы четырёх независимо
   запускаемых систем: market-orchestrator, ERP/WMS, payment и delivery provider
@@ -13,9 +13,9 @@ StockFlow Market — инженерный pet-проект маркетплей�
 - Разделение хранилищ по назначению: PostgreSQL для транзакций, Redis для кеша
   и очередей, Elasticsearch для поиска, ClickHouse для аналитической витрины
   складских движений.
-- Production-подобную эксплуатационную поверхность: readiness probes,
+- Приближенную к production эксплуатационную поверхность: readiness probes,
   Prometheus-метрики, Grafana dashboard, fault injection, DLQ-runbook,
-  воспроизводимый broker-level E2E и k6 regression baseline.
+  воспроизводимый broker-level E2E и регрессионный baseline k6.
 - Осознанные ограничения: это локальный Docker Compose стенд и инженерный case,
   а не заявление о production capacity или exactly-once обработке.
 
@@ -23,9 +23,9 @@ StockFlow Market — инженерный pet-проект маркетплей�
 
 | Измерение | Результат | Контекст |
 | --- | ---: | --- |
-| HTTP throughput | `50.52 req/s` | k6 mixed profile: catalog browse, reservation race, search и checkout burst |
+| HTTP throughput | `50.52 req/s` | Смешанный профиль k6: catalog browse, reservation race, search и checkout burst |
 | Request duration p95 | `8.17s` | Точка насыщения одиночного локального gateway; порог `750ms` нарушен |
-| Нагрузочный dataset | `1` товар, `1` retail price, `100000` единиц остатка, `4` search queries | Явно подготовленный минимальный dataset; catalog browse использовал диапазон `8` страниц по `20` товаров |
+| Нагрузочный dataset | `1` товар, `1` retail price, `100000` единиц остатка, `4` search queries | Явно подготовленный минимальный dataset; catalog browse использовал диапазон из `8` страниц по `20` товаров |
 | Максимум активных VUs | `409` из `410` | Локальный k6 baseline от `2026-06-01` |
 | Provider saga queue drain | `0–1s` | Три успешных broker-level E2E-прогона от confirm до `completed`, по timestamp PostgreSQL с точностью до секунды |
 
@@ -36,19 +36,19 @@ StockFlow Market — инженерный pet-проект маркетплей�
 прогретых прогонов попал в `stockflow.payment.requests.dlq`, поэтому sandbox-
 контур сохраняет отдельный операционный сценарий диагностики и requeue.
 
-## Guarantees and trade-offs
+## Гарантии и компромиссы
 
 | Механизм | Что гарантируется | Цена и граница гарантии |
 | --- | --- | --- |
-| At-least-once delivery | Durable RabbitMQ queues, retry queues и publisher confirms повторно доставляют provider requests и outcomes до успешной обработки или DLQ | Exactly-once не обещается: consumers обязаны выдерживать дубликаты |
-| Idempotency | Market дедуплицирует outcomes через inbox по `message_id`, saga transitions идемпотентны; provider sandbox-сервисы защищают повторные side effects | Нужны стабильные idempotency keys, хранение обработанных сообщений и политика очистки |
+| At-least-once delivery | Durable RabbitMQ queues, retry queues и publisher confirms повторно доставляют provider requests и outcomes до успешной обработки или попадания в DLQ | Exactly-once не обещается: consumers обязаны выдерживать дубликаты |
+| Idempotency | Market дедуплицирует outcomes через inbox по `message_id`, переходы saga идемпотентны; provider sandbox-сервисы защищают повторные side effects | Нужны стабильные idempotency keys, хранение обработанных сообщений и политика очистки |
 | Eventual consistency | Confirm быстро переводит заказ в промежуточное состояние, а workers доводят reserve, authorize, capture и shipment асинхронно | Клиент должен учитывать промежуточные статусы; мгновенной согласованности между сервисами нет |
 | Compensation | При сбое saga запускает release, refund и shipment cancel в зависимости от уже выполненных шагов | Компенсация является отдельной распределённой операцией и тоже может потребовать retry или ручного разбора |
-| DLQ | Отдельные DLQ сохраняют необработанные provider requests, outcomes и документы поисковой индексации для диагностики и ограниченного requeue | DLQ не исправляет причину сбоя автоматически: нужен runbook и операторское решение |
+| DLQ | Отдельные DLQ сохраняют необработанные provider requests, outcomes и документы поисковой индексации для диагностики и контролируемого requeue | DLQ не исправляет причину сбоя автоматически: нужен runbook и операторское решение |
 
 ## Экосистема StockFlow
 
-`stockflow-market` — основной репозиторий и landing page экосистемы. Вокруг него
+`stockflow-market` — основной репозиторий и точка входа в экосистему. Вокруг него
 подготовлены три независимых sandbox-сервиса для интеграции через RabbitMQ:
 
 | Репозиторий | RabbitMQ exchange | Ответственность |
@@ -75,9 +75,9 @@ inbox и выполняет компенсации release, refund и shipment c
 
 | Документ | Содержание |
 | --- | --- |
-| [`docs/architecture.md`](docs/architecture.md) | Контекст четырёх систем, границы интеграции и trade-offs |
-| [`docs/delivery-flow.md`](docs/delivery-flow.md) | Сквозной checkout sequence и компенсирующие действия |
-| [`docs/failure-modes.md`](docs/failure-modes.md) | Failure scenarios и таблица гарантий |
+| [`docs/architecture.md`](docs/architecture.md) | Контекст четырёх систем, границы интеграции и компромиссы |
+| [`docs/delivery-flow.md`](docs/delivery-flow.md) | Сквозная checkout-последовательность и компенсирующие действия |
+| [`docs/failure-modes.md`](docs/failure-modes.md) | Сценарии отказов и таблица гарантий |
 | [`docs/provider-outcome-dlq-runbook.md`](docs/provider-outcome-dlq-runbook.md) | Поиск, диагностика и requeue provider outcome DLQ |
 | [`docs/demo.md`](docs/demo.md) | Пятиминутный сценарий демонстрации техлиду |
 
@@ -162,11 +162,11 @@ flowchart LR
     grafana["Grafana"] --> prometheus
 
     subgraph extended["Опциональный профиль extended"]
-        rabbitmq["RabbitMQ<br/>будущий event transport"]
+        rabbitmq["RabbitMQ<br/>provider saga transport"]
         clickhouse[("ClickHouse<br/>аналитика складских движений")]
     end
 
-    outbox -. "планируемый transport" .-> rabbitmq
+    outbox -. "provider requests / outcomes" .-> rabbitmq
     outbox -- "inventory.stock.changed" --> clickhouse
 ```
 
@@ -206,7 +206,7 @@ stockflow-market/
 | `elasticsearch` | поисковый движок | базовый | `http://localhost:9200` |
 | `prometheus` | сбор метрик gateway | базовый | `http://localhost:9090` |
 | `grafana` | дашборды наблюдаемости | базовый | `http://localhost:3001` |
-| `rabbitmq` | transport provider saga и будущих доменных событий | `extended` | `localhost:5672`, UI `http://localhost:15672` |
+| `rabbitmq` | transport для provider saga и будущих доменных событий | `extended` | `localhost:5672`, UI `http://localhost:15672` |
 | `clickhouse` | аналитическая витрина складских движений | `extended` | HTTP `http://localhost:8123`, native `localhost:9000` |
 
 ## Сценарии инфраструктуры
@@ -313,7 +313,7 @@ docker compose down
 
 `composer test` запускает локальный PHP, если есть подходящий PDO-драйвер. При наличии `pdo_sqlite` используется in-memory SQLite; если локально доступен только `pdo_pgsql`, тесты переключаются на PostgreSQL с дефолтными локальными кредами `stockflow / secret`. Если локальный PHP не подходит, wrapper запускает suite внутри `docker compose run php`.
 
-`composer install-git-hooks` включает проектные git hooks и шаблон commit message. Commit message обязан соответствовать conventional commits в формате `type(scope): subject`, где `scope` обязателен и пишется в kebab-case.
+`composer install-git-hooks` включает проектные git hooks и шаблон commit message. Сообщение коммита обязано соответствовать Conventional Commits в формате `type(scope): subject`, где `scope` обязателен и пишется в kebab-case.
 
 Примеры:
 
@@ -324,9 +324,9 @@ docker compose down
 - `docs(adr): describe event-driven matching architecture`
 - `infra(observability): add prometheus and grafana stack`
 
-## Runtime-настройки
+## Настройки runtime
 
-Проектные highload-oriented настройки собраны в `config/stockflow.php`, чтобы прикладной код не хардкодил операционные лимиты. Значения переопределяются через `STOCKFLOW_*` переменные в `.env`.
+Настройки для сценариев высокой нагрузки собраны в `config/stockflow.php`, чтобы прикладной код не хардкодил операционные лимиты. Значения переопределяются через переменные `STOCKFLOW_*` в `.env`.
 
 | Группа | Назначение |
 | --- | --- |
@@ -360,7 +360,7 @@ curl http://localhost:8080/metrics
 
 Dashboard содержит панели для p95 latency по endpoint, глубины очередей, dead-letter count, reservation conflicts rate и Elasticsearch indexing failures rate. Эти метрики покрывают текущий async pipeline и дают базу для будущих alert rules по росту dead-letter, очередей и latency.
 
-### Screenshots локального стенда
+### Снимки экрана локального стенда
 
 Grafana dashboard `StockFlow Observability` после запуска локального стенда:
 
@@ -370,7 +370,7 @@ RabbitMQ Management UI с основными, retry и DLQ-очередями pr
 
 ![RabbitMQ Management UI с очередями provider saga](docs/screenshots/rabbitmq-management-queues.png)
 
-## Search dead-letter операции
+## Операции с search dead-letter
 
 Документы, которые не удалось проиндексировать после retry-порога, сохраняются в Redis-backed dead-letter хранилище. Это приближает локальный контур к production-подобному операционному сценарию, но не заменяет проверку под реальной нагрузкой и отказами. По умолчанию используется ключ `stockflow:search:dead-letter`; CLI-контракт остаётся прежним: оператор работает с числовым `ID`, фильтрами и теми же action `list` / `requeue`.
 
@@ -405,7 +405,7 @@ php artisan search:dead-letter requeue --all --index=catalog_products --batch-si
 - `--index` и `--document-id` сужают выборку перед requeue;
 - каждый реально возвращённый документ пишет структурированное audit-событие `search.dead_letter.requeued` в канал `STOCKFLOW_SEARCH_REQUEUE_AUDIT_CHANNEL`, чтобы его можно было отдельно направлять в SIEM.
 
-## Inventory reservation expiry
+## Истечение inventory-резервов
 
 Активные резервы остатков истекают через scheduled job. В локальном Docker Compose за это отвечает сервис `scheduler`, который запускает Laravel scheduler через `php artisan schedule:work`. Scheduler каждую минуту выполняет:
 
@@ -439,7 +439,7 @@ k6 run tests/load/k6/stockflow.js
 
 Зафиксированный локальный baseline с условиями запуска, метриками и ограничениями интерпретации: [`tests/load/k6/results/2026-06-01-local-baseline.md`](tests/load/k6/results/2026-06-01-local-baseline.md).
 
-Краткая сводка performance evidence для ревизии `16bba09`:
+Краткая сводка результатов нагрузочной проверки для ревизии `16bba09`:
 
 | Параметр | Значение |
 | --- | --- |
@@ -447,7 +447,7 @@ k6 run tests/load/k6/stockflow.js
 | HTTP throughput | `50.52 req/s` |
 | Request duration p95 | `8.17s` |
 | Подготовленный dataset | `1` товар, `1` retail price, `100000` единиц остатка, `4` search queries |
-| Hardware | AMD Ryzen 5 5500U, `6` ядер / `12` потоков, `15.0 GiB` RAM |
+| Аппаратная конфигурация | AMD Ryzen 5 5500U, `6` ядер / `12` потоков, `15.0 GiB` RAM |
 
 Это точка насыщения локального Docker Compose стенда, а не оценка production
 capacity. Полный профиль, нарушенные пороги и ограничения dataset описаны в
@@ -460,7 +460,7 @@ baseline.
 - Runtime-настройки зафиксированы в `docs/adr/0002-runtime-configuration-boundaries.md`.
 - PostgreSQL выбран как основное хранилище для транзакционных данных.
 - Redis используется для кеша, сессий и быстрых очередей локального контура.
-- RabbitMQ зарезервирован под доменные события между сервисами.
+- RabbitMQ используется для provider saga и остаётся целевым transport для доменных событий между сервисами.
 - Elasticsearch выделен под поисковые read-модели и индексацию каталога.
 - ClickHouse хранит аналитическую витрину складских движений и остаётся основой для следующих событийных витрин.
 - Контракты сервисов описываются до реализации публичных API.
