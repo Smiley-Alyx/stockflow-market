@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'frontend_url' => env('STOCKFLOW_FRONTEND_URL', 'http://localhost:3000'),
+
     'seed' => [
         'search_index' => (bool) env('STOCKFLOW_SEED_SEARCH_INDEX', true),
     ],
