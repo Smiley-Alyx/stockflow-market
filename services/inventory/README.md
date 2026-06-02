@@ -17,6 +17,20 @@
 
 Retention выполняет команда `inventory:stock-movements:archive`: она пачками переносит движения старше `STOCKFLOW_STOCK_MOVEMENT_RETENTION_DAYS` в `inventory_stock_movement_archives` и удаляет их из горячей таблицы. Размер транзакционной пачки задаётся `STOCKFLOW_STOCK_MOVEMENT_ARCHIVE_BATCH_SIZE`; `--dry-run` показывает объём без переноса. Для PostgreSQL прод-кластера эта же граница retention является естественным ключом месячных range-partitions по `occurred_at`: горячие партиции остаются в основной таблице, закрытые месяцы можно detach/drop после архивации.
 
+## Аналитическая витрина
+
+При `CLICKHOUSE_ENABLED=true` outbox-обработчик проецирует события
+`inventory.stock.changed` в ClickHouse-таблицу `inventory_stock_movements`.
+Consumer использует общий inbox, поэтому повторная доставка одного события не
+создаёт повторную вставку. Таблица партиционирована по месяцу `occurred_at` и
+хранит идентификаторы товара, склада и движения вместе с типом и количеством
+изменения.
+
+Команда `analytics:stock-movements:rebuild` создаёт таблицу при необходимости,
+очищает витрину и восстанавливает её из горячего журнала и
+`inventory_stock_movement_archives`. Размер HTTP-пачки задаётся
+`STOCKFLOW_ANALYTICS_STOCK_MOVEMENT_REBUILD_BATCH_SIZE`.
+
 ## Зоны
 
 - `contracts/` — HTTP/API-контракты сервиса.

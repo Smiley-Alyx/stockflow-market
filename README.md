@@ -55,7 +55,7 @@ inbox и выполняет компенсации release, refund и shipment c
 - добавлены `health/live` и `health/ready` probes для runtime и зависимостей;
 - подключён Elasticsearch adapter для записи поисковых документов;
 - добавлен первый search read endpoint поверх Elasticsearch для индексированных товаров;
-- добавлен локальный ClickHouse для будущих аналитических read-моделей и событийных витрин;
+- добавлен локальный ClickHouse с аналитической витриной складских движений;
 - реализован checkout-срез `cart → draft order → price snapshot → async inventory reservation → paid / cancelled / expired`;
 - добавлена provider saga `reserve → authorize → capture → shipment` с outbox relay, inbox-дедупликацией и компенсациями;
 - добавлены маршрутизация резервов по складам, архивирование складских движений и географический фильтр остатков;
@@ -118,11 +118,11 @@ flowchart LR
 
     subgraph extended["Опциональный профиль extended"]
         rabbitmq["RabbitMQ<br/>будущий event transport"]
-        clickhouse[("ClickHouse<br/>будущие аналитические витрины")]
+        clickhouse[("ClickHouse<br/>аналитика складских движений")]
     end
 
     outbox -. "планируемый transport" .-> rabbitmq
-    rabbitmq -. "планируемые аналитические события" .-> clickhouse
+    outbox -- "inventory.stock.changed" --> clickhouse
 ```
 
 ```text
@@ -150,7 +150,7 @@ stockflow-market/
 
 ## Локальная инфраструктура
 
-Базовый `docker compose up` поднимает только компоненты, для которых уже есть демонстрируемые сценарии. RabbitMQ и ClickHouse вынесены в опциональный профиль `extended`: они нужны для дальнейшего развития межсервисных событий и аналитических витрин, но пока не являются обязательными зависимостями рабочего backend-среза.
+Базовый `docker compose up` поднимает только обязательные компоненты. RabbitMQ и ClickHouse вынесены в опциональный профиль `extended`: они добавляют provider saga и аналитическую витрину складских движений, но не являются обязательными зависимостями рабочего backend-среза.
 
 | Сервис | Назначение | Режим запуска | Локальный адрес |
 | --- | --- | --- | --- |
@@ -162,7 +162,7 @@ stockflow-market/
 | `prometheus` | сбор метрик gateway | базовый | `http://localhost:9090` |
 | `grafana` | дашборды наблюдаемости | базовый | `http://localhost:3001` |
 | `rabbitmq` | transport provider saga и будущих доменных событий | `extended` | `localhost:5672`, UI `http://localhost:15672` |
-| `clickhouse` | будущие аналитические витрины | `extended` | HTTP `http://localhost:8123`, native `localhost:9000` |
+| `clickhouse` | аналитическая витрина складских движений | `extended` | HTTP `http://localhost:8123`, native `localhost:9000` |
 
 ## Сценарии инфраструктуры
 
@@ -174,7 +174,7 @@ stockflow-market/
 | Prometheus | scrape `/metrics` с latency, очередями, конфликтами резервов и ошибками индексации | используется |
 | Grafana | автоматически provisioned dashboard `StockFlow Observability` поверх Prometheus | используется |
 | RabbitMQ | provider outbox relay, outcome consumer и circuit breaker; открытый circuit оставляет события в outbox | профиль `extended`, используется provider saga |
-| ClickHouse | опциональная readiness-проверка и локальное хранилище для будущих аналитических read-моделей | профиль `extended`, проекция ещё не реализована |
+| ClickHouse | витрина `inventory_stock_movements`, заполняемая из outbox-событий с inbox-защитой от повторной доставки | профиль `extended`, используется |
 
 Расширенный профиль запускается явно:
 
@@ -183,6 +183,15 @@ RABBITMQ_ENABLED=true CLICKHOUSE_ENABLED=true docker compose --profile extended 
 ```
 
 Backend использует in-process публикацию общих доменных outbox-событий по умолчанию. Переменная `STOCKFLOW_EVENT_BUS=rabbitmq` пока включает для них только circuit-breaker границу для тестирования поведения outbox при недоступности будущего transport, но не отправляет эти сообщения в RabbitMQ. Provider saga использует отдельный RabbitMQ transport для request-событий и outcomes.
+
+При включённом `CLICKHOUSE_ENABLED=true` обработчик `inventory.stock.changed`
+проецирует каждое складское движение в ClickHouse. Для первоначального
+наполнения или полного восстановления витрины из горячего журнала и PostgreSQL-
+архива используется команда:
+
+```bash
+docker compose exec php php artisan analytics:stock-movements:rebuild
+```
 
 Все четыре репозитория можно поднять на одном RabbitMQ одной командой:
 
@@ -406,7 +415,7 @@ baseline.
 - Redis используется для кеша, сессий и быстрых очередей локального контура.
 - RabbitMQ зарезервирован под доменные события между сервисами.
 - Elasticsearch выделен под поисковые read-модели и индексацию каталога.
-- ClickHouse выделен под будущие аналитические read-модели и событийные витрины.
+- ClickHouse хранит аналитическую витрину складских движений и остаётся основой для следующих событийных витрин.
 - Контракты сервисов описываются до реализации публичных API.
 
 ## Ближайший план
