@@ -52,9 +52,9 @@ docker compose -f "$COMPOSE_FILE" exec -T php php artisan db:seed --force
 docker compose -f "$COMPOSE_FILE" restart domain-outbox-worker provider-outbox-worker provider-outcome-worker
 
 wait_for_url "Market gateway" "http://localhost:8080/health/ready"
-wait_for_url "Payment mock" "http://localhost:8081/health"
-wait_for_url "Delivery mock" "http://localhost:8082/health"
-wait_for_url "ERP mock" "http://localhost:8083/health"
+wait_for_url "Payment sandbox" "http://localhost:8081/health"
+wait_for_url "Delivery sandbox" "http://localhost:8082/health"
+wait_for_url "ERP sandbox" "http://localhost:8083/health"
 
 for service in queue-worker search-index-worker scheduler domain-outbox-worker provider-outbox-worker provider-outcome-worker payment-mock-worker delivery-mock-worker; do
     assert_service_running "$service"
@@ -65,9 +65,9 @@ cat <<'EOF'
 Стенд готов.
 
 Market gateway: http://localhost:8080
-Payment mock:   http://localhost:8081
-Delivery mock:  http://localhost:8082
-ERP mock:       http://localhost:8083
+Payment sandbox:  http://localhost:8081
+Delivery sandbox: http://localhost:8082
+ERP sandbox:      http://localhost:8083
 RabbitMQ UI:    http://localhost:15672 (stockflow / stockflow)
 
 План пятиминутного показа: docs/demo.md

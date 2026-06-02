@@ -57,8 +57,8 @@ docker compose -f "$COMPOSE_FILE" up -d --build \
     delivery-mock-worker
 
 wait_for_url "Market gateway" "http://localhost:8080/health/ready"
-wait_for_url "Payment mock" "http://localhost:8081/health"
-wait_for_url "Delivery mock" "http://localhost:8082/health"
-wait_for_url "ERP mock" "http://localhost:8083/health"
+wait_for_url "Payment sandbox" "http://localhost:8081/health"
+wait_for_url "Delivery sandbox" "http://localhost:8082/health"
+wait_for_url "ERP sandbox" "http://localhost:8083/health"
 
 "$ROOT_DIR/scripts/test-provider-saga-e2e.sh"

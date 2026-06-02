@@ -32,7 +32,8 @@ flowchart TB
 
 ## Текущее состояние интеграции
 
-Моки готовы к автономному запуску и ручному контрактному тестированию через общий
+Provider sandbox-сервисы готовы к автономному запуску и ручному контрактному
+тестированию через общий
 RabbitMQ. Они объявляют topic exchanges, входящие очереди, retry queues и DLQ.
 
 В `stockflow-market` реализованы draft order, price snapshot, checkout
@@ -45,7 +46,7 @@ relay и потребляет outcomes через inbox-дедупликацию
 | Уровень | Что работает сейчас |
 | --- | --- |
 | Marketplace slice | HTTP checkout и внутренний order/inventory lifecycle |
-| Provider sandbox | RabbitMQ-контракты, retries, DLQ, idempotency и failure injection в каждом моке |
+| Provider sandbox | RabbitMQ-контракты, retries, DLQ, idempotency и failure injection в каждом sandbox-сервисе |
 | End-to-end orchestration | Реализованы market publisher, outcome consumer, saga state и компенсации |
 
 ## Целевая оркестрация checkout
@@ -67,7 +68,7 @@ Marketplace хранит saga state по `order_id` и выполняет шаг
 ## Общий message envelope
 
 Границы используют одинаковую идею трассировки, хотя точный JSON envelope
-зафиксирован в контракте каждого мока:
+зафиксирован в контракте каждого sandbox-сервиса:
 
 | Поле | Назначение |
 | --- | --- |
@@ -81,14 +82,14 @@ Marketplace хранит saga state по `order_id` и выполняет шаг
 ## Локальный deployment
 
 [`docker-compose-all.yml`](../docker-compose-all.yml) поднимает market,
-инфраструктуру и три мока на одном broker:
+инфраструктуру и три provider sandbox-сервиса на одном broker:
 
 | Компонент | Адрес |
 | --- | --- |
 | Market gateway | `http://localhost:8080` |
-| Payment mock | `http://localhost:8081` |
-| Delivery mock | `http://localhost:8082` |
-| ERP mock | `http://localhost:8083` |
+| Payment sandbox | `http://localhost:8081` |
+| Delivery sandbox | `http://localhost:8082` |
+| ERP sandbox | `http://localhost:8083` |
 | RabbitMQ UI | `http://localhost:15672` |
 
 ERP использует `8083` только в общем стенде: в собственном compose репозитория он
@@ -98,11 +99,11 @@ ERP использует `8083` только в общем стенде: в со
 
 | Решение | Плюсы | Ограничения |
 | --- | --- | --- |
-| Независимые mock-репозитории | Видны реальные provider boundaries и отдельные контракты | Нужна синхронизация версий контрактов |
+| Независимые provider sandbox-репозитории | Видны реальные provider boundaries и отдельные контракты | Нужна синхронизация версий контрактов |
 | RabbitMQ topic exchanges | Явные routing keys, broker-native retry/DLQ | Требуется consumer idempotency и операционная работа с DLQ |
 | Saga orchestration в market | Проще видеть бизнес-порядок checkout | Market хранит orchestration state и компенсации |
 | In-memory state в ERP и delivery | Быстрые локальные демо и fault injection | State теряется при рестарте, multi-instance режим не поддержан |
-| SQLite state в payment mock | Повторяемый локальный ledger без отдельной БД | Не моделирует production-конкурентность PostgreSQL |
+| SQLite state в payment sandbox | Повторяемый локальный ledger без отдельной БД | Не моделирует production-конкурентность PostgreSQL |
 
 ## Следующий этап реализации
 

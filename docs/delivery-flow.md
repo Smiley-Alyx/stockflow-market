@@ -64,7 +64,7 @@ flowchart TD
   market освобождает inventory;
 - refund используется только после успешного capture.
 
-Текущий sandbox payment mock освобождает hold при capture failure, но не
+Текущий payment sandbox освобождает hold при capture failure, но не
 моделирует фоновое истечение `15 минут`. Это упрощение sandbox, а не открытый
 выбор протокола: production PSP boundary должен гарантировать TTL
 не captured authorization.

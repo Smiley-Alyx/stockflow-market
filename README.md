@@ -2,6 +2,50 @@
 
 StockFlow Market — инженерный pet-проект маркетплейса с микросервисным направлением вокруг Laravel, PostgreSQL, Redis, RabbitMQ, Elasticsearch, ClickHouse и заготовки Nuxt SSR frontend. Проект развивается как highload-oriented backend case: в нём последовательно прорабатываются каталог, остатки, заказы, цены, поиск, асинхронные события и локальная инфраструктура. Сейчас это фундамент и набор сквозных backend-срезов, а не завершённая production-система или готовый микросервисный маркетплейс.
 
+## What this demonstrates for employers
+
+- Умение провести бизнес-сценарий checkout через границы четырёх независимо
+  запускаемых систем: market-orchestrator, ERP/WMS, payment и delivery provider
+  sandbox.
+- Практическую работу с transactional outbox, inbox-дедупликацией,
+  at-least-once delivery, retry queues, DLQ, ручным requeue и saga-
+  компенсациями.
+- Разделение хранилищ по назначению: PostgreSQL для транзакций, Redis для кеша
+  и очередей, Elasticsearch для поиска, ClickHouse для аналитической витрины
+  складских движений.
+- Production-подобную эксплуатационную поверхность: readiness probes,
+  Prometheus-метрики, Grafana dashboard, fault injection, DLQ-runbook,
+  воспроизводимый broker-level E2E и k6 regression baseline.
+- Осознанные ограничения: это локальный Docker Compose стенд и инженерный case,
+  а не заявление о production capacity или exactly-once обработке.
+
+Подтверждённые локальные цифры:
+
+| Измерение | Результат | Контекст |
+| --- | ---: | --- |
+| HTTP throughput | `50.52 req/s` | k6 mixed profile: catalog browse, reservation race, search и checkout burst |
+| Request duration p95 | `8.17s` | Точка насыщения одиночного локального gateway; порог `750ms` нарушен |
+| Нагрузочный dataset | `1` товар, `1` retail price, `100000` единиц остатка, `4` search queries | Явно подготовленный минимальный dataset; catalog browse использовал диапазон `8` страниц по `20` товаров |
+| Максимум активных VUs | `409` из `410` | Локальный k6 baseline от `2026-06-01` |
+| Provider saga queue drain | `0–1s` | Три успешных broker-level E2E-прогона от confirm до `completed`, по timestamp PostgreSQL с точностью до секунды |
+
+Источники: [k6 baseline](tests/load/k6/results/2026-06-01-local-baseline.md),
+[broker-level E2E](scripts/test-broker-checkout-e2e.sh) и
+[failure scenarios](docs/failure-modes.md). Queue drain не является SLA: при
+повторной локальной проверке `2026-06-02` один из трёх последовательных
+прогретых прогонов попал в `stockflow.payment.requests.dlq`, поэтому sandbox-
+контур сохраняет отдельный операционный сценарий диагностики и requeue.
+
+## Guarantees and trade-offs
+
+| Механизм | Что гарантируется | Цена и граница гарантии |
+| --- | --- | --- |
+| At-least-once delivery | Durable RabbitMQ queues, retry queues и publisher confirms повторно доставляют provider requests и outcomes до успешной обработки или DLQ | Exactly-once не обещается: consumers обязаны выдерживать дубликаты |
+| Idempotency | Market дедуплицирует outcomes через inbox по `message_id`, saga transitions идемпотентны; provider sandbox-сервисы защищают повторные side effects | Нужны стабильные idempotency keys, хранение обработанных сообщений и политика очистки |
+| Eventual consistency | Confirm быстро переводит заказ в промежуточное состояние, а workers доводят reserve, authorize, capture и shipment асинхронно | Клиент должен учитывать промежуточные статусы; мгновенной согласованности между сервисами нет |
+| Compensation | При сбое saga запускает release, refund и shipment cancel в зависимости от уже выполненных шагов | Компенсация является отдельной распределённой операцией и тоже может потребовать retry или ручного разбора |
+| DLQ | Отдельные DLQ сохраняют необработанные provider requests, outcomes и документы поисковой индексации для диагностики и ограниченного requeue | DLQ не исправляет причину сбоя автоматически: нужен runbook и операторское решение |
+
 ## Экосистема StockFlow
 
 `stockflow-market` — основной репозиторий и landing page экосистемы. Вокруг него
@@ -23,8 +67,9 @@ flowchart LR
     rabbit <-->|"create / cancel shipment"| delivery["stockflow-delivery-mock<br/>stockflow.delivery"]
 ```
 
-Моки реализуют версионированные AsyncAPI-контракты, idempotency, retry, DLQ,
-failure injection и correlation headers. В `stockflow-market` provider saga
+Provider sandbox-сервисы реализуют версионированные AsyncAPI-контракты,
+idempotency, retry, DLQ, failure injection и correlation headers. В
+`stockflow-market` provider saga
 публикует requests через transactional outbox relay, дедуплицирует outcomes через
 inbox и выполняет компенсации release, refund и shipment cancel.
 
@@ -199,13 +244,14 @@ docker compose exec php php artisan analytics:stock-movements:rebuild
 docker compose -f docker-compose-all.yml up -d --build
 ```
 
-В общем стенде gateway остаётся на `http://localhost:8080`, payment mock доступен
-на `http://localhost:8081`, delivery mock — на `http://localhost:8082`, ERP mock —
-на `http://localhost:8083`. Подробности и команды проверки собраны в
+В общем стенде gateway остаётся на `http://localhost:8080`, payment sandbox
+доступен на `http://localhost:8081`, delivery sandbox — на
+`http://localhost:8082`, ERP sandbox — на `http://localhost:8083`. Подробности
+и команды проверки собраны в
 [`docs/demo.md`](docs/demo.md).
 
-Автономный broker-level E2E тест поднимает market, три provider mock и RabbitMQ,
-прогоняет один checkout и останавливает созданные контейнеры:
+Автономный broker-level E2E тест поднимает market, три provider sandbox-сервиса
+и RabbitMQ, прогоняет один checkout и останавливает созданные контейнеры:
 
 ```bash
 ./scripts/test-broker-checkout-e2e.sh
@@ -226,7 +272,8 @@ ClickHouse: stockflow / secret
 ```
 
 Общий стенд из `docker-compose-all.yml` использует для RabbitMQ креды
-`stockflow / stockflow`, одинаковые для marketplace и трёх моков.
+`stockflow / stockflow`, одинаковые для marketplace и трёх provider sandbox-
+сервисов.
 
 ## Быстрый старт
 

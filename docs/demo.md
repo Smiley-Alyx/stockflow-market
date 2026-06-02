@@ -2,7 +2,8 @@
 
 ## Цель
 
-Показать техлиду границы четырёх систем, единый RabbitMQ, доступность моков,
+Показать техлиду границы четырёх систем, единый RabbitMQ, доступность provider
+sandbox-сервисов,
 контрактный checkout flow и готовые механизмы reliability.
 
 ## 0:00–1:00 — поднять стенд
@@ -32,9 +33,9 @@ projects/
 Откройте [README](../README.md#экосистема-stockflow) и проговорите:
 
 1. `stockflow-market` хранит checkout и должен оркестрировать saga.
-2. ERP mock резервирует остатки через `stockflow.inventory`.
-3. Payment mock моделирует authorize/capture/refund через `stockflow.payment`.
-4. Delivery mock создаёт отправления через `stockflow.delivery`.
+2. ERP sandbox резервирует остатки через `stockflow.inventory`.
+3. Payment sandbox моделирует authorize/capture/refund через `stockflow.payment`.
+4. Delivery sandbox создаёт отправления через `stockflow.delivery`.
 5. Все сообщения checkout связываются одним `correlation_id`.
 
 Целевая sequence diagram находится в

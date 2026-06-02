@@ -18,7 +18,7 @@
 
 ## Таблица гарантий
 
-| Гарантия | ERP mock | Payment mock | Delivery mock | Market |
+| Гарантия | ERP sandbox | Payment sandbox | Delivery sandbox | Market |
 | --- | --- | --- | --- | --- |
 | At-least-once delivery | Да, durable queue + retry | Да, durable queue + retry | Да, durable queue + retry | Да, durable outcomes queue + requeue |
 | Idempotency | Да, in-memory store | Да, domain records + published event store | Да, in-memory records + published event store | Да, inbox по `message_id` и idempotent saga transitions |
@@ -28,7 +28,7 @@
 
 ## Инъекция отказов
 
-Моки позволяют воспроизводить отказ без изменения кода:
+Provider sandbox-сервисы позволяют воспроизводить отказ без изменения кода:
 
 | Boundary | Пример режима | Команда |
 | --- | --- | --- |
