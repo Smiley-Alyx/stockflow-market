@@ -201,6 +201,7 @@ stockflow-market/
 | --- | --- | --- | --- |
 | `php` | Laravel backend shell | базовый | `http://localhost:8080` |
 | `frontend` | Nuxt SSR dev server | базовый | `http://localhost:3000` |
+| `swagger-ui` | интерактивная документация gateway API | базовый | `http://localhost:8084` |
 | `postgres` | основная реляционная БД | базовый | `localhost:5432` |
 | `redis` | кеш, сессии, очереди | базовый | `localhost:6379` |
 | `elasticsearch` | поисковый движок | базовый | `http://localhost:9200` |
@@ -295,6 +296,7 @@ docker compose exec php php artisan db:seed
 
 - backend доступен на `http://localhost:8080`;
 - frontend доступен на `http://localhost:3000`;
+- Swagger UI для gateway API доступен на `http://localhost:8084`;
 - Prometheus доступен на `http://localhost:9090`;
 - Grafana доступна на `http://localhost:3001` с кредами `stockflow / stockflow`.
 

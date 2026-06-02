@@ -2,6 +2,9 @@
 
 Полный контракт gateway находится в [`services/gateway/contracts/openapi.yaml`](../services/gateway/contracts/openapi.yaml). Ниже приведена короткая шпаргалка для локальной проверки основных endpoint.
 
+После запуска базового Docker Compose стенда интерактивная документация Swagger
+UI доступна на `http://localhost:8084`.
+
 Подготовить переменные. Значения `PRODUCT_ID`, `CART_ID`, `ORDER_ID` и `SKU` нужно заменить на актуальные данные локальной базы:
 
 ```bash

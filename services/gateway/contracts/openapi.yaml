@@ -2,6 +2,9 @@ openapi: 3.1.0
 info:
   title: StockFlow Gateway API
   version: 0.1.0
+servers:
+  - url: http://localhost:8080
+    description: Local Docker Compose gateway
 paths:
   /api/catalog/products:
     get:

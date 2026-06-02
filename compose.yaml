@@ -172,6 +172,16 @@ services:
     depends_on:
       - php
 
+  swagger-ui:
+    image: swaggerapi/swagger-ui:v5.31.0
+    container_name: stockflow-swagger-ui
+    ports:
+      - "8084:8080"
+    environment:
+      SWAGGER_JSON: /openapi.yaml
+    volumes:
+      - ./services/gateway/contracts/openapi.yaml:/openapi.yaml:ro
+
   prometheus:
     image: prom/prometheus:v3.8.0
     container_name: stockflow-prometheus

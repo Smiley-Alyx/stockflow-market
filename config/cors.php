@@ -3,7 +3,10 @@
 return [
     'paths' => ['api/*'],
     'allowed_methods' => ['*'],
-    'allowed_origins' => [env('STOCKFLOW_FRONTEND_URL', 'http://localhost:3000')],
+    'allowed_origins' => [
+        env('STOCKFLOW_FRONTEND_URL', 'http://localhost:3000'),
+        env('STOCKFLOW_SWAGGER_UI_URL', 'http://localhost:8084'),
+    ],
     'allowed_origins_patterns' => [],
     'allowed_headers' => ['*'],
     'exposed_headers' => [],
