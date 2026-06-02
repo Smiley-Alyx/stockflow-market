@@ -208,6 +208,64 @@ class CatalogSearchApiTest extends TestCase
         });
     }
 
+    public function test_parent_category_includes_descendant_products_and_filters(): void
+    {
+        $equipment = Category::query()->create([
+            'name' => 'Equipment',
+            'slug' => 'equipment',
+            'filterable_attributes' => ['material'],
+            'is_active' => true,
+        ]);
+        Category::query()->create([
+            'parent_id' => $equipment->id,
+            'name' => 'Devices',
+            'slug' => 'devices',
+            'filterable_attributes' => ['color', 'memory'],
+            'is_active' => true,
+        ]);
+
+        Http::fake([
+            '*/catalog_products/_search' => Http::response([
+                'hits' => [
+                    'total' => ['value' => 1],
+                    'hits' => [],
+                ],
+                'aggregations' => [
+                    'material' => ['buckets' => []],
+                    'color' => ['buckets' => []],
+                    'memory' => ['buckets' => []],
+                ],
+            ]),
+        ]);
+
+        $this->getJson('/catalog/equipment/')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonStructure([
+                'meta' => [
+                    'filters' => ['material', 'color', 'memory'],
+                ],
+            ]);
+
+        Http::assertSent(function ($request): bool {
+            $body = $request->data();
+
+            return in_array(
+                [
+                    'bool' => [
+                        'should' => [
+                            ['term' => ['category.path.keyword' => 'equipment']],
+                            ['prefix' => ['category.path.keyword' => 'equipment/']],
+                        ],
+                        'minimum_should_match' => 1,
+                    ],
+                ],
+                $body['query']['bool']['filter'],
+                true,
+            ) && array_keys($body['aggs']) === ['material', 'color', 'memory', 'price_min', 'price_max'];
+        });
+    }
+
     public function test_catalog_filter_url_resolves_multiple_values_and_price_range(): void
     {
         $this->createProduct();

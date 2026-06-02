@@ -44,6 +44,14 @@ const meta = computed(() => catalog.value?.meta);
 const rootCategories = computed(() => (categories.value ?? []).filter((category) => category.image_url));
 const selectedFilters = computed(() => parseSelectedFilters(catalogPath.value));
 const filters = computed(() => Object.entries(meta.value?.filters ?? {}));
+const categoryQuery = computed(() =>
+    cleanQuery({
+        q: route.query.q,
+        sort: route.query.sort,
+        in_stock: route.query.in_stock,
+        city_code: route.query.city_code,
+    }),
+);
 const cities = computed<HomepageCity[]>(() => homepage.value?.find((block) => block.type === 'cities')?.content.cities ?? []);
 const currentPage = computed(() => meta.value?.current_page ?? 1);
 const lastPage = computed(() => Math.max(1, Math.ceil((meta.value?.total ?? 0) / (meta.value?.per_page ?? 12))));
@@ -314,6 +322,17 @@ function filterLabel(name: string): string {
     }[name] ?? name;
 }
 
+function categoryLink(category: CatalogCategory): { path: string; query: Record<string, string | string[]> } {
+    return {
+        path: category.url ?? '/catalog/',
+        query: categoryQuery.value,
+    };
+}
+
+function categoryIsActive(category: CatalogCategory): boolean {
+    return meta.value?.category_path === category.url?.replace(/^\/catalog\/|\/$/g, '');
+}
+
 onMounted(() => customer.initialize());
 
 useHead(() => ({
@@ -409,6 +428,24 @@ main.catalog-shell
             label.stock-checkbox
                 input(type="checkbox" :checked="route.query.in_stock === '1'" @change="toggleInStock")
                 span Только товары в наличии
+
+            section.filter-group.category-filter-group
+                h3 Категории
+                NuxtLink.category-filter-link(
+                    :to="{ path: '/catalog/', query: categoryQuery }"
+                    :class="{ active: !meta?.category_path }"
+                ) Все товары
+                template(v-for="category in rootCategories" :key="category.id")
+                    NuxtLink.category-filter-link(
+                        :to="categoryLink(category)"
+                        :class="{ active: categoryIsActive(category) }"
+                    ) {{ category.name }}
+                    NuxtLink.category-filter-link.child(
+                        v-for="child in category.children"
+                        :key="child.id"
+                        :to="categoryLink(child)"
+                        :class="{ active: categoryIsActive(child) }"
+                    ) {{ child.name }}
 
             section.filter-group
                 h3 Цена

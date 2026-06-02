@@ -9,6 +9,7 @@ use App\Domains\Catalog\Services\CatalogUrlService;
 use App\Domains\Inventory\Read\InventoryReadService;
 use App\Domains\Pricing\Read\PricingReadService;
 use App\Infrastructure\Resilience\CircuitBreaker;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -88,9 +89,9 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
      */
     private function filterableAttributes(CatalogProductQuery $query, ?Category $category): array
     {
-        $attributes = $category?->filterable_attributes ?? [];
-
-        $attributes = collect(is_array($attributes) ? $attributes : json_decode((string) $attributes, true))
+        $attributes = $this->categoryTree($category)
+            ->pluck('filterable_attributes')
+            ->flatten()
             ->map(fn (mixed $attribute): string => (string) $attribute)
             ->filter(fn (string $attribute): bool => preg_match('/^[a-zA-Z0-9_-]+$/', $attribute) === 1)
             ->unique()
@@ -116,7 +117,7 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
         $filters = [['term' => ['status' => 'published']]];
 
         if ($category !== null) {
-            $filters[] = ['term' => ['category.path.keyword' => $this->urls->categoryPath($category)]];
+            $filters[] = $this->categoryFilter($category);
         }
 
         if ($query->brands !== []) {
@@ -145,6 +146,52 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
                 'filter' => $filters,
             ],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function categoryFilter(Category $category): array
+    {
+        $path = $this->urls->categoryPath($category);
+
+        if (! $category->children()->where('is_active', true)->exists()) {
+            return ['term' => ['category.path.keyword' => $path]];
+        }
+
+        return [
+            'bool' => [
+                'should' => [
+                    ['term' => ['category.path.keyword' => $path]],
+                    ['prefix' => ['category.path.keyword' => $path.'/']],
+                ],
+                'minimum_should_match' => 1,
+            ],
+        ];
+    }
+
+    /**
+     * @return Collection<int, Category>
+     */
+    private function categoryTree(?Category $category): Collection
+    {
+        if (! $category instanceof Category) {
+            return collect();
+        }
+
+        $categories = collect([$category]);
+        $parentIds = collect([$category->id]);
+
+        while ($parentIds->isNotEmpty()) {
+            $children = Category::query()
+                ->whereIn('parent_id', $parentIds)
+                ->where('is_active', true)
+                ->get();
+            $categories = $categories->merge($children);
+            $parentIds = $children->pluck('id');
+        }
+
+        return $categories;
     }
 
     /**

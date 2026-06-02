@@ -20,6 +20,8 @@ export type CatalogCategory = {
     url: string | null;
     description: string | null;
     image_url: string | null;
+    filterable_attributes: string[];
+    card_attribute_names: string[];
     children: CatalogCategory[];
 };
 
