@@ -61,16 +61,22 @@ class MarketplaceSeeder extends Seeder
 
     private function seedUser(): void
     {
-        DB::table('users')->updateOrInsert(
-            ['email' => 'demo@stockflow.test'],
-            [
-                'name' => 'Demo Customer',
-                'password' => Hash::make('password'),
-                'email_verified_at' => now(),
-                'updated_at' => now(),
-                'created_at' => now(),
-            ],
-        );
+        foreach ([
+            ['Demo Customer', 'demo@stockflow.test'],
+            ['Admin', 'admin@stockflow.test'],
+        ] as [$name, $email]) {
+            DB::table('users')->updateOrInsert(
+                ['email' => $email],
+                [
+                    'name' => $name,
+                    'password' => Hash::make('password'),
+                    'email_verified_at' => now(),
+                    'is_active' => true,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ],
+            );
+        }
     }
 
     private function seedBrands(): void
