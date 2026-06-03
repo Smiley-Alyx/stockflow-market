@@ -80,7 +80,7 @@ class User extends Authenticatable implements FilamentUser
      */
     public function groups(): BelongsToMany
     {
-        return $this->belongsToMany(UserGroup::class)
+        return $this->belongsToMany(UserGroup::class, 'user_group_user')
             ->withTimestamps();
     }
 }
