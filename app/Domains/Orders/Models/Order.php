@@ -4,7 +4,9 @@ namespace App\Domains\Orders\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['cart_id', 'status', 'city_code', 'promo_code', 'subtotal_amount_minor', 'discount_amount_minor', 'total_amount_minor', 'currency', 'payment_method', 'recipient_name', 'recipient_phone', 'delivery_country_code', 'delivery_city', 'delivery_postal_code', 'delivery_address_line_1', 'delivery_address_line_2', 'checkout_at', 'confirmed_at', 'paid_at', 'cancelled_at', 'expired_at'])]
 class Order extends Model
@@ -26,6 +28,14 @@ class Order extends Model
     protected $table = 'orders_orders';
 
     /**
+     * @return BelongsTo<Cart, $this>
+     */
+    public function cart(): BelongsTo
+    {
+        return $this->belongsTo(Cart::class);
+    }
+
+    /**
      * @return HasMany<OrderItem, $this>
      */
     public function items(): HasMany
@@ -39,6 +49,14 @@ class Order extends Model
     public function shipments(): HasMany
     {
         return $this->hasMany(Shipment::class);
+    }
+
+    /**
+     * @return HasOne<CheckoutSaga, $this>
+     */
+    public function checkoutSaga(): HasOne
+    {
+        return $this->hasOne(CheckoutSaga::class);
     }
 
     /**

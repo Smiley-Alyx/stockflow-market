@@ -3,6 +3,7 @@
 namespace App\Domains\Orders\Models;
 
 use App\Domains\Catalog\Models\Product;
+use App\Domains\Pricing\Models\ProductPrice;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,6 +28,14 @@ class OrderItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * @return BelongsTo<ProductPrice, $this>
+     */
+    public function productPrice(): BelongsTo
+    {
+        return $this->belongsTo(ProductPrice::class, 'pricing_product_price_id');
     }
 
     /**
