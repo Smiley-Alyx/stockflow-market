@@ -7,135 +7,489 @@
         $failedChecks = collect($readiness)->filter(fn (array $check): bool => ! $check['ok'])->count();
         $healthyChecks = collect($readiness)->filter(fn (array $check): bool => $check['ok'])->count();
         $overallStatus = $failedCriticalChecks > 0 ? 'unavailable' : ($failedChecks > 0 ? 'degraded' : 'ok');
-        $statusClasses = [
-            'ok' => 'border-success-200 bg-success-50 text-success-800 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-300',
-            'degraded' => 'border-warning-200 bg-warning-50 text-warning-800 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300',
-            'unavailable' => 'border-danger-200 bg-danger-50 text-danger-800 dark:border-danger-500/30 dark:bg-danger-500/10 dark:text-danger-300',
-        ];
         $metricNumbers = collect($overview)->map(fn (string $value): int => (int) str_replace(' ', '', $value))->all();
         $maxMetric = max([1, ...$metricNumbers]);
     @endphp
 
-    <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-        <div class="border-b border-gray-100 bg-gray-50 px-5 py-4 dark:border-gray-800 dark:bg-gray-950">
-            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                    <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Stockflow runtime</div>
-                    <div class="mt-1 text-2xl font-semibold text-gray-950 dark:text-white">
-                        {{ config('stockflow.runtime.service_name') }}
+    <style>
+        .sf-monitoring {
+            --sf-bg: #f8fafc;
+            --sf-card: #ffffff;
+            --sf-card-soft: #f1f5f9;
+            --sf-border: #dbe3ef;
+            --sf-text: #111827;
+            --sf-muted: #64748b;
+            --sf-primary: #d97706;
+            --sf-primary-soft: #fff7ed;
+            --sf-success: #15803d;
+            --sf-success-soft: #dcfce7;
+            --sf-warning: #b45309;
+            --sf-warning-soft: #fef3c7;
+            --sf-danger: #b91c1c;
+            --sf-danger-soft: #fee2e2;
+            display: grid;
+            gap: 22px;
+        }
+
+        .dark .sf-monitoring {
+            --sf-bg: #020617;
+            --sf-card: #0f172a;
+            --sf-card-soft: #111827;
+            --sf-border: #334155;
+            --sf-text: #f8fafc;
+            --sf-muted: #94a3b8;
+            --sf-primary-soft: rgba(217, 119, 6, 0.14);
+            --sf-success-soft: rgba(21, 128, 61, 0.18);
+            --sf-warning-soft: rgba(180, 83, 9, 0.2);
+            --sf-danger-soft: rgba(185, 28, 28, 0.2);
+        }
+
+        .sf-hero,
+        .sf-panel,
+        .sf-metric {
+            background: var(--sf-card);
+            border: 1px solid var(--sf-border);
+            border-radius: 12px;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+            overflow: hidden;
+        }
+
+        .sf-hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 22px;
+            padding: 24px;
+            align-items: center;
+            border-top: 4px solid var(--sf-primary);
+        }
+
+        .sf-eyebrow,
+        .sf-label {
+            color: var(--sf-muted);
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+
+        .sf-title {
+            margin-top: 6px;
+            color: var(--sf-text);
+            font-size: 30px;
+            font-weight: 750;
+            line-height: 1.15;
+        }
+
+        .sf-subtitle {
+            margin-top: 8px;
+            color: var(--sf-muted);
+            font-size: 14px;
+        }
+
+        .sf-hero-status {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .sf-pill {
+            display: inline-flex;
+            align-items: center;
+            min-height: 34px;
+            border-radius: 999px;
+            border: 1px solid var(--sf-border);
+            padding: 7px 12px;
+            color: var(--sf-text);
+            font-size: 13px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .sf-pill-ok {
+            border-color: rgba(21, 128, 61, 0.28);
+            background: var(--sf-success-soft);
+            color: var(--sf-success);
+        }
+
+        .sf-pill-degraded {
+            border-color: rgba(180, 83, 9, 0.28);
+            background: var(--sf-warning-soft);
+            color: var(--sf-warning);
+        }
+
+        .sf-pill-unavailable {
+            border-color: rgba(185, 28, 28, 0.28);
+            background: var(--sf-danger-soft);
+            color: var(--sf-danger);
+        }
+
+        .sf-summary {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .sf-summary-card {
+            background: var(--sf-card);
+            border: 1px solid var(--sf-border);
+            border-radius: 10px;
+            padding: 18px;
+        }
+
+        .sf-summary-value {
+            margin-top: 8px;
+            color: var(--sf-text);
+            font-size: 32px;
+            font-weight: 760;
+            line-height: 1;
+        }
+
+        .sf-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .sf-metric {
+            padding: 18px;
+        }
+
+        .sf-metric-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .sf-metric-value {
+            margin-top: 8px;
+            color: var(--sf-text);
+            font-size: 28px;
+            font-weight: 760;
+        }
+
+        .sf-metric-mark {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            background: var(--sf-primary-soft);
+            border: 1px solid rgba(217, 119, 6, 0.18);
+        }
+
+        .sf-metric-mark-warning {
+            background: var(--sf-warning-soft);
+            border-color: rgba(180, 83, 9, 0.18);
+        }
+
+        .sf-bar {
+            height: 8px;
+            margin-top: 16px;
+            border-radius: 999px;
+            background: var(--sf-card-soft);
+            overflow: hidden;
+        }
+
+        .sf-bar-fill {
+            height: 100%;
+            border-radius: inherit;
+            background: var(--sf-primary);
+        }
+
+        .sf-bar-fill-warning {
+            background: var(--sf-warning);
+        }
+
+        .sf-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+            gap: 22px;
+        }
+
+        .sf-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--sf-border);
+            background: var(--sf-card-soft);
+        }
+
+        .sf-panel-title {
+            color: var(--sf-text);
+            font-size: 16px;
+            font-weight: 750;
+        }
+
+        .sf-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .sf-table th,
+        .sf-table td {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--sf-border);
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .sf-table th {
+            color: var(--sf-muted);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .sf-table td {
+            color: var(--sf-text);
+            font-size: 14px;
+        }
+
+        .sf-table tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .sf-service {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+        }
+
+        .sf-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 999px;
+            background: var(--sf-danger);
+            box-shadow: 0 0 0 4px var(--sf-danger-soft);
+        }
+
+        .sf-dot-ok {
+            background: var(--sf-success);
+            box-shadow: 0 0 0 4px var(--sf-success-soft);
+        }
+
+        .sf-detail {
+            margin-top: 6px;
+            color: var(--sf-muted);
+            font-size: 13px;
+            word-break: break-word;
+        }
+
+        .sf-links {
+            display: grid;
+            gap: 12px;
+            padding: 16px;
+        }
+
+        .sf-link-card {
+            display: block;
+            border: 1px solid var(--sf-border);
+            border-radius: 10px;
+            padding: 14px;
+            color: inherit;
+            text-decoration: none;
+            transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+        }
+
+        .sf-link-card:hover {
+            background: var(--sf-primary-soft);
+            border-color: rgba(217, 119, 6, 0.45);
+            transform: translateY(-1px);
+        }
+
+        .sf-link-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+        }
+
+        .sf-link-title {
+            color: var(--sf-text);
+            font-weight: 750;
+        }
+
+        .sf-link-action {
+            border-radius: 999px;
+            background: var(--sf-primary);
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 750;
+            padding: 6px 10px;
+            white-space: nowrap;
+        }
+
+        .sf-link-url {
+            margin-top: 8px;
+            color: var(--sf-muted);
+            font-size: 13px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 1100px) {
+            .sf-metrics {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .sf-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .sf-hero {
+                grid-template-columns: 1fr;
+            }
+
+            .sf-hero-status {
+                justify-content: flex-start;
+            }
+
+            .sf-summary,
+            .sf-metrics {
+                grid-template-columns: 1fr;
+            }
+
+            .sf-table {
+                min-width: 680px;
+            }
+
+            .sf-table-wrap {
+                overflow-x: auto;
+            }
+        }
+    </style>
+
+    <div class="sf-monitoring">
+        <section class="sf-hero">
+            <div>
+                <div class="sf-eyebrow">Stockflow runtime</div>
+                <div class="sf-title">{{ config('stockflow.runtime.service_name') }}</div>
+                <div class="sf-subtitle">Состояние сервиса, очередей, зависимостей и внешних панелей наблюдаемости.</div>
+            </div>
+
+            <div class="sf-hero-status">
+                <span class="sf-pill sf-pill-{{ $overallStatus }}">{{ strtoupper($overallStatus) }}</span>
+                <span class="sf-pill">{{ $healthyChecks }}/{{ count($readiness) }} checks ok</span>
+                <span class="sf-pill">{{ now()->format('H:i:s') }}</span>
+            </div>
+        </section>
+
+        <section class="sf-summary">
+            <div class="sf-summary-card">
+                <div class="sf-label">Healthy dependencies</div>
+                <div class="sf-summary-value">{{ $healthyChecks }}</div>
+            </div>
+            <div class="sf-summary-card">
+                <div class="sf-label">Degraded dependencies</div>
+                <div class="sf-summary-value">{{ $failedChecks }}</div>
+            </div>
+            <div class="sf-summary-card">
+                <div class="sf-label">Critical failures</div>
+                <div class="sf-summary-value">{{ $failedCriticalChecks }}</div>
+            </div>
+        </section>
+
+        <section class="sf-metrics">
+            @foreach ($overview as $label => $value)
+                @php
+                    $numericValue = (int) str_replace(' ', '', $value);
+                    $barWidth = max(6, min(100, (int) round(($numericValue / $maxMetric) * 100)));
+                    $isProblemMetric = str_contains(strtolower($label), 'failed') || str_contains(strtolower($label), 'pending');
+                @endphp
+
+                <div class="sf-metric">
+                    <div class="sf-metric-top">
+                        <div>
+                            <div class="sf-label">{{ $label }}</div>
+                            <div class="sf-metric-value">{{ $value }}</div>
+                        </div>
+                        <div class="sf-metric-mark {{ $isProblemMetric ? 'sf-metric-mark-warning' : '' }}"></div>
+                    </div>
+
+                    <div class="sf-bar">
+                        <div
+                            class="sf-bar-fill {{ $isProblemMetric ? 'sf-bar-fill-warning' : '' }}"
+                            style="width: {{ $barWidth }}%"
+                        ></div>
                     </div>
                 </div>
+            @endforeach
+        </section>
 
-                <div class="flex flex-wrap gap-2">
-                    <span class="inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-semibold {{ $statusClasses[$overallStatus] }}">
-                        {{ strtoupper($overallStatus) }}
-                    </span>
-                    <span class="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200">
-                        {{ $healthyChecks }}/{{ count($readiness) }} checks ok
-                    </span>
-                    <span class="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200">
-                        {{ now()->format('H:i:s') }}
-                    </span>
-                </div>
-            </div>
-        </div>
-
-        <div class="grid gap-px bg-gray-100 dark:bg-gray-800 md:grid-cols-3">
-            <div class="bg-white p-5 dark:bg-gray-900">
-                <div class="text-sm text-gray-500 dark:text-gray-400">Healthy dependencies</div>
-                <div class="mt-2 text-3xl font-semibold text-gray-950 dark:text-white">{{ $healthyChecks }}</div>
-            </div>
-            <div class="bg-white p-5 dark:bg-gray-900">
-                <div class="text-sm text-gray-500 dark:text-gray-400">Degraded dependencies</div>
-                <div class="mt-2 text-3xl font-semibold text-gray-950 dark:text-white">{{ $failedChecks }}</div>
-            </div>
-            <div class="bg-white p-5 dark:bg-gray-900">
-                <div class="text-sm text-gray-500 dark:text-gray-400">Critical failures</div>
-                <div class="mt-2 text-3xl font-semibold text-gray-950 dark:text-white">{{ $failedCriticalChecks }}</div>
-            </div>
-        </div>
-    </section>
-
-    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        @foreach ($overview as $label => $value)
-            @php
-                $numericValue = (int) str_replace(' ', '', $value);
-                $barWidth = max(6, min(100, (int) round(($numericValue / $maxMetric) * 100)));
-                $isProblemMetric = str_contains(strtolower($label), 'failed') || str_contains(strtolower($label), 'pending');
-            @endphp
-
-            <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <div class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ $label }}</div>
-                        <div class="mt-2 text-2xl font-semibold text-gray-950 dark:text-white">{{ $value }}</div>
-                    </div>
-                    <div class="h-10 w-10 rounded-md {{ $isProblemMetric ? 'bg-warning-50 dark:bg-warning-500/10' : 'bg-primary-50 dark:bg-primary-500/10' }}"></div>
+        <div class="sf-grid">
+            <section class="sf-panel">
+                <div class="sf-panel-header">
+                    <div class="sf-panel-title">Dependencies</div>
+                    <span class="sf-pill sf-pill-{{ $overallStatus }}">{{ $overallStatus }}</span>
                 </div>
 
-                <div class="mt-4 h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-                    <div
-                        class="h-full rounded-full {{ $isProblemMetric ? 'bg-warning-500' : 'bg-primary-500' }}"
-                        style="width: {{ $barWidth }}%"
-                    ></div>
+                <div class="sf-table-wrap">
+                    <table class="sf-table">
+                        <thead>
+                            <tr>
+                                <th>Service</th>
+                                <th>Status</th>
+                                <th>Criticality</th>
+                                <th>Detail</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($readiness as $name => $check)
+                                <tr>
+                                    <td>
+                                        <div class="sf-service">
+                                            <span class="sf-dot {{ $check['ok'] ? 'sf-dot-ok' : '' }}"></span>
+                                            {{ $name }}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="sf-pill {{ $check['ok'] ? 'sf-pill-ok' : 'sf-pill-unavailable' }}">
+                                            {{ $check['status'] }}
+                                        </span>
+                                    </td>
+                                    <td>{{ $check['critical'] ? 'critical' : 'optional' }}</td>
+                                    <td>
+                                        @if (! empty($check['detail']))
+                                            <div class="sf-detail">{{ $check['detail'] }}</div>
+                                        @else
+                                            <span class="sf-detail">No issues</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
-            </div>
-        @endforeach
-    </section>
+            </section>
 
-    <div class="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <section class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-            <div class="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-                <h2 class="text-base font-semibold text-gray-950 dark:text-white">Dependencies</h2>
-            </div>
+            <section class="sf-panel">
+                <div class="sf-panel-header">
+                    <div class="sf-panel-title">Observability links</div>
+                </div>
 
-            <div class="divide-y divide-gray-100 dark:divide-gray-800">
-                @foreach ($readiness as $name => $check)
-                    <div class="grid gap-4 px-5 py-4 md:grid-cols-[1fr_auto] md:items-center">
-                        <div class="min-w-0">
-                            <div class="flex items-center gap-3">
-                                <span class="h-2.5 w-2.5 rounded-full {{ $check['ok'] ? 'bg-success-500' : 'bg-danger-500' }}"></span>
-                                <div class="font-medium text-gray-950 dark:text-white">{{ $name }}</div>
+                <div class="sf-links">
+                    @foreach ($links as $label => $url)
+                        <a
+                            href="{{ $url }}"
+                            target="_blank"
+                            rel="noreferrer"
+                            class="sf-link-card"
+                        >
+                            <div class="sf-link-row">
+                                <div class="sf-link-title">{{ $label }}</div>
+                                <div class="sf-link-action">Open</div>
                             </div>
-                            @if (! empty($check['detail']))
-                                <div class="mt-2 break-words text-sm text-gray-500 dark:text-gray-400">{{ $check['detail'] }}</div>
-                            @endif
-                        </div>
-
-                        <div class="flex items-center gap-2 md:justify-end">
-                            <span class="inline-flex rounded-md px-2.5 py-1 text-xs font-semibold {{ $check['ok'] ? 'bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-300' : 'bg-danger-50 text-danger-700 dark:bg-danger-500/10 dark:text-danger-300' }}">
-                                {{ $check['status'] }}
-                            </span>
-                            <span class="inline-flex rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                                {{ $check['critical'] ? 'critical' : 'optional' }}
-                            </span>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-        </section>
-
-        <section class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-            <div class="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-                <h2 class="text-base font-semibold text-gray-950 dark:text-white">Observability links</h2>
-            </div>
-
-            <div class="grid gap-3 p-5">
-                @foreach ($links as $label => $url)
-                    <a
-                        href="{{ $url }}"
-                        target="_blank"
-                        rel="noreferrer"
-                        class="group rounded-lg border border-gray-200 px-4 py-3 transition hover:border-primary-300 hover:bg-primary-50 dark:border-gray-700 dark:hover:border-primary-500/50 dark:hover:bg-primary-500/10"
-                    >
-                        <div class="flex items-center justify-between gap-4">
-                            <div class="font-medium text-gray-950 dark:text-white">{{ $label }}</div>
-                            <div class="text-sm font-semibold text-primary-600 group-hover:text-primary-500 dark:text-primary-400">Open</div>
-                        </div>
-                        <div class="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">{{ $url }}</div>
-                    </a>
-                @endforeach
-            </div>
-        </section>
+                            <div class="sf-link-url">{{ $url }}</div>
+                        </a>
+                    @endforeach
+                </div>
+            </section>
+        </div>
     </div>
 </x-filament-panels::page>
