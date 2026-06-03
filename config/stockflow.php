@@ -51,6 +51,12 @@ return [
         ],
     ],
 
+    'observability' => [
+        'prometheus_url' => env('STOCKFLOW_PROMETHEUS_URL', 'http://localhost:9090'),
+        'grafana_url' => env('STOCKFLOW_GRAFANA_URL', 'http://localhost:3001'),
+        'rabbitmq_management_url' => env('STOCKFLOW_RABBITMQ_MANAGEMENT_URL', 'http://localhost:15672'),
+    ],
+
     'circuit_breakers' => [
         'rabbitmq' => [
             'failure_threshold' => (int) env('RABBITMQ_CIRCUIT_BREAKER_FAILURE_THRESHOLD', 3),
