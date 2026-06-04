@@ -11,17 +11,21 @@ const candidateSlug = computed(() => {
 
     return normalizedPath.value.split('/').filter(Boolean).at(-1) ?? '';
 });
-const { data: candidateProduct } = await useAsyncData(
-    'catalog-route-product',
+const {
+    data: candidateProduct,
+    pending: candidateProductPending,
+} = await useAsyncData(
+    () => `catalog-route-product-${candidateSlug.value || 'catalog'}`,
     async () => (candidateSlug.value ? catalogApi.fetchProduct(candidateSlug.value) : null),
     {
         watch: [candidateSlug],
     },
 );
 const isProductPage = computed(() => candidateProduct.value?.url === normalizedPath.value);
+const isResolvingProduct = computed(() => Boolean(candidateSlug.value) && candidateProductPending.value);
 </script>
 
 <template lang="pug">
 ProductMarketplace(v-if="isProductPage")
-CatalogMarketplace(v-else)
+CatalogMarketplace(v-else-if="!isResolvingProduct")
 </template>
