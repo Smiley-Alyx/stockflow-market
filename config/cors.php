@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'paths' => ['api/*'],
+    'paths' => ['api/*', 'catalog/*'],
     'allowed_methods' => ['*'],
     'allowed_origins' => [
         env('STOCKFLOW_FRONTEND_URL', 'http://localhost:3000'),
