@@ -438,7 +438,7 @@ onBeforeUnmount(() => recognition.value?.stop());
                     :key="message.id"
                     :class="[`is-${message.role}`, { 'has-products': message.products?.length }]"
                 )
-                    p {{ message.text }}
+                    AssistantRichText(:text="message.text")
                     .assistant-products(v-if="message.products?.length" :class="{ comparison: message.comparison }")
                         article.assistant-product(v-for="product in message.products" :key="product.id")
                             NuxtLink.assistant-product-image(:to="product.url ?? '/catalog/'" @click="open = false")
