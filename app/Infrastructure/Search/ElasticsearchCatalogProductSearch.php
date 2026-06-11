@@ -130,6 +130,17 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
                 : $this->cityAvailabilityFilter($query->cityCode, $query->inStock);
         }
 
+        if ($query->color !== null) {
+            $filters[] = [
+                'wildcard' => [
+                    'filters.color.keyword' => [
+                        'value' => '*'.$query->color.'*',
+                        'case_insensitive' => true,
+                    ],
+                ],
+            ];
+        }
+
         foreach ($query->filters as $name => $values) {
             $filters[] = ['terms' => ['filters.'.$name.'.keyword' => $values]];
         }

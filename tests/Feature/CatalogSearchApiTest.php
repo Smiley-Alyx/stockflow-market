@@ -383,6 +383,54 @@ class CatalogSearchApiTest extends TestCase
             ->assertJsonValidationErrors(['sort']);
     }
 
+    public function test_assistant_products_endpoint_searches_full_catalog_with_constraints(): void
+    {
+        Http::fake([
+            '*/catalog_products/_search' => Http::response([
+                'hits' => [
+                    'total' => ['value' => 1],
+                    'hits' => [['_source' => [
+                        'id' => 10,
+                        'name' => 'Blue Speaker',
+                        'slug' => 'blue-speaker',
+                        'sku' => 'SPEAKER-001',
+                    ]]],
+                ],
+            ]),
+        ]);
+
+        $this->getJson('/api/catalog/assistant-products?q=speaker&color=blue&price_to=25000&in_stock=1&sort=rating_desc&limit=50')
+            ->assertOk()
+            ->assertJsonPath('data.0.sku', 'SPEAKER-001')
+            ->assertJsonPath('meta.per_page', 50)
+            ->assertJsonPath('meta.total', 1);
+
+        Http::assertSent(function ($request): bool {
+            $body = $request->data();
+
+            return $body['size'] === 50
+                && $body['query']['bool']['must'][0]['multi_match']['query'] === 'speaker'
+                && in_array(['term' => ['availability.in_stock' => true]], $body['query']['bool']['filter'], true)
+                && in_array([
+                    'wildcard' => [
+                        'filters.color.keyword' => [
+                            'value' => '*blue*',
+                            'case_insensitive' => true,
+                        ],
+                    ],
+                ], $body['query']['bool']['filter'], true)
+                && $body['post_filter'] === ['range' => ['price.amount_minor' => ['lte' => 25000]]]
+                && $body['sort'] === [['rating' => 'desc'], ['id' => 'asc']];
+        });
+    }
+
+    public function test_assistant_products_endpoint_rejects_excessive_candidate_limit(): void
+    {
+        $this->getJson('/api/catalog/assistant-products?limit=51')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['limit']);
+    }
+
     private function createProduct(): Product
     {
         $category = Category::query()->create([

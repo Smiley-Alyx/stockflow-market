@@ -21,5 +21,6 @@ class CatalogProductQuery
         public readonly string $sort,
         public readonly int $page,
         public readonly int $perPage,
+        public readonly ?string $color = null,
     ) {}
 }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Auth\SessionController;
+use App\Http\Controllers\Api\Catalog\AssistantProductController;
 use App\Http\Controllers\Api\Catalog\CategoryController;
 use App\Http\Controllers\Api\Catalog\ProductController;
 use App\Http\Controllers\Api\Customers\CustomerStateController;
@@ -28,6 +29,8 @@ Route::get('/metrics', MetricsController::class);
 
 Route::get('/api/catalog/products', [ProductController::class, 'index'])
     ->middleware('throttle:stockflow-catalog');
+Route::get('/api/catalog/assistant-products', AssistantProductController::class)
+    ->middleware('throttle:stockflow-search');
 Route::get('/catalog/{path}', [ProductController::class, 'path'])
     ->where('path', '.*')
     ->middleware('throttle:stockflow-catalog');
