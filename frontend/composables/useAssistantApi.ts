@@ -4,22 +4,26 @@ type ApiResource<T> = {
     data: T;
 };
 
-export type OpenAiAssistantResponse = {
+export type AssistantResponse = {
     message: string;
-    response_id: string | null;
+    conversation_id: string | null;
     products: CatalogProduct[];
+    provider: {
+        code: string;
+        name: string;
+    };
 };
 
 export const useAssistantApi = () => {
     const config = useRuntimeConfig();
     const apiBase = config.public.apiBase;
 
-    const askOpenAi = async (message: string, previousResponseId: string | null) => {
+    const ask = async (message: string, conversationId: string | null) => {
         const csrf = await $fetch<{ csrf_token: string }>('/api/session/csrf', {
             baseURL: apiBase,
             credentials: 'include',
         });
-        const response = await $fetch<ApiResource<OpenAiAssistantResponse>>('/api/assistant/openai', {
+        const response = await $fetch<ApiResource<AssistantResponse>>('/api/assistant/respond', {
             baseURL: apiBase,
             method: 'POST',
             credentials: 'include',
@@ -28,7 +32,7 @@ export const useAssistantApi = () => {
             },
             body: {
                 message,
-                previous_response_id: previousResponseId,
+                conversation_id: conversationId,
             },
         });
 
@@ -36,6 +40,6 @@ export const useAssistantApi = () => {
     };
 
     return {
-        askOpenAi,
+        ask,
     };
 };

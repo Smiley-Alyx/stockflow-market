@@ -1,5 +1,5 @@
 <template lang="pug">
 NuxtPage
-OpenAiAssistantWidget
+AiAssistantWidget
 AssistantWidget
 </template>

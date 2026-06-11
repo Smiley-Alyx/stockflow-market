@@ -28,7 +28,8 @@ const input = ref('');
 const pending = ref(false);
 const listening = ref(false);
 const voiceAvailable = ref(false);
-const previousResponseId = ref<string | null>(null);
+const conversationId = ref<string | null>(null);
+const providerName = ref('AI-провайдер');
 const messageList = ref<HTMLElement | null>(null);
 const recognition = shallowRef<SpeechRecognitionInstance | null>(null);
 const messages = ref<AssistantMessage[]>(initialMessages());
@@ -48,7 +49,8 @@ watch(
 );
 
 const reset = () => {
-    previousResponseId.value = null;
+    conversationId.value = null;
+    providerName.value = 'AI-провайдер';
     messages.value = initialMessages();
     input.value = '';
 };
@@ -65,8 +67,9 @@ const submit = async (prompt = input.value) => {
     pending.value = true;
 
     try {
-        const response = await assistantApi.askOpenAi(text, previousResponseId.value);
-        previousResponseId.value = response.response_id;
+        const response = await assistantApi.ask(text, conversationId.value);
+        conversationId.value = response.conversation_id;
+        providerName.value = response.provider.name;
         messages.value.push({
             id: Date.now() + 1,
             role: 'assistant',
@@ -98,7 +101,7 @@ function initialMessages(): AssistantMessage[] {
         {
             id: 1,
             role: 'assistant',
-            text: 'Здравствуйте! Я консультант на базе OpenAI. Опишите задачу, а я уточню детали, найду товары по всему каталогу и объясню выбор.',
+            text: 'Здравствуйте! Я AI-консультант. Опишите задачу, а я уточню детали, найду товары по всему каталогу и объясню выбор.',
         },
     ];
 }
@@ -112,7 +115,7 @@ function errorMessage(error: unknown): string {
         }
     }
 
-    return 'Не удалось получить ответ OpenAI. Проверьте API-ключ и доступность сервиса.';
+    return 'Не удалось получить ответ AI-провайдера. Проверьте его настройки и доступность.';
 }
 
 function formatMoney(product: CatalogProduct): string {
@@ -164,23 +167,23 @@ onBeforeUnmount(() => recognition.value?.stop());
 </script>
 
 <template lang="pug">
-.assistant-layer.openai-assistant-layer
+.assistant-layer.provider-assistant-layer
     transition(name="assistant-panel")
-        section.assistant-panel.openai-assistant-panel(v-if="open" aria-label="OpenAI-ассистент магазина")
-            header.assistant-header.openai-assistant-header
+        section.assistant-panel.provider-assistant-panel(v-if="open" aria-label="AI-ассистент магазина")
+            header.assistant-header.provider-assistant-header
                 .assistant-identity
-                    span.assistant-avatar.openai-assistant-avatar AI+
+                    span.assistant-avatar.provider-assistant-avatar AI+
                     span
-                        strong OpenAI-консультант
+                        strong AI-консультант
                         small
                             i
-                            | Расширенный диалог
+                            | {{ providerName }}
                 .assistant-header-actions
                     button(type="button" aria-label="Начать заново" title="Начать заново" @click="reset") ↺
                     button(type="button" aria-label="Закрыть помощника" @click="open = false") ×
 
             .assistant-messages(ref="messageList" aria-live="polite")
-                article.assistant-message.openai-assistant-message(
+                article.assistant-message.provider-assistant-message(
                     v-for="message in messages"
                     :key="message.id"
                     :class="[`is-${message.role}`, { 'has-products': message.products?.length }]"
@@ -216,7 +219,7 @@ onBeforeUnmount(() => recognition.value?.stop());
                     v-model="input"
                     rows="1"
                     placeholder="Спросите о сложном выборе…"
-                    aria-label="Сообщение OpenAI-ассистенту"
+                    aria-label="Сообщение AI-ассистенту"
                     @keydown.enter.exact.prevent="submit()"
                 )
                 button.assistant-voice(
@@ -226,22 +229,22 @@ onBeforeUnmount(() => recognition.value?.stop());
                     :aria-label="listening ? 'Идёт запись' : 'Голосовой ввод'"
                     @click="startVoice"
                 ) ●
-                button.assistant-send.openai-assistant-send(
+                button.assistant-send.provider-assistant-send(
                     type="submit"
                     :disabled="!input.trim() || pending"
                     aria-label="Отправить"
                 ) ↑
-            p.assistant-disclaimer Ответ формирует OpenAI на основе актуального каталога магазина.
+            p.assistant-disclaimer Ответ формирует выбранный AI-провайдер на основе актуального каталога.
 
-    button.assistant-launcher.openai-assistant-launcher(
+    button.assistant-launcher.provider-assistant-launcher(
         type="button"
         :class="{ open }"
         :aria-expanded="open"
-        aria-label="Открыть OpenAI-ассистента"
+        aria-label="Открыть AI-ассистента"
         @click="open = !open"
     )
         span(v-if="open") ×
         template(v-else)
             b AI+
-            span OpenAI-консультант
+            span AI-консультант
 </template>
