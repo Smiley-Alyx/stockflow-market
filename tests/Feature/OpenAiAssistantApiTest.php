@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domains\Assistant\Contracts\ShoppingAssistantProvider;
 use App\Domains\Catalog\Search\CatalogProductQuery;
 use App\Domains\Catalog\Search\CatalogProductSearch;
 use Illuminate\Support\Facades\Http;
@@ -118,5 +119,45 @@ class OpenAiAssistantApiTest extends TestCase
         $this->postJson('/api/assistant/respond', ['message' => 'Помоги выбрать подарок'])
             ->assertStatus(503)
             ->assertJsonPath('message', 'Для AI-провайдера gigachat не настроен класс адаптера.');
+    }
+
+    public function test_assistant_switches_provider_through_configuration(): void
+    {
+        config([
+            'assistant.default' => 'example',
+            'assistant.providers.example.driver' => ExampleShoppingAssistantProvider::class,
+        ]);
+
+        $this->postJson('/api/assistant/respond', [
+            'message' => 'Подбери подарок',
+            'conversation_id' => 'dialog-1',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.message', 'Ответ другого провайдера: Подбери подарок')
+            ->assertJsonPath('data.conversation_id', 'dialog-1')
+            ->assertJsonPath('data.provider.code', 'example')
+            ->assertJsonPath('data.provider.name', 'Example AI');
+    }
+}
+
+class ExampleShoppingAssistantProvider implements ShoppingAssistantProvider
+{
+    public function code(): string
+    {
+        return 'example';
+    }
+
+    public function name(): string
+    {
+        return 'Example AI';
+    }
+
+    public function respond(string $message, ?string $conversationId = null): array
+    {
+        return [
+            'message' => 'Ответ другого провайдера: '.$message,
+            'conversation_id' => $conversationId,
+            'products' => [],
+        ];
     }
 }
