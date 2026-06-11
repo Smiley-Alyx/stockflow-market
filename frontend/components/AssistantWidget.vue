@@ -156,7 +156,7 @@ const respond = async (text: string) => {
 
 const loadProducts = async () => {
     if (!productCache.value) {
-        productCache.value = (await catalogApi.fetchProducts({ per_page: 100 })).products;
+        productCache.value = (await catalogApi.fetchProducts({ per_page: 24 })).products;
     }
 
     return productCache.value;
