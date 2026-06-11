@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\Api\Assistant\OpenAiAssistantController;
+use App\Http\Controllers\Api\Assistant\AssistantController;
 use App\Http\Controllers\Api\Auth\SessionController;
 use App\Http\Controllers\Api\Catalog\AssistantProductController;
 use App\Http\Controllers\Api\Catalog\CategoryController;
@@ -32,7 +32,7 @@ Route::get('/api/catalog/products', [ProductController::class, 'index'])
     ->middleware('throttle:stockflow-catalog');
 Route::get('/api/catalog/assistant-products', AssistantProductController::class)
     ->middleware('throttle:stockflow-search');
-Route::post('/api/assistant/openai', OpenAiAssistantController::class)
+Route::post('/api/assistant/respond', AssistantController::class)
     ->middleware('throttle:stockflow-search');
 Route::get('/catalog/{path}', [ProductController::class, 'path'])
     ->where('path', '.*')

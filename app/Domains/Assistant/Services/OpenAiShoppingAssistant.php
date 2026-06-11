@@ -2,34 +2,45 @@
 
 namespace App\Domains\Assistant\Services;
 
-use App\Domains\Catalog\Search\CatalogProductQuery;
-use App\Domains\Catalog\Search\CatalogProductSearch;
+use App\Domains\Assistant\Contracts\ShoppingAssistantProvider;
+use App\Domains\Assistant\Exceptions\AssistantConfigurationException;
+use App\Domains\Assistant\Tools\CatalogSearchTool;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
-class OpenAiShoppingAssistant
+class OpenAiShoppingAssistant implements ShoppingAssistantProvider
 {
     public function __construct(
-        private readonly CatalogProductSearch $catalog,
+        private readonly CatalogSearchTool $catalog,
     ) {}
 
-    /**
-     * @return array{message: string, response_id: string|null, products: array<int, array<string, mixed>>}
-     */
-    public function respond(string $message, ?string $previousResponseId = null): array
+    public function code(): string
     {
-        if (! is_string(config('services.openai.api_key')) || config('services.openai.api_key') === '') {
-            throw new RuntimeException('OpenAI API key is not configured.');
+        return 'openai';
+    }
+
+    public function name(): string
+    {
+        return (string) config('assistant.providers.openai.name');
+    }
+
+    /**
+     * @return array{message: string, conversation_id: string|null, products: array<int, array<string, mixed>>}
+     */
+    public function respond(string $message, ?string $conversationId = null): array
+    {
+        if (! is_string(config('assistant.providers.openai.api_key')) || config('assistant.providers.openai.api_key') === '') {
+            throw new AssistantConfigurationException('Для провайдера OpenAI не настроен OPENAI_API_KEY.');
         }
 
-        $responseId = $previousResponseId;
+        $responseId = $conversationId;
         $products = [];
         $input = $message;
 
         for ($attempt = 0; $attempt < 3; $attempt++) {
             $response = $this->request()->post('/v1/responses', array_filter([
-                'model' => config('services.openai.model'),
+                'model' => config('assistant.providers.openai.model'),
                 'instructions' => $this->instructions(),
                 'input' => $input,
                 'previous_response_id' => $responseId,
@@ -48,14 +59,14 @@ class OpenAiShoppingAssistant
             if ($calls->isEmpty()) {
                 return [
                     'message' => $this->responseText($response),
-                    'response_id' => $responseId,
+                    'conversation_id' => $responseId,
                     'products' => array_values($products),
                 ];
             }
 
             $input = $calls->map(function (array $call) use (&$products): array {
                 $arguments = json_decode((string) ($call['arguments'] ?? '{}'), true);
-                $result = $this->searchCatalog(is_array($arguments) ? $arguments : []);
+                $result = $this->catalog->execute(is_array($arguments) ? $arguments : []);
 
                 foreach ($result as $product) {
                     $products[(int) ($product['id'] ?? 0)] = $product;
@@ -64,7 +75,7 @@ class OpenAiShoppingAssistant
                 return [
                     'type' => 'function_call_output',
                     'call_id' => (string) ($call['call_id'] ?? ''),
-                    'output' => json_encode($this->catalogContext($result), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                    'output' => json_encode($this->catalog->context($result), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
                 ];
             })->all();
         }
@@ -74,11 +85,11 @@ class OpenAiShoppingAssistant
 
     private function request(): PendingRequest
     {
-        return Http::baseUrl(rtrim((string) config('services.openai.base_url'), '/'))
-            ->withToken((string) config('services.openai.api_key'))
+        return Http::baseUrl(rtrim((string) config('assistant.providers.openai.base_url'), '/'))
+            ->withToken((string) config('assistant.providers.openai.api_key'))
             ->acceptJson()
             ->asJson()
-            ->timeout((int) config('services.openai.timeout_seconds'));
+            ->timeout((int) config('assistant.providers.openai.timeout_seconds'));
     }
 
     /**
@@ -91,33 +102,7 @@ class OpenAiShoppingAssistant
             'name' => 'search_catalog',
             'description' => 'Search the full current store catalog. Use it for product recommendations, comparisons, prices, availability, brands, and characteristics.',
             'strict' => true,
-            'parameters' => [
-                'type' => 'object',
-                'properties' => [
-                    'q' => [
-                        'type' => ['string', 'null'],
-                        'description' => 'Short product search phrase in Russian without budget or filler words.',
-                    ],
-                    'color' => [
-                        'type' => ['string', 'null'],
-                        'description' => 'A short color fragment, for example синий or графит.',
-                    ],
-                    'max_price' => [
-                        'type' => ['number', 'null'],
-                        'description' => 'Maximum price in the catalog currency units.',
-                    ],
-                    'in_stock' => [
-                        'type' => ['boolean', 'null'],
-                        'description' => 'Whether to require current stock.',
-                    ],
-                    'sort' => [
-                        'type' => ['string', 'null'],
-                        'enum' => ['newest', 'price_asc', 'price_desc', 'rating_desc', null],
-                    ],
-                ],
-                'required' => ['q', 'color', 'max_price', 'in_stock', 'sort'],
-                'additionalProperties' => false,
-            ],
+            'parameters' => $this->catalog->jsonSchema(),
         ];
     }
 
@@ -130,55 +115,6 @@ class OpenAiShoppingAssistant
 Основывай утверждения о товарах только на результате search_catalog. Не выдумывай товары, цены, наличие и характеристики.
 Если подходящих товаров нет, сообщи об этом и предложи ослабить условия. Не оформляй заказ самостоятельно.
 PROMPT;
-    }
-
-    /**
-     * @param  array<string, mixed>  $arguments
-     * @return array<int, array<string, mixed>>
-     */
-    private function searchCatalog(array $arguments): array
-    {
-        $result = $this->catalog->products(new CatalogProductQuery(
-            query: $this->nullableString($arguments['q'] ?? null),
-            category: null,
-            categoryPath: null,
-            filters: [],
-            brands: [],
-            inStock: is_bool($arguments['in_stock'] ?? null) ? $arguments['in_stock'] : null,
-            cityCode: null,
-            priceFrom: null,
-            priceTo: is_numeric($arguments['max_price'] ?? null)
-                ? max(0, (int) round((float) $arguments['max_price'] * 100))
-                : null,
-            sort: in_array($arguments['sort'] ?? null, ['newest', 'price_asc', 'price_desc', 'rating_desc'], true)
-                ? $arguments['sort']
-                : 'rating_desc',
-            page: 1,
-            perPage: 10,
-            color: $this->nullableString($arguments['color'] ?? null),
-        ));
-
-        return array_slice($result['data'], 0, 10);
-    }
-
-    /**
-     * @param  array<int, array<string, mixed>>  $products
-     * @return array<int, array<string, mixed>>
-     */
-    private function catalogContext(array $products): array
-    {
-        return collect($products)->map(fn (array $product): array => [
-            'id' => $product['id'] ?? null,
-            'name' => $product['name'] ?? null,
-            'category' => data_get($product, 'category.name'),
-            'brand' => data_get($product, 'brand.name'),
-            'description' => $product['short_description'] ?? $product['description'] ?? null,
-            'price' => $product['price'] ?? null,
-            'availability' => $product['availability'] ?? null,
-            'rating' => $product['rating'] ?? null,
-            'attributes' => $product['attributes'] ?? [],
-            'url' => $product['url'] ?? null,
-        ])->all();
     }
 
     /**
@@ -196,10 +132,5 @@ PROMPT;
         }
 
         throw new RuntimeException('OpenAI assistant returned no text.');
-    }
-
-    private function nullableString(mixed $value): ?string
-    {
-        return is_string($value) && trim($value) !== '' ? trim($value) : null;
     }
 }

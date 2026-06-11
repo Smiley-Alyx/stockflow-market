@@ -12,9 +12,10 @@ class OpenAiAssistantApiTest extends TestCase
     public function test_openai_assistant_searches_catalog_and_returns_grounded_response(): void
     {
         config([
-            'services.openai.api_key' => 'test-key',
-            'services.openai.model' => 'gpt-5.4-mini',
-            'services.openai.base_url' => 'https://api.openai.com',
+            'assistant.default' => 'openai',
+            'assistant.providers.openai.api_key' => 'test-key',
+            'assistant.providers.openai.model' => 'gpt-5.4-mini',
+            'assistant.providers.openai.base_url' => 'https://api.openai.com',
         ]);
 
         $this->app->instance(CatalogProductSearch::class, new class implements CatalogProductSearch
@@ -68,12 +69,14 @@ class OpenAiAssistantApiTest extends TestCase
                 ]),
         ]);
 
-        $this->postJson('/api/assistant/openai', [
+        $this->postJson('/api/assistant/respond', [
             'message' => 'Нужна синяя колонка для кухни до 250',
         ])
             ->assertOk()
-            ->assertJsonPath('data.response_id', 'resp_answer')
+            ->assertJsonPath('data.conversation_id', 'resp_answer')
             ->assertJsonPath('data.products.0.sku', 'AUR-ROOM-SPK')
+            ->assertJsonPath('data.provider.code', 'openai')
+            ->assertJsonPath('data.provider.name', 'OpenAI')
             ->assertJsonPath('data.message', 'Подойдёт Aurora Room Speaker: она синяя, есть в наличии и укладывается в бюджет.');
 
         Http::assertSentCount(2);
@@ -92,13 +95,28 @@ class OpenAiAssistantApiTest extends TestCase
 
     public function test_openai_assistant_reports_missing_api_key(): void
     {
-        config(['services.openai.api_key' => null]);
+        config([
+            'assistant.default' => 'openai',
+            'assistant.providers.openai.api_key' => null,
+        ]);
         Http::fake();
 
-        $this->postJson('/api/assistant/openai', ['message' => 'Помоги выбрать подарок'])
+        $this->postJson('/api/assistant/respond', ['message' => 'Помоги выбрать подарок'])
             ->assertStatus(503)
-            ->assertJsonPath('message', 'Для AI-ассистента не настроен OPENAI_API_KEY.');
+            ->assertJsonPath('message', 'Для провайдера OpenAI не настроен OPENAI_API_KEY.');
 
         Http::assertNothingSent();
+    }
+
+    public function test_assistant_reports_provider_without_adapter(): void
+    {
+        config([
+            'assistant.default' => 'gigachat',
+            'assistant.providers.gigachat.driver' => null,
+        ]);
+
+        $this->postJson('/api/assistant/respond', ['message' => 'Помоги выбрать подарок'])
+            ->assertStatus(503)
+            ->assertJsonPath('message', 'Для AI-провайдера gigachat не настроен класс адаптера.');
     }
 }
