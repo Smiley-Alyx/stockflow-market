@@ -79,6 +79,7 @@ inbox и выполняет компенсации release, refund и shipment c
 | [`docs/delivery-flow.md`](docs/delivery-flow.md) | Сквозная checkout-последовательность и компенсирующие действия |
 | [`docs/failure-modes.md`](docs/failure-modes.md) | Сценарии отказов и таблица гарантий |
 | [`docs/provider-outcome-dlq-runbook.md`](docs/provider-outcome-dlq-runbook.md) | Поиск, диагностика и requeue provider outcome DLQ |
+| [`docs/ai-assistant-providers.md`](docs/ai-assistant-providers.md) | Подключение OpenAI, GigaChat, Yandex AI и других AI-провайдеров |
 | [`docs/demo.md`](docs/demo.md) | Пятиминутный сценарий демонстрации техлиду |
 
 ## Текущий статус
