@@ -217,6 +217,21 @@ export const useCatalogApi = () => {
         };
     };
 
+    const fetchAssistantProducts = async (params: AssistantCatalogQueryParams = {}) => {
+        const response = await $fetch<ApiPaginatedResource<CatalogProduct[], CatalogMeta>>(
+            '/api/catalog/assistant-products',
+            {
+                baseURL: apiBase,
+                query: params,
+            },
+        );
+
+        return {
+            products: response.data,
+            meta: response.meta,
+        };
+    };
+
     const fetchCatalogPath = async (path = '', params: CatalogQueryParams = {}) => {
         const endpoint = path ? `/catalog/${path.replace(/^\/+|\/+$/g, '')}/` : '/api/catalog/products';
         const response = await $fetch<ApiPaginatedResource<CatalogProduct[], CatalogMeta>>(endpoint, {
@@ -242,6 +257,7 @@ export const useCatalogApi = () => {
         fetchCategoryTree,
         fetchProduct,
         fetchProducts,
+        fetchAssistantProducts,
         fetchCatalogPath,
         fetchHomepage,
     };
@@ -255,6 +271,15 @@ export type CatalogQueryParams = {
     per_page?: number;
     in_stock?: boolean | number;
     city_code?: string;
+};
+
+export type AssistantCatalogQueryParams = {
+    q?: string;
+    color?: string;
+    in_stock?: boolean | number;
+    price_to?: number;
+    sort?: 'newest' | 'price_asc' | 'price_desc' | 'rating_desc';
+    limit?: number;
 };
 
 function isNotFoundError(error: unknown): boolean {

@@ -30,7 +30,6 @@ const pending = ref(false);
 const listening = ref(false);
 const voiceAvailable = ref(false);
 const messageList = ref<HTMLElement | null>(null);
-const productCache = ref<CatalogProduct[] | null>(null);
 const recognition = shallowRef<SpeechRecognitionInstance | null>(null);
 const messages = ref<AssistantMessage[]>(initialMessages());
 
@@ -126,11 +125,22 @@ const respond = async (text: string) => {
         return;
     }
 
-    const products = await loadProducts();
     const maxPrice = extractMaxPrice(normalized);
     const color = extractColor(normalized);
     const inStockOnly = /в наличии|достав|забрать|сегодня|быстр/.test(normalized);
     const cheaper = /дешев|бюджет|недорог/.test(normalized);
+    const popular = /хит|популяр|лучш/.test(normalized);
+    const broadIntent = /подар|коллег|универсаль|работ|офис|хит|популяр|лучш/.test(normalized);
+    const products = (
+        await catalogApi.fetchAssistantProducts({
+            q: broadIntent ? undefined : assistantSearchQuery(normalized) || undefined,
+            color: color ?? undefined,
+            in_stock: inStockOnly ? 1 : undefined,
+            price_to: maxPrice === null ? undefined : maxPrice * 100,
+            sort: cheaper ? 'price_asc' : popular ? 'rating_desc' : 'newest',
+            limit: 50,
+        })
+    ).products;
     const ranked = products
         .filter((product) => !inStockOnly || product.availability.in_stock)
         .filter((product) => maxPrice === null || !product.price || product.price.amount_minor <= maxPrice * 100)
@@ -156,14 +166,6 @@ const respond = async (text: string) => {
             : 'Под эти условия товаров не нашлось. Попробуйте увеличить бюджет или убрать одно из ограничений.',
         products: result,
     });
-};
-
-const loadProducts = async () => {
-    if (!productCache.value) {
-        productCache.value = (await catalogApi.fetchProducts({ per_page: 24 })).products;
-    }
-
-    return productCache.value;
 };
 
 const startVoice = () => {
@@ -243,17 +245,38 @@ function scoreProduct(product: CatalogProduct, query: string): number {
 }
 
 function subjectTokens(query: string): string[] {
-    const ignored = new Set([
-        'и', 'в', 'на', 'для', 'до', 'от', 'из', 'мне', 'хочу', 'ищу', 'найди', 'нужен', 'нужна', 'нужно',
-        'покажи', 'подбери', 'товар', 'товары', 'первый', 'первые', 'два', 'только', 'цвет', 'цена', 'бюджет',
-        'тыс', 'тысяч', 'к',
-    ].map(stem));
+    const ignored = ignoredSubjectTokens();
     const color = extractColor(query);
 
     return query
         .split(' ')
         .map(stem)
         .filter((token) => token.length > 2 && !ignored.has(token) && token !== color && !/^\d+$/.test(token));
+}
+
+function assistantSearchQuery(query: string): string {
+    const ignored = ignoredSubjectTokens();
+    const color = extractColor(query);
+
+    return query
+        .split(' ')
+        .filter((token) => {
+            const normalizedToken = stem(token);
+
+            return normalizedToken.length > 2
+                && !ignored.has(normalizedToken)
+                && normalizedToken !== color
+                && !/^\d+$/.test(normalizedToken);
+        })
+        .join(' ');
+}
+
+function ignoredSubjectTokens(): Set<string> {
+    return new Set([
+        'и', 'в', 'на', 'для', 'до', 'от', 'из', 'мне', 'хочу', 'ищу', 'найди', 'нужен', 'нужна', 'нужно',
+        'покажи', 'подбери', 'товар', 'товары', 'первый', 'первые', 'два', 'только', 'цвет', 'цена', 'бюджет',
+        'тыс', 'тысяч', 'к',
+    ].map(stem));
 }
 
 function stem(word: string): string {
