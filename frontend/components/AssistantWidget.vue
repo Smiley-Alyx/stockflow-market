@@ -128,11 +128,13 @@ const respond = async (text: string) => {
 
     const products = await loadProducts();
     const maxPrice = extractMaxPrice(normalized);
+    const color = extractColor(normalized);
     const inStockOnly = /в наличии|достав|забрать|сегодня|быстр/.test(normalized);
     const cheaper = /дешев|бюджет|недорог/.test(normalized);
     const ranked = products
         .filter((product) => !inStockOnly || product.availability.in_stock)
         .filter((product) => maxPrice === null || !product.price || product.price.amount_minor <= maxPrice * 100)
+        .filter((product) => color === null || productHasColor(product, color))
         .map((product) => ({ product, score: scoreProduct(product, normalized) }))
         .sort((left, right) => {
             if (cheaper && left.score === right.score) {
@@ -141,14 +143,16 @@ const respond = async (text: string) => {
 
             return right.score - left.score;
         });
-    const hasMeaningfulMatch = ranked.some((entry) => entry.score > 0);
-    const result = (hasMeaningfulMatch ? ranked.filter((entry) => entry.score > 0) : ranked).slice(0, 5).map((entry) => entry.product);
+    const relevant = ranked.filter((entry) => entry.score > 0);
+    const hasSubject = subjectTokens(normalized).length > 0;
+    const hasMeaningfulMatch = relevant.length > 0 || !hasSubject;
+    const result = (hasSubject ? relevant : ranked).slice(0, 5).map((entry) => entry.product);
 
     messages.value.push({
         id: Date.now() + 1,
         role: 'assistant',
         text: result.length
-            ? resultText(text, result, maxPrice, inStockOnly, hasMeaningfulMatch)
+            ? resultText(text, result, maxPrice, inStockOnly, hasMeaningfulMatch, color)
             : 'Под эти условия товаров не нашлось. Попробуйте увеличить бюджет или убрать одно из ограничений.',
         products: result,
     });
@@ -214,13 +218,10 @@ function searchableText(product: CatalogProduct): string {
 }
 
 function scoreProduct(product: CatalogProduct, query: string): number {
-    const haystack = searchableText(product);
-    const ignored = new Set([
-        'и', 'в', 'на', 'для', 'до', 'от', 'из', 'мне', 'хочу', 'ищу', 'нужен', 'нужна', 'нужно',
-        'покажи', 'подбери', 'товар', 'товары', 'первый', 'первые', 'два', 'только',
-    ]);
-    const tokens = query.split(' ').filter((token) => token.length > 2 && !ignored.has(token) && !/^\d+$/.test(token));
-    let score = tokens.reduce((total, token) => total + (haystack.includes(token) ? 3 : 0), 0);
+    const text = searchableText(product);
+    const haystack = new Set(text.split(' ').map(stem));
+    const tokens = subjectTokens(query);
+    let score = tokens.reduce((total, token) => total + (haystack.has(token) ? 3 : 0), 0);
 
     if (/хит|популяр|лучш/.test(query)) {
         score += (product.rating ?? 0) + Math.min(product.rating_count / 10, 5);
@@ -230,15 +231,58 @@ function scoreProduct(product: CatalogProduct, query: string): number {
         score += 2;
     }
 
-    if (/работ|офис/.test(query) && /ноутбук|клавиатур|мыш|наушник|кресл|ламп/.test(haystack)) {
+    if (/работ|офис/.test(query) && /ноутбук|клавиатур|мыш|наушник|кресл|ламп/.test(text)) {
         score += 6;
     }
 
-    if (product.availability.in_stock) {
+    if (score > 0 && product.availability.in_stock) {
         score += 0.5;
     }
 
     return score;
+}
+
+function subjectTokens(query: string): string[] {
+    const ignored = new Set([
+        'и', 'в', 'на', 'для', 'до', 'от', 'из', 'мне', 'хочу', 'ищу', 'найди', 'нужен', 'нужна', 'нужно',
+        'покажи', 'подбери', 'товар', 'товары', 'первый', 'первые', 'два', 'только', 'цвет', 'цена', 'бюджет',
+        'тыс', 'тысяч', 'к',
+    ].map(stem));
+    const color = extractColor(query);
+
+    return query
+        .split(' ')
+        .map(stem)
+        .filter((token) => token.length > 2 && !ignored.has(token) && token !== color && !/^\d+$/.test(token));
+}
+
+function stem(word: string): string {
+    const endings = [
+        'иями', 'ями', 'ами', 'ого', 'его', 'ому', 'ему', 'ыми', 'ими', 'ая', 'яя', 'ой', 'ей', 'ий', 'ый',
+        'ое', 'ее', 'ую', 'юю', 'ам', 'ям', 'ах', 'ях', 'ов', 'ев', 'ом', 'ем', 'а', 'я', 'ы', 'и', 'у', 'ю',
+        'е', 'о',
+    ];
+    const ending = endings.find((candidate) => word.endsWith(candidate) && word.length - candidate.length >= 3);
+
+    return ending ? word.slice(0, -ending.length) : word;
+}
+
+function extractColor(query: string): string | null {
+    const colors = new Set([
+        'син', 'бел', 'черн', 'красн', 'зелен', 'желт', 'сер', 'графит', 'натуральн', 'шалфейн',
+        'бежев', 'терракотов', 'оливков', 'сиренев', 'песочн',
+    ]);
+
+    return query.split(' ').map(stem).find((token) => colors.has(token)) ?? null;
+}
+
+function productHasColor(product: CatalogProduct, color: string): boolean {
+    return product.attributes.some((attribute) => {
+        const name = stem(normalize(attribute.name));
+        const values = normalize(attribute.value).split(' ').map(stem);
+
+        return (name === 'цвет' || name === 'color') && values.includes(color);
+    });
 }
 
 function extractMaxPrice(query: string): number | null {
@@ -262,9 +306,11 @@ function resultText(
     maxPrice: number | null,
     inStockOnly: boolean,
     meaningful: boolean,
+    color: string | null,
 ): string {
     const conditions = [
-        maxPrice ? `в бюджете до ${maxPrice.toLocaleString('ru-RU')} ₽` : '',
+        color ? 'в нужном цвете' : '',
+        maxPrice ? `в бюджете до ${formatBudget(maxPrice, products)}` : '',
         inStockOnly ? 'с наличием на складах' : '',
     ].filter(Boolean).join(' и ');
 
@@ -273,6 +319,20 @@ function resultText(
     }
 
     return `Нашёл ${products.length} подходящих вариантов${conditions ? ` ${conditions}` : ''}. Первые позиции лучше всего совпадают с вашим запросом.`;
+}
+
+function formatBudget(amount: number, products: CatalogProduct[]): string {
+    const currency = products.find((product) => product.price)?.price?.currency;
+
+    if (!currency) {
+        return amount.toLocaleString('ru-RU');
+    }
+
+    return new Intl.NumberFormat('ru-RU', {
+        style: 'currency',
+        currency,
+        maximumFractionDigits: 0,
+    }).format(amount);
 }
 
 function comparisonText(products: CatalogProduct[]): string {
