@@ -86,6 +86,15 @@ class ArchitectureStructureTest extends TestCase
         $this->assertStringContainsString('alert: StockflowHttpLatencyP95High', $rules);
     }
 
+    public function test_frontend_mounts_only_provider_backed_assistant(): void
+    {
+        $app = (string) file_get_contents(base_path('frontend/app.vue'));
+
+        $this->assertStringContainsString("\nAiAssistantWidget\n", $app);
+        $this->assertStringNotContainsString("\nAssistantWidget\n", $app);
+        $this->assertFileDoesNotExist(base_path('frontend/components/AssistantWidget.vue'));
+    }
+
     public function test_compose_defines_clickhouse_storage(): void
     {
         $compose = (string) file_get_contents(base_path('compose.yaml'));
