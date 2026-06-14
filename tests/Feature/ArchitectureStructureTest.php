@@ -60,6 +60,16 @@ class ArchitectureStructureTest extends TestCase
         $this->assertStringContainsString('php artisan queue:work redis --queue=search-indexing', $compose);
     }
 
+    public function test_common_compose_routes_domain_events_through_rabbitmq(): void
+    {
+        $compose = (string) file_get_contents(base_path('docker-compose-all.yml'));
+
+        $this->assertStringContainsString('domain-outbox-worker:', $compose);
+        $this->assertStringContainsString('STOCKFLOW_EVENT_BUS: rabbitmq', $compose);
+        $this->assertStringContainsString('domain-event-worker:', $compose);
+        $this->assertStringContainsString('php artisan messaging:domain-events:consume', $compose);
+    }
+
     public function test_compose_defines_clickhouse_storage(): void
     {
         $compose = (string) file_get_contents(base_path('compose.yaml'));

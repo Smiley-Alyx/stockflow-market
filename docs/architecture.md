@@ -42,6 +42,11 @@ inventory/payment/delivery requests через transactional outbox relay, по�
 outcomes через inbox-дедупликацию и проецирует статусы резервов в checkout
 read-модель.
 
+Общие доменные события проходят через transactional outbox и topic exchange
+`stockflow.domain.events`. Market consumer использует inbox для защиты от
+повторной доставки, TTL retry queue и отдельную DLQ. Детали transport описаны в
+[`domain-event-transport.md`](domain-event-transport.md).
+
 Это разделяет два уровня демонстрации:
 
 | Уровень | Что работает сейчас |

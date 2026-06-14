@@ -13,6 +13,7 @@
 | Shipment creation failed после capture | Fulfillment не стартует | Market публикует refund, затем release резерва |
 | Дублированный request | Provider replay-ит сохранённый результат | Side effect выполняется один раз |
 | Дублированный outcome | Market inbox пропускает повторный transition | Saga state не меняется повторно |
+| Дублированное доменное событие | Market inbox пропускает повторный dispatch | Listener side effect выполняется один раз |
 | Невалидный payload | Сообщение не обрабатывается как бизнес-команда | DLQ и ручной разбор |
 | Broker недоступен при публикации market | Outbox сохраняет событие | Relay повторяет публикацию после восстановления |
 
@@ -20,9 +21,9 @@
 
 | Гарантия | ERP sandbox | Payment sandbox | Delivery sandbox | Market |
 | --- | --- | --- | --- | --- |
-| At-least-once delivery | Да, durable queue + retry | Да, durable queue + retry | Да, durable queue + retry | Да, durable outcomes queue + requeue |
+| At-least-once delivery | Да, durable queue + retry | Да, durable queue + retry | Да, durable queue + retry | Да, durable outcomes и domain event queues |
 | Idempotency | Да, in-memory store | Да, domain records + published event store | Да, in-memory records + published event store | Да, inbox по `message_id` и idempotent saga transitions |
-| DLQ | Да, отдельные DLQ по reservation flow | Да, `stockflow.payment.requests.dlq` | Да, `stockflow.delivery.requests.dlq` | Да, `stockflow.market.provider.outcomes.dlq` для provider outcomes |
+| DLQ | Да, отдельные DLQ по reservation flow | Да, `stockflow.payment.requests.dlq` | Да, `stockflow.delivery.requests.dlq` | Да, отдельные provider outcomes и domain events DLQ |
 | Retry | TTL retry queues, по умолчанию 3 попытки | Retry queue, по умолчанию 3 попытки | Retry queue, по умолчанию 3 попытки | Да, outbox relay с backoff и stale claim recovery |
 | Correlation tracing | `correlation_id`, `causation_id` | `correlation_id`, `causation_id` | `correlation_id`, `causation_id` | Да, один `correlation_id` на saga |
 
@@ -44,9 +45,10 @@ Provider sandbox-сервисы позволяют воспроизводить 
 
 ## Ограничения общего стенда
 
-Общий compose поднимает runtime, broker topology, market relay, outcome consumer
-и три provider worker. Автономный broker-level E2E happy path сам поднимает
-стенд, прогоняет один checkout и останавливает созданные контейнеры:
+Общий compose поднимает runtime, broker topology, domain event relay и consumer,
+provider outcome consumer и три provider worker. Автономный broker-level E2E
+happy path сам поднимает стенд, прогоняет один checkout и останавливает созданные
+контейнеры:
 
 ```bash
 ./scripts/test-broker-checkout-e2e.sh

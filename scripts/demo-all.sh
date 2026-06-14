@@ -49,14 +49,14 @@ fi
 docker compose -f "$COMPOSE_FILE" up -d --build
 docker compose -f "$COMPOSE_FILE" exec -T php php artisan migrate --force
 docker compose -f "$COMPOSE_FILE" exec -T php php artisan db:seed --force
-docker compose -f "$COMPOSE_FILE" restart domain-outbox-worker provider-outbox-worker provider-outcome-worker
+docker compose -f "$COMPOSE_FILE" restart domain-outbox-worker domain-event-worker provider-outbox-worker provider-outcome-worker
 
 wait_for_url "Market gateway" "http://localhost:8080/health/ready"
 wait_for_url "Payment sandbox" "http://localhost:8081/health"
 wait_for_url "Delivery sandbox" "http://localhost:8082/health"
 wait_for_url "ERP sandbox" "http://localhost:8083/health"
 
-for service in queue-worker search-index-worker scheduler domain-outbox-worker provider-outbox-worker provider-outcome-worker payment-mock-worker delivery-mock-worker; do
+for service in queue-worker search-index-worker scheduler domain-outbox-worker domain-event-worker provider-outbox-worker provider-outcome-worker payment-mock-worker delivery-mock-worker; do
     assert_service_running "$service"
 done
 

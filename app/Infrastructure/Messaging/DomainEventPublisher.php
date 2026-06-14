@@ -2,6 +2,7 @@
 
 namespace App\Infrastructure\Messaging;
 
+use App\Infrastructure\Messaging\RabbitMq\DomainEventRabbitMqPublisher;
 use App\Infrastructure\Resilience\CircuitBreaker;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,7 @@ class DomainEventPublisher
 {
     public function __construct(
         private readonly CircuitBreaker $circuitBreaker,
+        private readonly DomainEventRabbitMqPublisher $rabbitMq,
     ) {}
 
     public function publishPending(int $limit = 100): int
@@ -57,9 +59,13 @@ class DomainEventPublisher
         }
 
         try {
-            DomainEventContext::withMessageId((string) $claimed->id, function () use ($claimed): void {
-                Event::dispatch(unserialize(base64_decode($claimed->serialized_event), ['allowed_classes' => true]));
-            });
+            if ($this->usesRabbitMq()) {
+                $this->rabbitMq->publish($claimed);
+            } else {
+                DomainEventContext::withMessageId((string) $claimed->id, function () use ($claimed): void {
+                    Event::dispatch(unserialize(base64_decode($claimed->serialized_event), ['allowed_classes' => true]));
+                });
+            }
 
             $claimed->status = OutboxMessage::STATUS_PUBLISHED;
             $claimed->published_at = now();

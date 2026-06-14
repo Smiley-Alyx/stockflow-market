@@ -58,7 +58,7 @@ provider_saga_cleanup() {
 }
 
 provider_saga_prepare() {
-    for service in php postgres rabbitmq erp-mock payment-mock payment-mock-worker delivery-mock delivery-mock-worker domain-outbox-worker provider-outbox-worker provider-outcome-worker; do
+    for service in php postgres rabbitmq erp-mock payment-mock payment-mock-worker delivery-mock delivery-mock-worker domain-outbox-worker domain-event-worker provider-outbox-worker provider-outcome-worker; do
         provider_saga_assert_running "$service"
     done
 

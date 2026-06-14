@@ -58,6 +58,19 @@ services:
       RABBITMQ_PASSWORD: stockflow
       RABBITMQ_USER: stockflow
       CLICKHOUSE_ENABLED: "true"
+      STOCKFLOW_EVENT_BUS: rabbitmq
+
+  domain-event-worker:
+    extends:
+      file: compose.yaml
+      service: queue-worker
+    container_name: stockflow-domain-event-worker
+    command: php artisan messaging:domain-events:consume
+    environment:
+      RABBITMQ_ENABLED: "true"
+      RABBITMQ_PASSWORD: stockflow
+      RABBITMQ_USER: stockflow
+      CLICKHOUSE_ENABLED: "true"
 
   provider-outcome-worker:
     extends:

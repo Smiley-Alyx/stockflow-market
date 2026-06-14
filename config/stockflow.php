@@ -34,6 +34,9 @@ return [
             'enabled' => (bool) env('RABBITMQ_ENABLED', false),
             'host' => env('RABBITMQ_HOST', 'rabbitmq'),
             'port' => (int) env('RABBITMQ_PORT', 5672),
+            'user' => env('RABBITMQ_USER', 'stockflow'),
+            'password' => env('RABBITMQ_PASSWORD', 'secret'),
+            'vhost' => env('RABBITMQ_VHOST', '/'),
             'critical' => (bool) env('RABBITMQ_CRITICAL', false),
         ],
         'elasticsearch' => [
@@ -97,11 +100,6 @@ return [
             'publisher_confirm_timeout_seconds' => (int) env('STOCKFLOW_PROVIDER_OUTBOX_CONFIRM_TIMEOUT_SECONDS', 5),
         ],
         'rabbitmq' => [
-            'host' => env('RABBITMQ_HOST', 'rabbitmq'),
-            'port' => (int) env('RABBITMQ_PORT', 5672),
-            'user' => env('RABBITMQ_USER', 'stockflow'),
-            'password' => env('RABBITMQ_PASSWORD', 'secret'),
-            'vhost' => env('RABBITMQ_VHOST', '/'),
             'outcomes_queue' => env('STOCKFLOW_PROVIDER_OUTCOMES_QUEUE', 'stockflow.market.provider.outcomes'),
             'outcomes_retry_queue' => env('STOCKFLOW_PROVIDER_OUTCOMES_RETRY_QUEUE', 'stockflow.market.provider.outcomes.retry'),
             'outcomes_dead_letter_queue' => env('STOCKFLOW_PROVIDER_OUTCOMES_DLQ', 'stockflow.market.provider.outcomes.dlq'),
@@ -128,6 +126,15 @@ return [
 
     'messaging' => [
         'event_bus' => env('STOCKFLOW_EVENT_BUS', 'in_process'),
+        'rabbitmq' => [
+            'exchange' => env('STOCKFLOW_DOMAIN_EVENTS_EXCHANGE', 'stockflow.domain.events'),
+            'queue' => env('STOCKFLOW_DOMAIN_EVENTS_QUEUE', 'stockflow.market.domain.events'),
+            'retry_queue' => env('STOCKFLOW_DOMAIN_EVENTS_RETRY_QUEUE', 'stockflow.market.domain.events.retry'),
+            'dead_letter_queue' => env('STOCKFLOW_DOMAIN_EVENTS_DLQ', 'stockflow.market.domain.events.dlq'),
+            'retry_delay_ms' => (int) env('STOCKFLOW_DOMAIN_EVENTS_RETRY_DELAY_MS', 2000),
+            'max_retry_count' => (int) env('STOCKFLOW_DOMAIN_EVENTS_MAX_RETRY_COUNT', 3),
+            'publisher_confirm_timeout_seconds' => (int) env('STOCKFLOW_DOMAIN_EVENTS_CONFIRM_TIMEOUT_SECONDS', 5),
+        ],
         'inbox' => [
             'processing_timeout_seconds' => (int) env('STOCKFLOW_INBOX_PROCESSING_TIMEOUT_SECONDS', 60),
         ],

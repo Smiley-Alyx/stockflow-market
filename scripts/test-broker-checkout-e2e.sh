@@ -51,6 +51,7 @@ docker compose -f "$COMPOSE_FILE" up -d --build php erp-mock payment-mock delive
 docker compose -f "$COMPOSE_FILE" exec -T php php artisan migrate --force
 docker compose -f "$COMPOSE_FILE" up -d --build \
     domain-outbox-worker \
+    domain-event-worker \
     provider-outbox-worker \
     provider-outcome-worker \
     payment-mock-worker \

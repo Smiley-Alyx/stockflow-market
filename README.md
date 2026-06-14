@@ -105,6 +105,7 @@ inbox и выполняет компенсации release, refund и shipment c
 - реализован checkout-срез `cart → draft order → price snapshot → async inventory reservation → paid / cancelled / expired`;
 - добавлена provider saga `reserve → authorize → capture → shipment` с outbox relay, inbox-дедупликацией и компенсациями;
 - checkout read-модель проецирует статусы резервов из RabbitMQ outcomes и доступна через `GET /api/orders/{id}/checkout`;
+- межсервисные доменные события публикуются в RabbitMQ через outbox relay и потребляются с inbox-дедупликацией, retry и DLQ;
 - добавлены маршрутизация резервов по складам, архивирование складских движений и географический фильтр остатков;
 - цены поддерживают городские переопределения, версии, интервалы активности и промокоды; заказ сохраняет снимок выбранной цены и скидки;
 - добавлена scheduled-команда истечения активных inventory-резервов с метрикой количества истёкших резервов;
@@ -221,7 +222,7 @@ stockflow-market/
 | Elasticsearch | индексация каталога, поисковый read endpoint и деградированный ответ при недоступности | используется |
 | Prometheus | scrape `/metrics` с latency, очередями, конфликтами резервов и ошибками индексации | используется |
 | Grafana | автоматически provisioned dashboard `StockFlow Observability` поверх Prometheus | используется |
-| RabbitMQ | provider outbox relay, outcome consumer и circuit breaker; открытый circuit оставляет события в outbox | профиль `extended`, используется provider saga |
+| RabbitMQ | provider saga и transport доменных событий с outbox/inbox, retry и DLQ | профиль `extended`, используется |
 | ClickHouse | витрина `inventory_stock_movements`, заполняемая из outbox-событий с inbox-защитой от повторной доставки | профиль `extended`, используется |
 
 Расширенный профиль запускается явно:
@@ -231,9 +232,9 @@ RABBITMQ_ENABLED=true CLICKHOUSE_ENABLED=true docker compose --profile extended 
 ```
 
 Backend использует in-process публикацию общих доменных outbox-событий по
-умолчанию. Переменная `STOCKFLOW_EVENT_BUS=rabbitmq` пока включает для них
-только circuit-breaker границу для тестирования поведения outbox при
-недоступности будущего transport, но не отправляет эти сообщения в RabbitMQ.
+умолчанию. В общем стенде `STOCKFLOW_EVENT_BUS=rabbitmq` переключает relay на
+topic exchange `stockflow.domain.events`; отдельный consumer обрабатывает
+события с inbox-дедупликацией, TTL retry queue и DLQ.
 Checkout всегда запускает provider saga: reservation requests и outcomes идут
 через отдельный RabbitMQ transport, а gateway читает их асинхронную проекцию.
 
@@ -476,8 +477,7 @@ baseline.
 
 ## Ближайший план
 
-1. Подключить RabbitMQ transport для межсервисных доменных событий и проверить сценарии повторной доставки.
-2. Добавить alert rules для Prometheus по росту dead-letter, очередей и latency.
+1. Добавить alert rules для Prometheus по росту dead-letter, очередей и latency.
 
 ## Лицензия
 

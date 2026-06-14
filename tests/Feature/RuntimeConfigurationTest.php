@@ -14,6 +14,7 @@ class RuntimeConfigurationTest extends TestCase
         $this->assertSame(15, config('stockflow.runtime.shutdown_timeout_seconds'));
         $this->assertFalse(config('stockflow.dependencies.rabbitmq.enabled'));
         $this->assertSame('rabbitmq', config('stockflow.dependencies.rabbitmq.host'));
+        $this->assertSame('stockflow', config('stockflow.dependencies.rabbitmq.user'));
         $this->assertSame('http://elasticsearch:9200', config('stockflow.dependencies.elasticsearch.host'));
         $this->assertSame('http://clickhouse:8123', config('stockflow.dependencies.clickhouse.host'));
         $this->assertFalse(config('stockflow.dependencies.clickhouse.enabled'));
@@ -30,6 +31,8 @@ class RuntimeConfigurationTest extends TestCase
         $this->assertSame(100, config('stockflow.search.indexing.batch_size'));
         $this->assertSame(500, config('stockflow.search.indexing.max_in_flight'));
         $this->assertSame('in_process', config('stockflow.messaging.event_bus'));
+        $this->assertSame('stockflow.domain.events', config('stockflow.messaging.rabbitmq.exchange'));
+        $this->assertSame('stockflow.market.domain.events', config('stockflow.messaging.rabbitmq.queue'));
         $this->assertSame(5, config('stockflow.messaging.retry.max_attempts'));
     }
 
@@ -51,6 +54,8 @@ class RuntimeConfigurationTest extends TestCase
         $this->assertStringContainsString('STOCKFLOW_SEARCH_REQUEUE_AUDIT_CHANNEL=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_SEARCH_REQUEUE_BATCH_SIZE=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_EVENT_BUS=in_process', $envExample);
+        $this->assertStringContainsString('STOCKFLOW_DOMAIN_EVENTS_QUEUE=', $envExample);
+        $this->assertStringContainsString('STOCKFLOW_DOMAIN_EVENTS_DLQ=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_MESSAGE_RETRY_ATTEMPTS=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_MESSAGE_DEAD_LETTER_AFTER=', $envExample);
     }
