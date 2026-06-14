@@ -14,8 +14,10 @@ StockFlow Market — инженерный pet-проект маркетплей�
   и очередей, Elasticsearch для поиска, ClickHouse для аналитической витрины
   складских движений.
 - Приближенную к production эксплуатационную поверхность: readiness probes,
-  Prometheus-метрики, Grafana dashboard, fault injection, DLQ-runbook,
-  воспроизводимый broker-level E2E и регрессионный baseline k6.
+  Prometheus-метрики и alert rules, Grafana dashboard, fault injection,
+  DLQ-runbook, воспроизводимый broker-level E2E и регрессионный baseline k6.
+- Provider-независимый AI-ассистент, который ищет товары через каталог и
+  возвращает карточки только для подтверждённых результатами поиска ID.
 - Осознанные ограничения: это локальный Docker Compose стенд и инженерный case,
   а не заявление о production capacity или exactly-once обработке.
 
@@ -78,13 +80,16 @@ inbox и выполняет компенсации release, refund и shipment c
 | [`docs/architecture.md`](docs/architecture.md) | Контекст четырёх систем, границы интеграции и компромиссы |
 | [`docs/delivery-flow.md`](docs/delivery-flow.md) | Сквозная checkout-последовательность и компенсирующие действия |
 | [`docs/failure-modes.md`](docs/failure-modes.md) | Сценарии отказов и таблица гарантий |
+| [`docs/domain-event-transport.md`](docs/domain-event-transport.md) | RabbitMQ transport доменных событий, retry и повторная доставка |
 | [`docs/provider-outcome-dlq-runbook.md`](docs/provider-outcome-dlq-runbook.md) | Поиск, диагностика и requeue provider outcome DLQ |
+| [`docs/alerting.md`](docs/alerting.md) | Prometheus alert rules, пороги и порядок диагностики |
 | [`docs/ai-assistant-providers.md`](docs/ai-assistant-providers.md) | Подключение OpenAI, GigaChat, Yandex AI и других AI-провайдеров |
 | [`docs/demo.md`](docs/demo.md) | Пятиминутный сценарий демонстрации техлиду |
 
 ## Текущий статус
 
-Сейчас проект находится на этапе закладки фундамента:
+Сейчас проект представляет рабочий локальный интеграционный стенд и набор
+сквозных backend-срезов:
 
 - поднят Laravel backend shell, который временно выполняет роль API gateway;
 - добавлен Docker Compose для локального запуска инфраструктуры;
@@ -112,6 +117,11 @@ inbox и выполняет компенсации release, refund и shipment c
 - добавлена операционная команда `search:dead-letter` для просмотра и ручного возврата документов поисковой индексации из отдельного dead-letter backend;
 - поиск умеет возвращать деградированный ответ при недоступности Elasticsearch;
 - добавлен Prometheus-compatible `/metrics` endpoint и локальный Prometheus/Grafana стек для latency, очередей, dead-letter, reservation conflicts, saga outcomes, компенсаций и stale messaging claims;
+- Prometheus собирает per-object метрики RabbitMQ и загружает проверяемые
+  `promtool` правила для роста DLQ, backlog очередей и HTTP p95 latency;
+- provider-backed AI-ассистент использует `search_catalog`, структурированный
+  ответ и серверную проверку выбранных product ID; старый браузерный
+  эвристический подбор удалён;
 - добавлен `config/stockflow.php` для runtime-настроек таймаутов, кеша, очередей, retry и backpressure limits;
 - описан первый ADR по переходной архитектуре Laravel gateway + service workspace;
 - добавлен архитектурный тест, который проверяет наличие сервисной структуры.
@@ -132,6 +142,7 @@ flowchart LR
         orders["Orders"]
         homepage["Homepage"]
         search["Search"]
+        assistant["Assistant"]
     end
 
     gateway --> catalog
@@ -140,6 +151,7 @@ flowchart LR
     gateway --> orders
     gateway --> homepage
     gateway --> search
+    gateway --> assistant
 
     postgres[("PostgreSQL")]
     redis[("Redis<br/>cache / queues / dead-letter")]
@@ -154,12 +166,14 @@ flowchart LR
     inventory --> outbox
     orders --> outbox
     outbox --> postgres
-    outbox --> publisher["In-process publisher"]
-    publisher --> redis
+    outbox --> publisher["Domain event relay"]
+    publisher -. "in_process" .-> listeners["Laravel listeners"]
+    listeners --> redis
     redis --> worker["Search index worker"]
     worker --> elasticsearch
     worker -. "dead-letter при сбое" .-> redis
     search --> elasticsearch
+    assistant --> search
 
     prometheus["Prometheus"] -->|"scrape /metrics"| gateway
     grafana["Grafana"] --> prometheus
@@ -169,8 +183,12 @@ flowchart LR
         clickhouse[("ClickHouse<br/>аналитика складских движений")]
     end
 
+    publisher -. "rabbitmq mode" .-> rabbitmq
+    rabbitmq --> eventconsumer["Domain event consumer"]
+    eventconsumer --> listeners
     outbox -. "provider requests / outcomes" .-> rabbitmq
     outbox -- "inventory.stock.changed" --> clickhouse
+    prometheus -->|"scrape /metrics/per-object"| rabbitmq
 ```
 
 ```text
@@ -210,7 +228,7 @@ stockflow-market/
 | `elasticsearch` | поисковый движок | базовый | `http://localhost:9200` |
 | `prometheus` | сбор метрик gateway | базовый | `http://localhost:9090` |
 | `grafana` | дашборды наблюдаемости | базовый | `http://localhost:3001` |
-| `rabbitmq` | transport для provider saga и будущих доменных событий | `extended` | `localhost:5672`, UI `http://localhost:15672` |
+| `rabbitmq` | transport для provider saga и доменных событий | `extended` | `localhost:5672`, UI `http://localhost:15672` |
 | `clickhouse` | аналитическая витрина складских движений | `extended` | HTTP `http://localhost:8123`, native `localhost:9000` |
 
 ## Сценарии инфраструктуры
@@ -220,7 +238,7 @@ stockflow-market/
 | PostgreSQL | транзакционные данные каталога, складов, цен, корзин, заказов, outbox и inbox | используется |
 | Redis | кеш каталога, Laravel queues, сессии и search dead-letter storage | используется |
 | Elasticsearch | индексация каталога, поисковый read endpoint и деградированный ответ при недоступности | используется |
-| Prometheus | scrape `/metrics` с latency, очередями, конфликтами резервов и ошибками индексации | используется |
+| Prometheus | gateway/RabbitMQ scrape и alert rules для DLQ, backlog очередей и HTTP p95 latency | используется |
 | Grafana | автоматически provisioned dashboard `StockFlow Observability` поверх Prometheus | используется |
 | RabbitMQ | provider saga и transport доменных событий с outbox/inbox, retry и DLQ | профиль `extended`, используется |
 | ClickHouse | витрина `inventory_stock_movements`, заполняемая из outbox-событий с inbox-защитой от повторной доставки | профиль `extended`, используется |
@@ -348,6 +366,19 @@ docker compose down
 
 Эти настройки задают операционные границы для кеша каталога, Elasticsearch adapter, retries и backpressure. Очередь `search-indexing` уже используется job pipeline для поисковой индексации, а окончательно упавшие документы сохраняются в Redis-backed dead-letter storage с operational name `search-indexing-dead-letter`.
 
+## AI-ассистент
+
+Nuxt отображает один provider-backed AI-виджет. Backend выбирает адаптер через
+`AI_ASSISTANT_PROVIDER`; OpenAI используется по умолчанию, а для GigaChat и
+Yandex AI предусмотрены конфигурационные точки расширения.
+
+Для рекомендаций адаптер обязан вызвать `search_catalog`. Финальный ответ
+содержит текст и выбранные `product_ids`; перед возвратом клиенту backend
+пересекает их с фактическими результатами поиска. Это не позволяет
+промежуточным или выдуманным ID попасть в карточки товаров. Настройка новых
+провайдеров описана в
+[`docs/ai-assistant-providers.md`](docs/ai-assistant-providers.md).
+
 ## Наблюдаемость
 
 Gateway отдаёт Prometheus text exposition на:
@@ -441,7 +472,10 @@ composer test
 
 GitHub Actions workflow `.github/workflows/ci.yml` запускает `composer test`, `vendor/bin/pint --test` и `docker compose config --quiet` для каждого push и pull request.
 
-Тесты страхуют базовый Laravel bootstrap, runtime-конфигурацию, сервисную структуру, модель и проекции каталога, OpenAPI-контракты, HTTP read API, блоки главной страницы, цены и промокоды, checkout-срез с резервированием остатков и поисковый indexing pipeline, включая retry/dead-letter поведение и ручной requeue.
+Тесты страхуют базовый Laravel bootstrap, runtime-конфигурацию, сервисную
+структуру, модель и проекции каталога, OpenAPI-контракты, HTTP read API, блоки
+главной страницы, цены и промокоды, checkout-срез, RabbitMQ transport доменных
+событий, повторную доставку, retry/DLQ и grounding карточек AI-ассистента.
 
 ## Нагрузочные сценарии
 
@@ -480,6 +514,32 @@ baseline.
 - Elasticsearch выделен под поисковые read-модели и индексацию каталога.
 - ClickHouse хранит аналитическую витрину складских движений и остаётся основой для следующих событийных витрин.
 - Контракты сервисов описываются до реализации публичных API.
+
+## Что делать дальше
+
+Приоритетные следующие шаги:
+
+1. **Усилить CI для уже существующих проверок.** Добавить обязательные jobs для
+   `npm run typecheck`, `npm run build`, `promtool check/test rules` и
+   broker-level E2E по расписанию. Результат: изменения frontend, alert rules и
+   RabbitMQ topology перестают проверяться только локально.
+2. **Заменить переходный `serialized_event` на версионированные JSON-контракты.**
+   Сейчас RabbitMQ envelope доменных событий всё ещё содержит сериализованный
+   PHP-объект для локальных listeners. Результат: события смогут безопасно
+   потребляться независимо развернутыми сервисами и проверяться контрактными
+   тестами без связи с Laravel-классами.
+3. **Подключить Alertmanager и воспроизводимые failure drills.** Настроить
+   маршрутизацию предупреждений, затем автоматизировать сценарии роста DLQ,
+   остановки consumer и деградации latency. Результат: alert rules проверяются
+   не только unit-сценариями `promtool`, но и сквозным доставленным уведомлением.
+4. **Добавить eval-набор для AI-ассистента.** Зафиксировать пользовательские
+   запросы, ожидаемые ограничения и допустимые product ID, отдельно проверяя
+   отсутствие карточек вне результатов `search_catalog`. Результат: качество
+   рекомендаций измеряется при смене prompt, модели или provider adapter.
+5. **Повторить нагрузочный baseline на реалистичном каталоге.** Подготовить
+   репрезентативный dataset, устранить основные причины текущего p95 `8.17s` и
+   сравнить новый прогон с сохранённым baseline. Результат: следующий этап
+   оптимизации опирается на измеримое изменение throughput и latency.
 
 ## Лицензия
 
