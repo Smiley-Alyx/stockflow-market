@@ -60,3 +60,57 @@ jobs:
 
       - name: Validate Compose config
         run: docker compose config --quiet
+
+  frontend:
+    name: Frontend typecheck and build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run frontend typecheck
+        run: npm run typecheck
+
+      - name: Build frontend
+        run: npm run build
+
+  promtool:
+    name: Prometheus config and alert rules
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Prometheus config
+        run: |
+          docker run --rm \
+            --entrypoint promtool \
+            -v "$PWD/docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
+            -v "$PWD/docker/prometheus/rules:/etc/prometheus/rules:ro" \
+            prom/prometheus:v3.8.0 \
+            check config /etc/prometheus/prometheus.yml
+
+      - name: Test Prometheus alert rules
+        run: |
+          docker run --rm \
+            --entrypoint promtool \
+            -v "$PWD/docker/prometheus/rules:/etc/prometheus/rules:ro" \
+            -w /etc/prometheus/rules \
+            prom/prometheus:v3.8.0 \
+            test rules stockflow-alerts.test.yml
