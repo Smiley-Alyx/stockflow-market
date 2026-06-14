@@ -111,11 +111,10 @@ ERP использует `8083` только в общем стенде: в со
 | In-memory state в ERP и delivery | Быстрые локальные демо и fault injection | State теряется при рестарте, multi-instance режим не поддержан |
 | SQLite state в payment sandbox | Повторяемый локальный ledger без отдельной БД | Не моделирует production-конкурентность PostgreSQL |
 
-## Следующий этап реализации
-
-Для усиления end-to-end checkout нужны:
-
-1. Grafana-панели и alert thresholds для saga outcomes, компенсаций и stale claim recovery.
+Prometheus собирает gateway-метрики и per-object метрики RabbitMQ. Alert rules
+сигнализируют о росте DLQ, устойчивом backlog основных очередей и повышенной HTTP
+p95 latency. Пороги и порядок диагностики описаны в
+[`alerting.md`](alerting.md).
 
 Runbook для разбора и повторной постановки provider outcome DLQ находится в
 [`provider-outcome-dlq-runbook.md`](provider-outcome-dlq-runbook.md).

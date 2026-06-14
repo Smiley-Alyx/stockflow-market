@@ -70,6 +70,22 @@ class ArchitectureStructureTest extends TestCase
         $this->assertStringContainsString('php artisan messaging:domain-events:consume', $compose);
     }
 
+    public function test_prometheus_loads_operational_alert_rules_and_rabbitmq_metrics(): void
+    {
+        $compose = (string) file_get_contents(base_path('compose.yaml'));
+        $prometheus = (string) file_get_contents(base_path('docker/prometheus/prometheus.yml'));
+        $rules = (string) file_get_contents(base_path('docker/prometheus/rules/stockflow-alerts.yml'));
+
+        $this->assertFileExists(base_path('docker/prometheus/rules/stockflow-alerts.test.yml'));
+        $this->assertStringContainsString('./docker/prometheus/rules:/etc/prometheus/rules:ro', $compose);
+        $this->assertStringContainsString('/etc/prometheus/rules/*-alerts.yml', $prometheus);
+        $this->assertStringContainsString('/metrics/per-object', $prometheus);
+        $this->assertStringContainsString('rabbitmq:15692', $prometheus);
+        $this->assertStringContainsString('alert: StockflowDeadLetterGrowth', $rules);
+        $this->assertStringContainsString('alert: StockflowQueueBacklogHigh', $rules);
+        $this->assertStringContainsString('alert: StockflowHttpLatencyP95High', $rules);
+    }
+
     public function test_compose_defines_clickhouse_storage(): void
     {
         $compose = (string) file_get_contents(base_path('compose.yaml'));

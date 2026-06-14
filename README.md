@@ -356,7 +356,9 @@ Gateway отдаёт Prometheus text exposition на:
 curl http://localhost:8080/metrics
 ```
 
-Локальный Prometheus scrape-ит endpoint `php:8000/metrics` каждые 15 секунд. Grafana автоматически подхватывает datasource `Prometheus` и dashboard `StockFlow Observability`.
+Локальный Prometheus scrape-ит endpoint `php:8000/metrics` и RabbitMQ
+`rabbitmq:15692/metrics/per-object` каждые 15 секунд. Grafana автоматически
+подхватывает datasource `Prometheus` и dashboard `StockFlow Observability`.
 
 Экспортируемые метрики:
 
@@ -368,7 +370,11 @@ curl http://localhost:8080/metrics
 | `stockflow_inventory_reservation_conflicts_total` | counter | конфликты резервирования по причине `idempotency` / `insufficient_stock` |
 | `stockflow_search_indexing_failures_total` | counter | окончательные ошибки Elasticsearch indexing/delete по index и operation |
 
-Dashboard содержит панели для p95 latency по endpoint, глубины очередей, dead-letter count, reservation conflicts rate и Elasticsearch indexing failures rate. Эти метрики покрывают текущий async pipeline и дают базу для будущих alert rules по росту dead-letter, очередей и latency.
+Dashboard содержит панели для p95 latency по endpoint, глубины очередей,
+dead-letter count, reservation conflicts rate и Elasticsearch indexing failures
+rate. Prometheus загружает правила для роста DLQ, устойчивого backlog очередей и
+HTTP p95 latency. Пороги и порядок проверки описаны в
+[`docs/alerting.md`](docs/alerting.md).
 
 ### Снимки экрана локального стенда
 
@@ -474,10 +480,6 @@ baseline.
 - Elasticsearch выделен под поисковые read-модели и индексацию каталога.
 - ClickHouse хранит аналитическую витрину складских движений и остаётся основой для следующих событийных витрин.
 - Контракты сервисов описываются до реализации публичных API.
-
-## Ближайший план
-
-1. Добавить alert rules для Prometheus по росту dead-letter, очередей и latency.
 
 ## Лицензия
 
