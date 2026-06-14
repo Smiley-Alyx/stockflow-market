@@ -3,6 +3,9 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * *'
 
 permissions:
   contents: read
@@ -114,3 +117,64 @@ jobs:
             -w /etc/prometheus/rules \
             prom/prometheus:v3.8.0 \
             test rules stockflow-alerts.test.yml
+
+  broker-e2e:
+    name: Broker checkout E2E
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    defaults:
+      run:
+        working-directory: stockflow-market
+
+    steps:
+      - name: Checkout marketplace
+        uses: actions/checkout@v4
+        with:
+          path: stockflow-market
+
+      - name: Checkout ERP sandbox
+        uses: actions/checkout@v4
+        with:
+          repository: Smiley-Alyx/stockflow-erp-mock
+          path: stockflow-erp-mock
+
+      - name: Checkout payment sandbox
+        uses: actions/checkout@v4
+        with:
+          repository: Smiley-Alyx/stockflow-payment-mock
+          path: stockflow-payment-mock
+
+      - name: Checkout delivery sandbox
+        uses: actions/checkout@v4
+        with:
+          repository: Smiley-Alyx/stockflow-delivery-mock
+          path: stockflow-delivery-mock
+
+      - name: Reset broker E2E stack
+        run: docker compose -f docker-compose-all.yml down --volumes --remove-orphans
+
+      - name: Run broker checkout E2E
+        env:
+          KEEP_BROKER_E2E_STACK: 'true'
+          TIMEOUT_SECONDS: '60'
+        run: ./scripts/test-broker-checkout-e2e.sh
+
+      - name: Collect broker E2E logs
+        if: failure()
+        run: |
+          docker compose -f docker-compose-all.yml ps --all > broker-e2e.log || true
+          docker compose -f docker-compose-all.yml logs --no-color >> broker-e2e.log 2>&1 || true
+
+      - name: Upload broker E2E logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: broker-e2e-logs
+          path: stockflow-market/broker-e2e.log
+          if-no-files-found: ignore
+
+      - name: Stop broker E2E stack
+        if: always()
+        run: docker compose -f docker-compose-all.yml down --volumes --remove-orphans
