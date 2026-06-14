@@ -24,6 +24,6 @@ class RequestProductIndexing
 
     private function messageId(ProductCreated|ProductUpdated $event): string
     {
-        return DomainEventContext::messageId() ?? sha1($event::class.serialize($event->payload()));
+        return DomainEventContext::eventId($event);
     }
 }

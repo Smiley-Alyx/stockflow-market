@@ -25,10 +25,10 @@ class DomainEventRabbitMqPublisher
                 new AMQPMessage(
                     json_encode([
                         'event_name' => $message->event_name,
+                        'schema_version' => $message->schema_version,
                         'aggregate_type' => $message->aggregate_type,
                         'aggregate_id' => $message->aggregate_id,
                         'payload' => $message->payload,
-                        'serialized_event' => $message->serialized_event,
                     ], JSON_THROW_ON_ERROR),
                     [
                         'content_type' => 'application/json',
@@ -36,6 +36,7 @@ class DomainEventRabbitMqPublisher
                         'application_headers' => new AMQPTable([
                             'message_id' => $this->messageId($message),
                             'event_name' => $message->event_name,
+                            'schema_version' => $message->schema_version,
                             'producer' => (string) config('stockflow.runtime.service_name'),
                             'retry_count' => max(0, $message->attempts - 1),
                             'occurred_at' => $message->created_at?->toISOString() ?? now()->toISOString(),

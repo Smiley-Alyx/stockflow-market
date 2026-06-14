@@ -7,11 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
     'event_name',
-    'event_class',
+    'schema_version',
     'aggregate_type',
     'aggregate_id',
     'payload',
-    'serialized_event',
     'status',
     'attempts',
     'available_at',
@@ -39,6 +38,7 @@ class OutboxMessage extends Model
     {
         return [
             'payload' => 'array',
+            'schema_version' => 'integer',
             'attempts' => 'integer',
             'available_at' => 'datetime',
             'published_at' => 'datetime',

@@ -10,6 +10,7 @@ use App\Infrastructure\Messaging\RabbitMq\DomainEventRabbitMqPublisher;
 use App\Infrastructure\Messaging\RabbitMq\DomainEventTopology;
 use App\Infrastructure\Messaging\RabbitMq\RabbitMqConnectionFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Mockery;
 use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
@@ -36,10 +37,13 @@ class DomainEventRabbitMqPublisherTest extends TestCase
                     && $routingKey === SearchIndexRequested::NAME
                     && $headers['message_id'] === 'gateway:domain-outbox:'.$message->id
                     && $headers['retry_count'] === 0
+                    && $headers['schema_version'] === 1
+                    && $envelope['event_name'] === SearchIndexRequested::NAME
+                    && $envelope['schema_version'] === 1
                     && $envelope['aggregate_type'] === 'product'
                     && $envelope['aggregate_id'] === '15'
                     && $envelope['payload'] === $event->payload()
-                    && $envelope['serialized_event'] === $message->serialized_event;
+                    && ! array_key_exists('serialized_event', $envelope);
             });
         $channel->shouldReceive('wait_for_pending_acks')->once()->with(5);
         $channel->shouldReceive('close')->once();
@@ -57,7 +61,9 @@ class DomainEventRabbitMqPublisherTest extends TestCase
         $publisher = new DomainEventRabbitMqPublisher($connections, $topology);
         $publisher->publish($message);
 
-        $this->assertTrue(true);
+        $this->assertSame(1, $message->schema_version);
+        $this->assertFalse(Schema::hasColumn('messaging_outbox', 'serialized_event'));
+        $this->assertFalse(Schema::hasColumn('messaging_outbox', 'event_class'));
     }
 
     public function test_domain_outbox_uses_rabbitmq_transport_without_in_process_dispatch(): void

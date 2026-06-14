@@ -27,6 +27,6 @@ class RequestProductIndexDeletion
 
     private function messageId(ProductArchived $event): string
     {
-        return DomainEventContext::messageId() ?? sha1($event::class.serialize($event->payload()));
+        return DomainEventContext::eventId($event);
     }
 }

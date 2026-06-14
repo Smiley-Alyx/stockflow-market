@@ -70,6 +70,19 @@ class ArchitectureStructureTest extends TestCase
         $this->assertStringContainsString('php artisan messaging:domain-events:consume', $compose);
     }
 
+    public function test_domain_event_transport_exposes_versioned_json_contract(): void
+    {
+        $contract = json_decode(
+            (string) file_get_contents(base_path('services/gateway/contracts/domain-event-envelope.v1.schema.json')),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $this->assertSame(1, $contract['properties']['schema_version']['const']);
+        $this->assertArrayNotHasKey('serialized_event', $contract['properties']);
+        $this->assertFalse($contract['additionalProperties']);
+    }
+
     public function test_prometheus_loads_operational_alert_rules_and_rabbitmq_metrics(): void
     {
         $compose = (string) file_get_contents(base_path('compose.yaml'));

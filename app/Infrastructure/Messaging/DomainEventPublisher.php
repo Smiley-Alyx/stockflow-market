@@ -14,6 +14,7 @@ class DomainEventPublisher
     public function __construct(
         private readonly CircuitBreaker $circuitBreaker,
         private readonly DomainEventRabbitMqPublisher $rabbitMq,
+        private readonly DomainEventContractRegistry $contracts,
     ) {}
 
     public function publishPending(int $limit = 100): int
@@ -63,7 +64,11 @@ class DomainEventPublisher
                 $this->rabbitMq->publish($claimed);
             } else {
                 DomainEventContext::withMessageId((string) $claimed->id, function () use ($claimed): void {
-                    Event::dispatch(unserialize(base64_decode($claimed->serialized_event), ['allowed_classes' => true]));
+                    Event::dispatch($this->contracts->restore(
+                        $claimed->event_name,
+                        $claimed->schema_version,
+                        $claimed->payload,
+                    ));
                 });
             }
 

@@ -27,6 +27,6 @@ class ProjectStockMovementAnalytics
 
     private function messageId(StockChanged $event): string
     {
-        return DomainEventContext::messageId() ?? sha1($event::class.serialize($event->payload()));
+        return DomainEventContext::eventId($event);
     }
 }

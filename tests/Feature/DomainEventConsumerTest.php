@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domains\Search\Events\SearchIndexDeletionRequested;
 use App\Domains\Search\Events\SearchIndexRequested;
 use App\Domains\Search\Jobs\IndexSearchDocument;
 use App\Infrastructure\Messaging\InboxMessage;
@@ -10,6 +11,7 @@ use App\Infrastructure\Messaging\RabbitMq\DomainEventProcessor;
 use App\Infrastructure\Messaging\RabbitMq\DomainEventTopology;
 use App\Infrastructure\Messaging\RabbitMq\RabbitMqConnectionFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Mockery;
 use PhpAmqpLib\Channel\AMQPChannel;
@@ -26,7 +28,11 @@ class DomainEventConsumerTest extends TestCase
     {
         Queue::fake();
         $event = new SearchIndexRequested('catalog_products', '15', ['sku' => 'SCAN-001']);
-        $envelope = ['serialized_event' => base64_encode(serialize($event))];
+        $envelope = [
+            'event_name' => SearchIndexRequested::NAME,
+            'schema_version' => 1,
+            'payload' => $event->payload(),
+        ];
         $headers = ['message_id' => 'gateway:domain-outbox:15'];
         $processor = $this->app->make(DomainEventProcessor::class);
 
@@ -39,6 +45,50 @@ class DomainEventConsumerTest extends TestCase
             'consumer' => DomainEventProcessor::class,
             'status' => InboxMessage::STATUS_PROCESSED,
         ]);
+    }
+
+    public function test_unsupported_domain_event_version_is_rejected_before_dispatch(): void
+    {
+        Event::fake();
+        $event = new SearchIndexRequested('catalog_products', '15', ['sku' => 'SCAN-001']);
+
+        $this->expectExceptionMessage('Unsupported search.index.requested schema version: 2');
+
+        try {
+            $this->app->make(DomainEventProcessor::class)->process(
+                ['message_id' => 'gateway:domain-outbox:16'],
+                [
+                    'event_name' => SearchIndexRequested::NAME,
+                    'schema_version' => 2,
+                    'payload' => $event->payload(),
+                ],
+            );
+        } finally {
+            Event::assertNotDispatched(SearchIndexRequested::class);
+        }
+    }
+
+    public function test_domain_event_payload_must_match_envelope_name(): void
+    {
+        Event::fake();
+        $event = new SearchIndexRequested('catalog_products', '15', ['sku' => 'SCAN-001']);
+        $payload = $event->payload();
+        $payload['event'] = SearchIndexDeletionRequested::NAME;
+
+        $this->expectExceptionMessage('Domain event payload does not match its envelope name.');
+
+        try {
+            $this->app->make(DomainEventProcessor::class)->process(
+                ['message_id' => 'gateway:domain-outbox:17'],
+                [
+                    'event_name' => SearchIndexRequested::NAME,
+                    'schema_version' => 1,
+                    'payload' => $payload,
+                ],
+            );
+        } finally {
+            Event::assertNotDispatched(SearchIndexRequested::class);
+        }
     }
 
     public function test_failed_domain_event_is_sent_to_retry_queue(): void

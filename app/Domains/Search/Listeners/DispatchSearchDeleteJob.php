@@ -25,6 +25,6 @@ class DispatchSearchDeleteJob
 
     private function messageId(SearchIndexDeletionRequested $event): string
     {
-        return DomainEventContext::messageId() ?? sha1($event::class.serialize($event->payload()));
+        return DomainEventContext::eventId($event);
     }
 }

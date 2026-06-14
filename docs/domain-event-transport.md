@@ -8,15 +8,40 @@
 опубликованной только после publisher confirm.
 
 `domain-event-worker` читает очередь `stockflow.market.domain.events` и
-диспатчит событие локальным consumers. JSON envelope содержит публичный
-`payload` и служебное `serialized_event`, необходимое переходному Laravel
-runtime для восстановления объекта события.
+диспатчит событие локальным consumers. JSON envelope содержит `event_name`,
+`schema_version`, агрегат и публичный `payload`. Laravel runtime восстанавливает
+только явно зарегистрированные типы событий из JSON-контракта и отклоняет
+неизвестные события или версии до запуска listeners.
+
+Машиночитаемый формат envelope зафиксирован в
+`services/gateway/contracts/domain-event-envelope.v1.schema.json`.
+
+Пример envelope:
+
+```json
+{
+  "event_name": "search.index.requested",
+  "schema_version": 1,
+  "aggregate_type": "search_document",
+  "aggregate_id": "catalog_products:15",
+  "payload": {
+    "event": "search.index.requested",
+    "index": "catalog_products",
+    "document_id": "15",
+    "document": {
+      "sku": "SCAN-001"
+    }
+  }
+}
+```
 
 ## Гарантии повторной доставки
 
 - delivery семантика transport — at-least-once;
 - `message_id` стабилен для outbox-записи: `<service>:domain-outbox:<id>`;
 - общий inbox дедуплицирует повторную доставку до запуска listeners;
+- неизвестная версия контракта считается ошибкой обработки и проходит обычный
+  retry/DLQ-путь;
 - ошибка consumer отправляет сообщение в TTL retry queue;
 - после `STOCKFLOW_DOMAIN_EVENTS_MAX_RETRY_COUNT` сообщение попадает в
   `stockflow.market.domain.events.dlq`;

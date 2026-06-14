@@ -13,6 +13,11 @@ class DomainEventContext
         return self::$messageId;
     }
 
+    public static function eventId(object $event): string
+    {
+        return self::$messageId ?? sha1($event::class.json_encode($event->payload(), JSON_THROW_ON_ERROR));
+    }
+
     /**
      * @template TReturn
      *
