@@ -64,7 +64,10 @@ class OpenAiAssistantApiTest extends TestCase
                         'type' => 'message',
                         'content' => [[
                             'type' => 'output_text',
-                            'text' => 'Подойдёт Aurora Room Speaker: она синяя, есть в наличии и укладывается в бюджет.',
+                            'text' => json_encode([
+                                'message' => 'Подойдёт Aurora Room Speaker: она синяя, есть в наличии и укладывается в бюджет.',
+                                'product_ids' => [15],
+                            ], JSON_UNESCAPED_UNICODE),
                         ]],
                     ]],
                 ]),
@@ -85,13 +88,80 @@ class OpenAiAssistantApiTest extends TestCase
             return $request->url() === 'https://api.openai.com/v1/responses'
                 && $request->hasHeader('Authorization', 'Bearer test-key')
                 && $request['model'] === 'gpt-5.4-mini'
-                && $request['tools'][0]['name'] === 'search_catalog';
+                && $request['tools'][0]['name'] === 'search_catalog'
+                && data_get($request->data(), 'text.format.name') === 'shopping_assistant_response';
         });
         Http::assertSent(function ($request): bool {
             return ($request['previous_response_id'] ?? null) === 'resp_search'
                 && data_get($request->data(), 'input.0.type') === 'function_call_output'
                 && str_contains((string) data_get($request->data(), 'input.0.output'), 'Aurora Room Speaker');
         });
+    }
+
+    public function test_openai_assistant_returns_only_selected_products_from_catalog_results(): void
+    {
+        config([
+            'assistant.default' => 'openai',
+            'assistant.providers.openai.api_key' => 'test-key',
+            'assistant.providers.openai.base_url' => 'https://api.openai.com',
+        ]);
+
+        $this->app->instance(CatalogProductSearch::class, new class implements CatalogProductSearch
+        {
+            public function products(CatalogProductQuery $query): array
+            {
+                $products = $query->query === 'колонка'
+                    ? [
+                        $this->product(21, 'Aurora Room Speaker', 'AUR-ROOM-SPK'),
+                        $this->product(22, 'Aurora Pocket Speaker', 'AUR-POCKET-SPK'),
+                    ]
+                    : [
+                        $this->product(31, 'Office Lamp', 'OFFICE-LAMP'),
+                    ];
+
+                return ['data' => $products, 'meta' => ['total' => count($products)]];
+            }
+
+            /**
+             * @return array<string, mixed>
+             */
+            private function product(int $id, string $name, string $sku): array
+            {
+                return [
+                    'id' => $id,
+                    'name' => $name,
+                    'sku' => $sku,
+                    'availability' => ['in_stock' => true, 'available_quantity' => 5],
+                ];
+            }
+        });
+
+        Http::fake([
+            'https://api.openai.com/v1/responses' => Http::sequence()
+                ->push($this->toolCallResponse('resp_broad', 'call_broad', 'офис'))
+                ->push($this->toolCallResponse('resp_refined', 'call_refined', 'колонка'))
+                ->push([
+                    'id' => 'resp_answer',
+                    'output' => [[
+                        'type' => 'message',
+                        'content' => [[
+                            'type' => 'output_text',
+                            'text' => json_encode([
+                                'message' => 'Рекомендую Aurora Pocket Speaker.',
+                                'product_ids' => [22, 999, 22],
+                            ], JSON_UNESCAPED_UNICODE),
+                        ]],
+                    ]],
+                ]),
+        ]);
+
+        $this->postJson('/api/assistant/respond', ['message' => 'Подбери компактную колонку для офиса'])
+            ->assertOk()
+            ->assertJsonCount(1, 'data.products')
+            ->assertJsonPath('data.products.0.id', 22)
+            ->assertJsonPath('data.products.0.sku', 'AUR-POCKET-SPK')
+            ->assertJsonMissing(['id' => 31])
+            ->assertJsonMissing(['id' => 999]);
     }
 
     public function test_openai_assistant_reports_missing_api_key(): void
@@ -137,6 +207,28 @@ class OpenAiAssistantApiTest extends TestCase
             ->assertJsonPath('data.conversation_id', 'dialog-1')
             ->assertJsonPath('data.provider.code', 'example')
             ->assertJsonPath('data.provider.name', 'Example AI');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function toolCallResponse(string $responseId, string $callId, string $query): array
+    {
+        return [
+            'id' => $responseId,
+            'output' => [[
+                'type' => 'function_call',
+                'name' => 'search_catalog',
+                'call_id' => $callId,
+                'arguments' => json_encode([
+                    'q' => $query,
+                    'color' => null,
+                    'max_price' => null,
+                    'in_stock' => true,
+                    'sort' => 'rating_desc',
+                ], JSON_UNESCAPED_UNICODE),
+            ]],
+        ];
     }
 }
 

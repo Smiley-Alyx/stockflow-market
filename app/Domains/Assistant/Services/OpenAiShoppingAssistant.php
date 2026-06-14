@@ -46,7 +46,10 @@ class OpenAiShoppingAssistant implements ShoppingAssistantProvider
                 'previous_response_id' => $responseId,
                 'tools' => [$this->catalogTool()],
                 'reasoning' => ['effort' => 'low'],
-                'text' => ['verbosity' => 'low'],
+                'text' => [
+                    'format' => $this->responseFormat(),
+                    'verbosity' => 'low',
+                ],
             ], fn (mixed $value): bool => $value !== null))->throw()->json();
 
             $responseId = isset($response['id']) ? (string) $response['id'] : $responseId;
@@ -57,10 +60,18 @@ class OpenAiShoppingAssistant implements ShoppingAssistantProvider
                 ->values();
 
             if ($calls->isEmpty()) {
+                $answer = $this->responsePayload($response);
+
                 return [
-                    'message' => $this->responseText($response),
+                    'message' => $answer['message'],
                     'conversation_id' => $responseId,
-                    'products' => array_values($products),
+                    'products' => collect($answer['product_ids'])
+                        ->map(fn (int $productId): ?array => $products[$productId] ?? null)
+                        ->filter()
+                        ->unique(fn (array $product): int => (int) $product['id'])
+                        ->take(5)
+                        ->values()
+                        ->all(),
                 ];
             }
 
@@ -69,7 +80,11 @@ class OpenAiShoppingAssistant implements ShoppingAssistantProvider
                 $result = $this->catalog->execute(is_array($arguments) ? $arguments : []);
 
                 foreach ($result as $product) {
-                    $products[(int) ($product['id'] ?? 0)] = $product;
+                    $productId = (int) ($product['id'] ?? 0);
+
+                    if ($productId > 0) {
+                        $products[$productId] = $product;
+                    }
                 }
 
                 return [
@@ -113,14 +128,44 @@ class OpenAiShoppingAssistant implements ShoppingAssistantProvider
 Ты умеешь понимать сложные бытовые сценарии, задавать уточняющие вопросы, сравнивать товары и объяснять выбор.
 Для любых рекомендаций, сравнений, вопросов о цене, наличии или характеристиках обязательно используй search_catalog.
 Основывай утверждения о товарах только на результате search_catalog. Не выдумывай товары, цены, наличие и характеристики.
+В product_ids возвращай только ID товаров из результатов search_catalog, которые ты действительно рекомендуешь или упоминаешь в ответе.
 Если подходящих товаров нет, сообщи об этом и предложи ослабить условия. Не оформляй заказ самостоятельно.
 PROMPT;
     }
 
     /**
-     * @param  array<string, mixed>  $response
+     * @return array<string, mixed>
      */
-    private function responseText(array $response): string
+    private function responseFormat(): array
+    {
+        return [
+            'type' => 'json_schema',
+            'name' => 'shopping_assistant_response',
+            'strict' => true,
+            'schema' => [
+                'type' => 'object',
+                'properties' => [
+                    'message' => [
+                        'type' => 'string',
+                        'description' => 'Short Russian response for the user.',
+                    ],
+                    'product_ids' => [
+                        'type' => 'array',
+                        'description' => 'IDs from search_catalog that are recommended or mentioned in the response.',
+                        'items' => ['type' => 'integer'],
+                    ],
+                ],
+                'required' => ['message', 'product_ids'],
+                'additionalProperties' => false,
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $response
+     * @return array{message: string, product_ids: array<int, int>}
+     */
+    private function responsePayload(array $response): array
     {
         $text = collect($response['output'] ?? [])
             ->filter(fn (mixed $item): bool => is_array($item) && ($item['type'] ?? null) === 'message')
@@ -128,9 +173,23 @@ PROMPT;
             ->first(fn (mixed $content): bool => is_array($content) && ($content['type'] ?? null) === 'output_text');
 
         if (is_array($text) && is_string($text['text'] ?? null) && $text['text'] !== '') {
-            return $text['text'];
+            $payload = json_decode($text['text'], true);
+
+            if (is_array($payload)
+                && is_string($payload['message'] ?? null)
+                && trim($payload['message']) !== ''
+                && is_array($payload['product_ids'] ?? null)) {
+                return [
+                    'message' => trim($payload['message']),
+                    'product_ids' => collect($payload['product_ids'])
+                        ->filter(fn (mixed $productId): bool => is_int($productId) && $productId > 0)
+                        ->unique()
+                        ->values()
+                        ->all(),
+                ];
+            }
         }
 
-        throw new RuntimeException('OpenAI assistant returned no text.');
+        throw new RuntimeException('OpenAI assistant returned an invalid structured response.');
     }
 }
