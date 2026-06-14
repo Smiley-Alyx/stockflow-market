@@ -119,6 +119,8 @@ inbox и выполняет компенсации release, refund и shipment c
 - добавлен Prometheus-compatible `/metrics` endpoint и локальный Prometheus/Grafana стек для latency, очередей, dead-letter, reservation conflicts, saga outcomes, компенсаций и stale messaging claims;
 - Prometheus собирает per-object метрики RabbitMQ и загружает проверяемые
   `promtool` правила для роста DLQ, backlog очередей и HTTP p95 latency;
+- Alertmanager доставляет firing/resolved уведомления в локальный webhook-
+  receiver с доступной для проверок историей;
 - provider-backed AI-ассистент использует `search_catalog`, структурированный
   ответ и серверную проверку выбранных product ID; старый браузерный
   эвристический подбор удалён;

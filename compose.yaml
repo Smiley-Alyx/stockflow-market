@@ -201,9 +201,41 @@ services:
     depends_on:
       php:
         condition: service_started
+      alertmanager:
+        condition: service_started
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    container_name: stockflow-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./docker/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    depends_on:
+      alert-webhook:
+        condition: service_healthy
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+
+  alert-webhook:
+    image: php:8.4-cli-alpine
+    container_name: stockflow-alert-webhook
+    ports:
+      - "9081:8080"
+    volumes:
+      - ./scripts/alert-webhook-server.php:/app/router.php:ro
+      - alert-webhook-data:/data
+    command: php -S 0.0.0.0:8080 /app/router.php
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   grafana:
     image: grafana/grafana:12.3.0
@@ -326,3 +358,5 @@ volumes:
   clickhouse-data:
   prometheus-data:
   grafana-data:
+  alertmanager-data:
+  alert-webhook-data:

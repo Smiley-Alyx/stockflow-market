@@ -49,6 +49,10 @@ class PrometheusExporter
         $lines[] = '# TYPE stockflow_search_dead_letter_count gauge';
         $lines[] = $this->sample('stockflow_search_dead_letter_count', ['queue' => config('stockflow.search.indexing.dead_letter_queue')], $this->deadLetters->count());
 
+        $lines[] = '# HELP stockflow_dependency_enabled Whether an optional dependency is required by this runtime.';
+        $lines[] = '# TYPE stockflow_dependency_enabled gauge';
+        $lines[] = $this->sample('stockflow_dependency_enabled', ['dependency' => 'rabbitmq'], config('stockflow.dependencies.rabbitmq.enabled') ? 1 : 0);
+
         $lines[] = '# HELP stockflow_inventory_reservation_conflicts_total Inventory reservation conflicts by reason.';
         $lines[] = '# TYPE stockflow_inventory_reservation_conflicts_total counter';
         $lines = array_merge($lines, $this->counterSamples('stockflow_inventory_reservation_conflicts_total'));

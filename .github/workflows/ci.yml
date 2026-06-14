@@ -121,6 +121,14 @@ jobs:
             prom/prometheus:v3.8.0 \
             test rules stockflow-alerts.test.yml
 
+      - name: Validate Alertmanager config
+        run: |
+          docker run --rm \
+            --entrypoint amtool \
+            -v "$PWD/docker/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro" \
+            prom/alertmanager:v0.28.1 \
+            check-config /etc/alertmanager/alertmanager.yml
+
   broker-e2e:
     name: Broker checkout E2E
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main')

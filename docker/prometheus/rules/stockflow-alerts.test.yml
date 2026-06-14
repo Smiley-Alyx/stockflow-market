@@ -59,3 +59,40 @@ tests:
             exp_annotations:
               summary: HTTP p95 latency remains high
               description: Endpoint /api/orders p95 latency has exceeded 1 second for 10 minutes.
+
+  - name: required rabbitmq outage becomes critical
+    interval: 1m
+    input_series:
+      - series: 'up{job="rabbitmq"}'
+        values: '0+0x3'
+      - series: 'stockflow_dependency_enabled{dependency="rabbitmq"}'
+        values: '1+0x3'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: StockflowRabbitMqUnavailable
+        exp_alerts:
+          - exp_labels:
+              job: rabbitmq
+              service: stockflow
+              severity: critical
+            exp_annotations:
+              summary: RabbitMQ is unavailable
+              description: Prometheus cannot scrape the required RabbitMQ instance.
+
+  - name: stopped consumer becomes critical
+    interval: 1m
+    input_series:
+      - series: 'rabbitmq_queue_consumers{queue="stockflow.market.domain.events",vhost="/"}'
+        values: '0+0x3'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: StockflowConsumerDown
+        exp_alerts:
+          - exp_labels:
+              queue: stockflow.market.domain.events
+              service: stockflow
+              severity: critical
+              vhost: /
+            exp_annotations:
+              summary: RabbitMQ consumer is down
+              description: Queue stockflow.market.domain.events has no active consumers.

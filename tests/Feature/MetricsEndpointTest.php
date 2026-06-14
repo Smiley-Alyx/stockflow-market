@@ -38,7 +38,8 @@ class MetricsEndpointTest extends TestCase
             ->assertHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
             ->assertSee('stockflow_http_request_duration_seconds_bucket{endpoint="/health/live",le="+Inf",method="GET",status="200"}', false)
             ->assertSee('stockflow_queue_depth{queue="default"} 0', false)
-            ->assertSee('stockflow_search_dead_letter_count{queue="search-indexing-dead-letter"} 0', false);
+            ->assertSee('stockflow_search_dead_letter_count{queue="search-indexing-dead-letter"} 0', false)
+            ->assertSee('stockflow_dependency_enabled{dependency="rabbitmq"} 0', false);
     }
 
     public function test_metrics_endpoint_exports_search_indexing_failures_and_dead_letter_count(): void

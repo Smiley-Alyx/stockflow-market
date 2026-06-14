@@ -93,6 +93,16 @@ services:
       file: compose.yaml
       service: prometheus
 
+  alertmanager:
+    extends:
+      file: compose.yaml
+      service: alertmanager
+
+  alert-webhook:
+    extends:
+      file: compose.yaml
+      service: alert-webhook
+
   grafana:
     extends:
       file: compose.yaml
@@ -238,5 +248,7 @@ volumes:
   elasticsearch-data:
   prometheus-data:
   grafana-data:
+  alertmanager-data:
+  alert-webhook-data:
   payment-mock-data:
   delivery-mock-state:

@@ -42,3 +42,29 @@ groups:
         annotations:
           summary: HTTP p95 latency remains high
           description: Endpoint {{ $labels.endpoint }} p95 latency has exceeded 1 second for 10 minutes.
+
+      - alert: StockflowRabbitMqUnavailable
+        expr: |
+          up{job="rabbitmq"} == 0
+          and on()
+          stockflow_dependency_enabled{dependency="rabbitmq"} == 1
+        for: 1m
+        labels:
+          severity: critical
+          service: stockflow
+        annotations:
+          summary: RabbitMQ is unavailable
+          description: Prometheus cannot scrape the required RabbitMQ instance.
+
+      - alert: StockflowConsumerDown
+        expr: |
+          rabbitmq_queue_consumers{
+            queue=~"stockflow\\.market\\.(domain\\.events|provider\\.outcomes)"
+          } == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: stockflow
+        annotations:
+          summary: RabbitMQ consumer is down
+          description: Queue {{ $labels.queue }} has no active consumers.
