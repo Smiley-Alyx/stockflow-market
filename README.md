@@ -470,7 +470,15 @@ php artisan inventory:reservations:expire
 composer test
 ```
 
-GitHub Actions workflow `.github/workflows/ci.yml` запускает `composer test`, `vendor/bin/pint --test` и `docker compose config --quiet` для каждого push и pull request.
+GitHub Actions workflow `.github/workflows/ci.yml` для каждого push и pull
+request запускает `composer test`, `vendor/bin/pint --test`,
+`docker compose config --quiet`, frontend typecheck/build и проверки
+Prometheus-конфигурации и alert rules через `promtool`.
+
+Broker-level checkout E2E клонирует market и три provider sandbox-репозитория,
+поднимает чистый общий RabbitMQ-стенд и сохраняет Docker-логи как artifact при
+сбое. Тяжёлый job запускается на push в `main`, вручную через
+`workflow_dispatch` и ежедневно по расписанию.
 
 Тесты страхуют базовый Laravel bootstrap, runtime-конфигурацию, сервисную
 структуру, модель и проекции каталога, OpenAPI-контракты, HTTP read API, блоки
@@ -519,24 +527,20 @@ baseline.
 
 Приоритетные следующие шаги:
 
-1. **Усилить CI для уже существующих проверок.** Добавить обязательные jobs для
-   `npm run typecheck`, `npm run build`, `promtool check/test rules` и
-   broker-level E2E по расписанию. Результат: изменения frontend, alert rules и
-   RabbitMQ topology перестают проверяться только локально.
-2. **Заменить переходный `serialized_event` на версионированные JSON-контракты.**
+1. **Заменить переходный `serialized_event` на версионированные JSON-контракты.**
    Сейчас RabbitMQ envelope доменных событий всё ещё содержит сериализованный
    PHP-объект для локальных listeners. Результат: события смогут безопасно
    потребляться независимо развернутыми сервисами и проверяться контрактными
    тестами без связи с Laravel-классами.
-3. **Подключить Alertmanager и воспроизводимые failure drills.** Настроить
+2. **Подключить Alertmanager и воспроизводимые failure drills.** Настроить
    маршрутизацию предупреждений, затем автоматизировать сценарии роста DLQ,
    остановки consumer и деградации latency. Результат: alert rules проверяются
    не только unit-сценариями `promtool`, но и сквозным доставленным уведомлением.
-4. **Добавить eval-набор для AI-ассистента.** Зафиксировать пользовательские
+3. **Добавить eval-набор для AI-ассистента.** Зафиксировать пользовательские
    запросы, ожидаемые ограничения и допустимые product ID, отдельно проверяя
    отсутствие карточек вне результатов `search_catalog`. Результат: качество
    рекомендаций измеряется при смене prompt, модели или provider adapter.
-5. **Повторить нагрузочный baseline на реалистичном каталоге.** Подготовить
+4. **Повторить нагрузочный baseline на реалистичном каталоге.** Подготовить
    репрезентативный dataset, устранить основные причины текущего p95 `8.17s` и
    сравнить новый прогон с сохранённым baseline. Результат: следующий этап
    оптимизации опирается на измеримое изменение throughput и latency.
