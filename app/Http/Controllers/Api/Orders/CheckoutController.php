@@ -91,6 +91,15 @@ class CheckoutController extends Controller
                     ])
                     ->values()
                     ->all(),
+                'reservations' => $order->checkoutSaga?->reservations
+                    ->map(fn ($reservation): array => [
+                        'reservation_id' => $reservation->reservation_id,
+                        'order_item_id' => $reservation->order_item_id,
+                        'status' => $reservation->status,
+                        'updated_at' => $reservation->updated_at?->toJSON(),
+                    ])
+                    ->values()
+                    ->all() ?? [],
                 'shipments' => $order->shipments
                     ->map(fn ($shipment): array => [
                         'id' => $shipment->id,

@@ -97,6 +97,6 @@ class CheckoutService
 
     private function load(Order $order): Order
     {
-        return $order->load('items', 'shipments.items.orderItem');
+        return $order->load('items', 'shipments.items.orderItem', 'checkoutSaga.reservations');
     }
 }

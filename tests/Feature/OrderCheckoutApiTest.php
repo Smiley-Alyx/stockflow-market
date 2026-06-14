@@ -15,7 +15,11 @@ use App\Domains\Orders\Events\OrderExpired;
 use App\Domains\Orders\Events\OrderPaid;
 use App\Domains\Orders\Events\OrderReservationFailed;
 use App\Domains\Orders\Events\OrderReservationSucceeded;
+use App\Domains\Orders\Models\CheckoutSaga;
+use App\Domains\Orders\Models\CheckoutSagaReservation;
 use App\Domains\Orders\Models\Order;
+use App\Domains\Orders\Services\CheckoutSagaService;
+use App\Domains\Orders\Services\OrderService;
 use App\Domains\Pricing\Models\ProductPrice;
 use App\Domains\Pricing\Models\Promotion;
 use App\Infrastructure\Messaging\DomainEventPublisher;
@@ -100,12 +104,32 @@ class OrderCheckoutApiTest extends TestCase
         $stockItem->refresh();
 
         $this->assertSame(10, $stockItem->on_hand_quantity);
-        $this->assertSame(2, $stockItem->reserved_quantity);
-        $this->assertSame(8, $stockItem->availableQuantity());
+        $this->assertSame(0, $stockItem->reserved_quantity);
+        $this->assertSame(10, $stockItem->availableQuantity());
+
+        /** @var CheckoutSaga $saga */
+        $saga = CheckoutSaga::query()->where('order_id', $order['id'])->firstOrFail();
+        /** @var CheckoutSagaReservation $reservation */
+        $reservation = $saga->reservations()->firstOrFail();
+
+        $this->assertDatabaseHas('messaging_provider_outbox', [
+            'routing_key' => 'inventory.reservation.requested.v1',
+            'correlation_id' => $saga->correlation_id,
+        ]);
+        $this->app->make(CheckoutSagaService::class)->handle(
+            'inventory.reservation.confirmed.v1',
+            $saga->correlation_id,
+            'msg-inventory-confirmed',
+            ['reservation_id' => $reservation->reservation_id],
+        );
 
         $this->assertDatabaseHas('orders_orders', [
             'id' => $order['id'],
             'status' => Order::STATUS_CONFIRMED,
+        ]);
+        $this->assertDatabaseHas('orders_checkout_saga_reservations', [
+            'reservation_id' => $reservation->reservation_id,
+            'status' => CheckoutSagaReservation::STATUS_CONFIRMED,
         ]);
         $this->assertDatabaseHas('messaging_outbox', [
             'event_name' => OrderReservationSucceeded::NAME,
@@ -148,9 +172,29 @@ class OrderCheckoutApiTest extends TestCase
         $stockItem->refresh();
 
         $this->assertSame(0, $stockItem->reserved_quantity);
+
+        /** @var CheckoutSaga $saga */
+        $saga = CheckoutSaga::query()->where('order_id', $order['id'])->firstOrFail();
+        /** @var CheckoutSagaReservation $reservation */
+        $reservation = $saga->reservations()->firstOrFail();
+
+        $this->app->make(CheckoutSagaService::class)->handle(
+            'inventory.reservation.rejected.v1',
+            $saga->correlation_id,
+            'msg-inventory-rejected',
+            [
+                'reservation_id' => $reservation->reservation_id,
+                'reason' => 'INSUFFICIENT_STOCK',
+            ],
+        );
+
         $this->assertDatabaseHas('orders_orders', [
             'id' => $order['id'],
             'status' => Order::STATUS_RESERVATION_FAILED,
+        ]);
+        $this->assertDatabaseHas('orders_checkout_saga_reservations', [
+            'reservation_id' => $reservation->reservation_id,
+            'status' => CheckoutSagaReservation::STATUS_REJECTED,
         ]);
 
         $this->assertDatabaseHas('messaging_outbox', [
@@ -165,7 +209,7 @@ class OrderCheckoutApiTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame((string) $order['id'], $failedEvent->aggregate_id);
-        $this->assertStringContainsString('Insufficient available stock', $failedEvent->payload['reason']);
+        $this->assertSame('INSUFFICIENT_STOCK', $failedEvent->payload['reason']);
     }
 
     public function test_paid_order_deducts_reserved_stock_idempotently(): void
@@ -604,6 +648,7 @@ class OrderCheckoutApiTest extends TestCase
 
         $this->postJson('/api/orders/'.$order['id'].'/confirm')->assertOk();
         $this->app->make(DomainEventPublisher::class)->publishPending();
+        $this->app->make(OrderService::class)->reserveInventory($order['id']);
 
         return [$order, $stockItem->fresh()];
     }

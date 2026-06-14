@@ -91,7 +91,6 @@ return [
     ],
 
     'provider_saga' => [
-        'enabled' => (bool) env('STOCKFLOW_PROVIDER_SAGA_ENABLED', false),
         'payment_token' => env('STOCKFLOW_PROVIDER_SAGA_PAYMENT_TOKEN', 'tok_approved_visa'),
         'outbox' => [
             'processing_timeout_seconds' => (int) env('STOCKFLOW_PROVIDER_OUTBOX_PROCESSING_TIMEOUT_SECONDS', 60),

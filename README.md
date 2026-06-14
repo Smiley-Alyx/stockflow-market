@@ -104,6 +104,7 @@ inbox и выполняет компенсации release, refund и shipment c
 - добавлен локальный ClickHouse с аналитической витриной складских движений;
 - реализован checkout-срез `cart → draft order → price snapshot → async inventory reservation → paid / cancelled / expired`;
 - добавлена provider saga `reserve → authorize → capture → shipment` с outbox relay, inbox-дедупликацией и компенсациями;
+- checkout read-модель проецирует статусы резервов из RabbitMQ outcomes и доступна через `GET /api/orders/{id}/checkout`;
 - добавлены маршрутизация резервов по складам, архивирование складских движений и географический фильтр остатков;
 - цены поддерживают городские переопределения, версии, интервалы активности и промокоды; заказ сохраняет снимок выбранной цены и скидки;
 - добавлена scheduled-команда истечения активных inventory-резервов с метрикой количества истёкших резервов;
@@ -229,7 +230,12 @@ stockflow-market/
 RABBITMQ_ENABLED=true CLICKHOUSE_ENABLED=true docker compose --profile extended up -d
 ```
 
-Backend использует in-process публикацию общих доменных outbox-событий по умолчанию. Переменная `STOCKFLOW_EVENT_BUS=rabbitmq` пока включает для них только circuit-breaker границу для тестирования поведения outbox при недоступности будущего transport, но не отправляет эти сообщения в RabbitMQ. Provider saga использует отдельный RabbitMQ transport для request-событий и outcomes.
+Backend использует in-process публикацию общих доменных outbox-событий по
+умолчанию. Переменная `STOCKFLOW_EVENT_BUS=rabbitmq` пока включает для них
+только circuit-breaker границу для тестирования поведения outbox при
+недоступности будущего transport, но не отправляет эти сообщения в RabbitMQ.
+Checkout всегда запускает provider saga: reservation requests и outcomes идут
+через отдельный RabbitMQ transport, а gateway читает их асинхронную проекцию.
 
 При включённом `CLICKHOUSE_ENABLED=true` обработчик `inventory.stock.changed`
 проецирует каждое складское движение в ClickHouse. Для первоначального
@@ -470,9 +476,8 @@ baseline.
 
 ## Ближайший план
 
-1. Добавить async-проекцию статусов резервирования поверх брокера вместо текущего in-process gateway path.
-2. Подключить RabbitMQ transport для межсервисных событий и проверить сценарии повторной доставки.
-3. Добавить alert rules для Prometheus по росту dead-letter, очередей и latency.
+1. Подключить RabbitMQ transport для межсервисных доменных событий и проверить сценарии повторной доставки.
+2. Добавить alert rules для Prometheus по росту dead-letter, очередей и latency.
 
 ## Лицензия
 

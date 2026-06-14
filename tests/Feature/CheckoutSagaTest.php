@@ -33,6 +33,10 @@ class CheckoutSagaTest extends TestCase
         $this->outcome($saga, 'inventory.reservation.confirmed.v1', [
             'reservation_id' => $reservation->reservation_id,
         ]);
+        $this->assertDatabaseHas('orders_orders', [
+            'id' => $order->id,
+            'status' => Order::STATUS_CONFIRMED,
+        ]);
         $authorizationMessage = $this->assertProviderMessage('payment.authorization.requested.v1');
         $this->assertSame('v1', $authorizationMessage->headers['schema_version']);
 
@@ -41,10 +45,6 @@ class CheckoutSagaTest extends TestCase
         ], 'msg_demo_auth_001');
         $captureMessage = $this->assertProviderMessage('payment.capture.requested.v1');
         $this->assertSame('msg_demo_auth_001', $captureMessage->causation_id);
-        $this->assertDatabaseHas('orders_orders', [
-            'id' => $order->id,
-            'status' => Order::STATUS_CONFIRMED,
-        ]);
 
         $this->outcome($saga, 'payment.capture.completed.v1', [
             'capture_id' => 'cap_demo_001',
@@ -111,9 +111,34 @@ class CheckoutSagaTest extends TestCase
             'reservation_id' => $reservations[0]->reservation_id,
             'status' => CheckoutSagaReservation::STATUS_RELEASE_PENDING,
         ]);
+        $this->assertDatabaseHas('orders_checkout_saga_reservations', [
+            'reservation_id' => $reservations[1]->reservation_id,
+            'status' => CheckoutSagaReservation::STATUS_REJECTED,
+        ]);
 
         $release = $this->assertProviderMessage('inventory.reservation.release.requested.v1');
         $this->assertSame($reservations[0]->reservation_id, $release->payload['reservation_id']);
+    }
+
+    public function test_checkout_read_model_exposes_projected_reservation_statuses(): void
+    {
+        $order = $this->orderWithItems();
+        $saga = $this->app->make(CheckoutSagaService::class)->start($order->id);
+        $reservation = $saga->reservations->firstOrFail();
+
+        $this->getJson('/api/orders/'.$order->id.'/checkout')
+            ->assertOk()
+            ->assertJsonPath('data.order.reservations.0.reservation_id', $reservation->reservation_id)
+            ->assertJsonPath('data.order.reservations.0.status', CheckoutSagaReservation::STATUS_PENDING);
+
+        $this->outcome($saga, 'inventory.reservation.confirmed.v1', [
+            'reservation_id' => $reservation->reservation_id,
+        ]);
+
+        $this->getJson('/api/orders/'.$order->id.'/checkout')
+            ->assertOk()
+            ->assertJsonPath('data.order.status', Order::STATUS_CONFIRMED)
+            ->assertJsonPath('data.order.reservations.0.status', CheckoutSagaReservation::STATUS_CONFIRMED);
     }
 
     public function test_provider_saga_compensates_payment_inventory_and_created_shipments_after_delivery_failure(): void
@@ -226,13 +251,6 @@ class CheckoutSagaTest extends TestCase
             'operation' => 'inventory_release',
             'outcome' => 'failed',
         ]));
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        config(['stockflow.provider_saga.enabled' => true]);
     }
 
     private function orderWithItems(int $count = 1, int $shipmentCount = 1): Order

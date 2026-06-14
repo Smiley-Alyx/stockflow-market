@@ -8,7 +8,6 @@ services:
       RABBITMQ_PASSWORD: stockflow
       RABBITMQ_USER: stockflow
       CLICKHOUSE_ENABLED: "true"
-      STOCKFLOW_PROVIDER_SAGA_ENABLED: "true"
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -47,7 +46,6 @@ services:
       RABBITMQ_ENABLED: "true"
       RABBITMQ_PASSWORD: stockflow
       RABBITMQ_USER: stockflow
-      STOCKFLOW_PROVIDER_SAGA_ENABLED: "true"
 
   domain-outbox-worker:
     extends:
@@ -60,7 +58,6 @@ services:
       RABBITMQ_PASSWORD: stockflow
       RABBITMQ_USER: stockflow
       CLICKHOUSE_ENABLED: "true"
-      STOCKFLOW_PROVIDER_SAGA_ENABLED: "true"
 
   provider-outcome-worker:
     extends:
@@ -72,7 +69,6 @@ services:
       RABBITMQ_ENABLED: "true"
       RABBITMQ_PASSWORD: stockflow
       RABBITMQ_USER: stockflow
-      STOCKFLOW_PROVIDER_SAGA_ENABLED: "true"
 
   frontend:
     extends:

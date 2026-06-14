@@ -348,6 +348,7 @@ components:
         - total_amount_minor
         - currency
         - items
+        - reservations
         - shipments
       properties:
         id:
@@ -375,10 +376,38 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CheckoutOrderItem'
+        reservations:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckoutReservation'
         shipments:
           type: array
           items:
             $ref: '#/components/schemas/CheckoutShipment'
+    CheckoutReservation:
+      type: object
+      required:
+        - reservation_id
+        - order_item_id
+        - status
+        - updated_at
+      properties:
+        reservation_id:
+          type: string
+        order_item_id:
+          type: integer
+        status:
+          type: string
+          enum:
+            - pending
+            - confirmed
+            - rejected
+            - release_pending
+            - released
+            - release_failed
+        updated_at:
+          type: string
+          format: date-time
     CheckoutAddress:
       type: object
       required:

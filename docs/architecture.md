@@ -37,15 +37,16 @@ Provider sandbox-сервисы готовы к автономному запу�
 RabbitMQ. Они объявляют topic exchanges, входящие очереди, retry queues и DLQ.
 
 В `stockflow-market` реализованы draft order, price snapshot, checkout
-configuration, внутреннее резервирование остатков и lifecycle заказа. Provider
-saga публикует inventory/payment/delivery requests через transactional outbox
-relay и потребляет outcomes через inbox-дедупликацию.
+configuration и lifecycle заказа. Provider saga публикует
+inventory/payment/delivery requests через transactional outbox relay, потребляет
+outcomes через inbox-дедупликацию и проецирует статусы резервов в checkout
+read-модель.
 
 Это разделяет два уровня демонстрации:
 
 | Уровень | Что работает сейчас |
 | --- | --- |
-| Marketplace slice | HTTP checkout и внутренний order/inventory lifecycle |
+| Marketplace slice | HTTP checkout и асинхронная read-модель резервов |
 | Provider sandbox | RabbitMQ-контракты, retries, DLQ, idempotency и failure injection в каждом sandbox-сервисе |
 | End-to-end orchestration | Реализованы market publisher, outcome consumer, saga state и компенсации |
 
@@ -55,9 +56,9 @@ Marketplace хранит saga state по `order_id` и выполняет шаг
 последовательно:
 
 1. Опубликовать `inventory.reservation.requested.v1`.
-2. После `inventory.reservation.confirmed.v1` опубликовать
-   `payment.authorization.requested.v1`.
-3. Создать заказ в подтверждённом состоянии.
+2. После всех `inventory.reservation.confirmed.v1` подтвердить заказ и
+   опубликовать `payment.authorization.requested.v1`.
+3. Проецировать каждый reservation outcome для checkout read endpoint.
 4. Опубликовать `payment.capture.requested.v1`.
 5. После `payment.capture.completed.v1` опубликовать
    `delivery.shipment.requested.v1`.

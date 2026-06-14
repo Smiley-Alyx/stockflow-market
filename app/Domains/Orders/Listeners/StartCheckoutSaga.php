@@ -16,10 +16,6 @@ class StartCheckoutSaga
 
     public function handle(OrderConfirmationRequested $event): void
     {
-        if (! config('stockflow.provider_saga.enabled')) {
-            return;
-        }
-
         $this->inbox->consume($this->messageId($event), self::class, function () use ($event): void {
             $this->sagas->start($event->order->id);
         });

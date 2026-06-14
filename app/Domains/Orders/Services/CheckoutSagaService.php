@@ -90,7 +90,7 @@ class CheckoutSagaService
 
             match ($routingKey) {
                 'inventory.reservation.confirmed.v1' => $this->reservationConfirmed($saga, $causationId, $payload),
-                'inventory.reservation.rejected.v1' => $this->fail($saga, $causationId, (string) ($payload['reason'] ?? 'inventory reservation rejected')),
+                'inventory.reservation.rejected.v1' => $this->reservationRejected($saga, $causationId, $payload),
                 'inventory.reservation.released.v1' => $this->reservationReleased($saga, $payload),
                 'inventory.reservation.release_failed.v1' => $this->reservationReleaseFailed($saga, $payload),
                 'payment.authorization.approved.v1' => $this->authorizationApproved($saga, $causationId, $payload),
@@ -128,7 +128,15 @@ class CheckoutSagaService
             return;
         }
 
+        $order = $saga->order;
+        $order->update([
+            'status' => Order::STATUS_CONFIRMED,
+            'confirmed_at' => now(),
+        ]);
         $saga->update(['status' => CheckoutSaga::STATUS_AUTHORIZING_PAYMENT]);
+
+        $this->events->record(new OrderReservationSucceeded($order), 'order', (string) $order->id);
+        $this->events->record(new OrderCreated($order), 'order', (string) $order->id);
 
         $this->messages->record(
             exchange: 'stockflow.payment',
@@ -154,25 +162,30 @@ class CheckoutSagaService
     /**
      * @param  array<string, mixed>  $payload
      */
+    private function reservationRejected(CheckoutSaga $saga, string $causationId, array $payload): void
+    {
+        $saga->reservations()
+            ->where('reservation_id', (string) $payload['reservation_id'])
+            ->where('status', CheckoutSagaReservation::STATUS_PENDING)
+            ->update(['status' => CheckoutSagaReservation::STATUS_REJECTED]);
+        $saga->load('reservations');
+
+        $this->fail($saga, $causationId, (string) ($payload['reason'] ?? 'inventory reservation rejected'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
     private function authorizationApproved(CheckoutSaga $saga, string $causationId, array $payload): void
     {
         if ($saga->status !== CheckoutSaga::STATUS_AUTHORIZING_PAYMENT) {
             return;
         }
 
-        $order = $saga->order;
-        $order->update([
-            'status' => Order::STATUS_CONFIRMED,
-            'confirmed_at' => now(),
-        ]);
-
         $saga->update([
             'status' => CheckoutSaga::STATUS_CAPTURING_PAYMENT,
             'authorization_id' => (string) $payload['authorization_id'],
         ]);
-
-        $this->events->record(new OrderReservationSucceeded($order), 'order', (string) $order->id);
-        $this->events->record(new OrderCreated($order), 'order', (string) $order->id);
 
         $this->messages->record(
             exchange: 'stockflow.payment',
@@ -182,8 +195,8 @@ class CheckoutSagaService
             idempotencyKey: 'capture:'.$saga->payment_id,
             payload: [
                 'payment_id' => $saga->payment_id,
-                'amount' => $this->amount($order),
-                'metadata' => ['order_id' => (string) $order->id],
+                'amount' => $this->amount($saga->order),
+                'metadata' => ['order_id' => (string) $saga->order_id],
             ],
         );
     }

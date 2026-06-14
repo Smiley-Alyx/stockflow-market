@@ -3,7 +3,7 @@
 ## Happy path
 
 Целевая последовательность checkout:
-`reserve stock → authorize payment → create order → capture payment → create shipment`.
+`reserve stock → confirm order → authorize payment → capture payment → create shipment`.
 
 ```mermaid
 sequenceDiagram
@@ -16,9 +16,9 @@ sequenceDiagram
     Client->>Market: confirm checkout
     Market->>ERP: inventory.reservation.requested.v1
     ERP-->>Market: inventory.reservation.confirmed.v1
+    Market->>Market: project reservation and confirm order
     Market->>PSP: payment.authorization.requested.v1
     PSP-->>Market: payment.authorization.approved.v1
-    Market->>Market: create confirmed order
     Market->>PSP: payment.capture.requested.v1
     PSP-->>Market: payment.capture.completed.v1
     Market->>Delivery: delivery.shipment.requested.v1
@@ -69,11 +69,10 @@ flowchart TD
 выбор протокола: production PSP boundary должен гарантировать TTL
 не captured authorization.
 
-В текущем market-orchestrator confirmed order и
-`payment.capture.requested.v1` записываются в одной DB-транзакции после
+В текущем market-orchestrator confirmed order проецируется после успешных
+inventory outcomes, а `payment.capture.requested.v1` записывается после
 authorization outcome. TTL остаётся страховкой provider boundary для
-запоздалого capture, внешнего сбоя и будущего выделения order creation в
-отдельный шаг.
+запоздалого capture и внешнего сбоя.
 
 ## Routing keys
 

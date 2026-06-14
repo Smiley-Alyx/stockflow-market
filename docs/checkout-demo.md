@@ -144,6 +144,9 @@ App\Domains\Pricing\Models\ProductPrice::query()
 
 ## Асинхронное резервирование
 
+Для broker flow используйте общий стенд `docker-compose-all.yml`, в котором
+запущены ERP mock, provider outbox worker и provider outcome worker.
+
 Запросить подтверждение заказа:
 
 ```bash
@@ -170,13 +173,17 @@ stock.on_hand_quantity = 10
 stock.reserved_quantity = 0
 ```
 
-Опубликовать ожидающие outbox-события:
+Опубликовать ожидающие domain и provider outbox-события:
 
 ```bash
-docker compose exec php php artisan messaging:outbox:publish
+docker compose -f docker-compose-all.yml exec php php artisan messaging:outbox:publish
+docker compose -f docker-compose-all.yml exec php php artisan messaging:provider-outbox:publish
 ```
 
-Обработчик `ReserveInventoryForOrder` создаст резерв, переведёт заказ в `confirmed` и запишет события `order.reservation_succeeded` и `orders.order.created`.
+Provider outcome worker спроецирует ответ ERP в
+`orders_checkout_saga_reservations`. После подтверждения всех резервов заказ
+перейдёт в `confirmed`, а в outbox появятся события
+`order.reservation_succeeded` и `orders.order.created`.
 
 ## Проверка результата
 
@@ -190,14 +197,11 @@ docker compose exec postgres psql -U stockflow -d stockflow -c \
   "select sku, quantity, price_type, price_version, unit_amount_minor, line_amount_minor from orders_order_items where order_id = <ORDER_ID>;"
 ```
 
-Проверить резерв:
+Проверить асинхронную проекцию резерва:
 
 ```bash
 docker compose exec postgres psql -U stockflow -d stockflow -c \
-  "select sku, on_hand_quantity, reserved_quantity from inventory_stock_items where sku = 'DEMO-CHECKOUT-001';"
-
-docker compose exec postgres psql -U stockflow -d stockflow -c \
-  "select status, quantity, idempotency_key from inventory_reservations order by id desc limit 5;"
+  "select reservation_id, status from orders_checkout_saga_reservations order by id desc limit 5;"
 ```
 
 Ожидаемые значения:
@@ -206,10 +210,7 @@ docker compose exec postgres psql -U stockflow -d stockflow -c \
 order.status = confirmed
 order.total_amount_minor = 259800
 order_item.unit_amount_minor = 129900
-stock.on_hand_quantity = 10
-stock.reserved_quantity = 2
-reservation.status = active
-reservation.quantity = 2
+reservation.status = confirmed
 ```
 
 Проверить доменные события заказа:
