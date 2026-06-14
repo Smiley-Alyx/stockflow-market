@@ -8,6 +8,7 @@ services:
       RABBITMQ_PASSWORD: stockflow
       RABBITMQ_USER: stockflow
       CLICKHOUSE_ENABLED: "true"
+      STOCKFLOW_FAULT_INJECTION_ENABLED: "true"
     depends_on:
       rabbitmq:
         condition: service_healthy

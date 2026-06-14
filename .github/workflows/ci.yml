@@ -189,3 +189,37 @@ jobs:
       - name: Stop broker E2E stack
         if: always()
         run: docker compose -f docker-compose-all.yml down --volumes --remove-orphans
+
+  alert-drills:
+    name: Alert delivery failure drills
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run alert delivery failure drills
+        env:
+          KEEP_ALERT_DRILL_STACK: 'true'
+          TIMEOUT_SECONDS: '300'
+        run: ./scripts/test-alert-drills.sh
+
+      - name: Collect alert drill logs
+        if: failure()
+        run: |
+          docker compose -f docker-compose-all.yml ps --all > alert-drills.log || true
+          docker compose -f docker-compose-all.yml logs --no-color >> alert-drills.log 2>&1 || true
+
+      - name: Upload alert drill logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alert-drill-logs
+          path: alert-drills.log
+          if-no-files-found: ignore
+
+      - name: Stop alert drill stack
+        if: always()
+        run: docker compose -f docker-compose-all.yml down --volumes --remove-orphans

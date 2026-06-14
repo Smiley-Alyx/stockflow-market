@@ -101,6 +101,7 @@ class ArchitectureStructureTest extends TestCase
         $this->assertStringContainsString('alert: StockflowConsumerDown', $rules);
         $this->assertStringContainsString('alertmanager:9093', $prometheus);
         $this->assertFileExists(base_path('docker/alertmanager/alertmanager.yml'));
+        $this->assertFileExists(base_path('scripts/test-alert-drills.sh'));
     }
 
     public function test_frontend_mounts_only_provider_backed_assistant(): void

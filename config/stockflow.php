@@ -58,6 +58,7 @@ return [
         'prometheus_url' => env('STOCKFLOW_PROMETHEUS_URL', 'http://localhost:9090'),
         'grafana_url' => env('STOCKFLOW_GRAFANA_URL', 'http://localhost:3001'),
         'rabbitmq_management_url' => env('STOCKFLOW_RABBITMQ_MANAGEMENT_URL', 'http://localhost:15672'),
+        'fault_injection_enabled' => (bool) env('STOCKFLOW_FAULT_INJECTION_ENABLED', false),
     ],
 
     'circuit_breakers' => [

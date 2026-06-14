@@ -16,6 +16,9 @@
 | Дублированное доменное событие | Market inbox пропускает повторный dispatch | Listener side effect выполняется один раз |
 | Невалидный payload | Сообщение не обрабатывается как бизнес-команда | DLQ и ручной разбор |
 | Broker недоступен при публикации market | Outbox сохраняет событие | Relay повторяет публикацию после восстановления |
+| Consumer остановлен | RabbitMQ сохраняет сообщения в очереди, Alertmanager доставляет `StockflowConsumerDown` | После запуска consumer очередь продолжает обработку, alert переходит в `resolved` |
+| RabbitMQ недоступен | Alertmanager доставляет `StockflowRabbitMqUnavailable` только для runtime с включённым broker | После восстановления scrape alert переходит в `resolved` |
+| Высокая HTTP latency | Alertmanager доставляет `StockflowHttpLatencyP95High` | После прекращения деградации alert переходит в `resolved` |
 
 ## Таблица гарантий
 
@@ -59,6 +62,12 @@ happy path сам поднимает стенд, прогоняет один che
 ```bash
 ./scripts/test-provider-saga-e2e.sh
 ./scripts/test-provider-saga-compensations-e2e.sh
+```
+
+Доставку и восстановление operational alerts проверяет отдельный drill:
+
+```bash
+./scripts/test-alert-drills.sh
 ```
 
 Второй сценарий проверяет освобождение ERP-резерва после отказа capture, а также

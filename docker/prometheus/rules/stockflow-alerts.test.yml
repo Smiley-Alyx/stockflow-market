@@ -19,7 +19,7 @@ tests:
               severity: critical
             exp_annotations:
               summary: Dead-letter storage is growing
-              description: Dead-letter messages increased during the last 15 minutes.
+              description: Dead-letter storage contains messages that require investigation.
 
   - name: sustained queue backlog becomes warning
     interval: 1m
@@ -45,11 +45,11 @@ tests:
       - series: 'stockflow_http_request_duration_seconds_bucket{endpoint="/api/orders",le="1"}'
         values: '0+0x20'
       - series: 'stockflow_http_request_duration_seconds_bucket{endpoint="/api/orders",le="2.5"}'
-        values: '0+0x20'
+        values: '0+100x20'
       - series: 'stockflow_http_request_duration_seconds_bucket{endpoint="/api/orders",le="+Inf"}'
         values: '0+100x20'
     alert_rule_test:
-      - eval_time: 16m
+      - eval_time: 4m
         alertname: StockflowHttpLatencyP95High
         exp_alerts:
           - exp_labels:
@@ -58,7 +58,7 @@ tests:
               severity: warning
             exp_annotations:
               summary: HTTP p95 latency remains high
-              description: Endpoint /api/orders p95 latency has exceeded 1 second for 10 minutes.
+              description: Endpoint /api/orders p95 latency has exceeded 1 second for 30 seconds.
 
   - name: required rabbitmq outage becomes critical
     interval: 1m
@@ -68,7 +68,7 @@ tests:
       - series: 'stockflow_dependency_enabled{dependency="rabbitmq"}'
         values: '1+0x3'
     alert_rule_test:
-      - eval_time: 2m
+      - eval_time: 1m
         alertname: StockflowRabbitMqUnavailable
         exp_alerts:
           - exp_labels:
@@ -85,7 +85,7 @@ tests:
       - series: 'rabbitmq_queue_consumers{queue="stockflow.market.domain.events",vhost="/"}'
         values: '0+0x3'
     alert_rule_test:
-      - eval_time: 2m
+      - eval_time: 1m
         alertname: StockflowConsumerDown
         exp_alerts:
           - exp_labels:

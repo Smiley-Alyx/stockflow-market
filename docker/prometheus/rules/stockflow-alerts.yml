@@ -3,16 +3,16 @@ groups:
     rules:
       - alert: StockflowDeadLetterGrowth
         expr: |
-          delta(stockflow_search_dead_letter_count[15m]) > 0
+          stockflow_search_dead_letter_count > 0
           or
-          delta(rabbitmq_queue_messages_ready{queue=~".*\\.dlq"}[15m]) > 0
-        for: 1m
+          rabbitmq_queue_messages_ready{queue=~".*\\.dlq"} > 0
+        for: 30s
         labels:
           severity: critical
           service: stockflow
         annotations:
           summary: Dead-letter storage is growing
-          description: Dead-letter messages increased during the last 15 minutes.
+          description: Dead-letter storage contains messages that require investigation.
 
       - alert: StockflowQueueBacklogHigh
         expr: |
@@ -32,23 +32,23 @@ groups:
           histogram_quantile(
             0.95,
             sum by (le, endpoint) (
-              rate(stockflow_http_request_duration_seconds_bucket[5m])
+              rate(stockflow_http_request_duration_seconds_bucket[2m])
             )
           ) > 1
-        for: 10m
+        for: 30s
         labels:
           severity: warning
           service: stockflow
         annotations:
           summary: HTTP p95 latency remains high
-          description: Endpoint {{ $labels.endpoint }} p95 latency has exceeded 1 second for 10 minutes.
+          description: Endpoint {{ $labels.endpoint }} p95 latency has exceeded 1 second for 30 seconds.
 
       - alert: StockflowRabbitMqUnavailable
         expr: |
           up{job="rabbitmq"} == 0
           and on()
           stockflow_dependency_enabled{dependency="rabbitmq"} == 1
-        for: 1m
+        for: 30s
         labels:
           severity: critical
           service: stockflow
@@ -61,7 +61,7 @@ groups:
           rabbitmq_queue_consumers{
             queue=~"stockflow\\.market\\.(domain\\.events|provider\\.outcomes)"
           } == 0
-        for: 1m
+        for: 30s
         labels:
           severity: critical
           service: stockflow
