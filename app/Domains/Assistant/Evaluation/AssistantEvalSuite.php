@@ -18,7 +18,7 @@ class AssistantEvalSuite
     {
         $metadata = $this->metadata($run);
         $results = collect($run['results'] ?? [])
-            ->filter('is_array')
+            ->filter(fn (mixed $result): bool => is_array($result))
             ->keyBy(fn (array $result): string => (string) ($result['case_id'] ?? ''));
         $evaluated = [];
 
