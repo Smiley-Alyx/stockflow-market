@@ -18,7 +18,8 @@
 | Broker недоступен при публикации market | Outbox сохраняет событие | Relay повторяет публикацию после восстановления |
 | Consumer остановлен | RabbitMQ сохраняет сообщения в очереди, Alertmanager доставляет `StockflowConsumerDown` | После запуска consumer очередь продолжает обработку, alert переходит в `resolved` |
 | RabbitMQ недоступен | Alertmanager доставляет `StockflowRabbitMqUnavailable` только для runtime с включённым broker | После восстановления scrape alert переходит в `resolved` |
-| Высокая HTTP latency | Alertmanager доставляет `StockflowHttpLatencyP95High` | После прекращения деградации alert переходит в `resolved` |
+| Устойчивый backlog очереди | Alertmanager доставляет warning `StockflowQueueBacklogHigh` или critical `StockflowQueueBacklogCritical` | Восстановить consumer throughput и проверить ready/unacked сообщения |
+| Высокая HTTP latency | Alertmanager доставляет warning `StockflowHttpLatencyP95High` или critical `StockflowHttpLatencyP99Critical` | После прекращения деградации alert переходит в `resolved` |
 
 ## Таблица гарантий
 

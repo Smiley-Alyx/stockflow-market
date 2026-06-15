@@ -32,7 +32,7 @@ projects/
 
 Откройте [README](../README.md#экосистема-stockflow) и проговорите:
 
-1. `stockflow-market` хранит checkout и должен оркестрировать saga.
+1. `stockflow-market` хранит checkout и оркестрирует provider saga.
 2. ERP sandbox резервирует остатки через `stockflow.inventory`.
 3. Payment sandbox моделирует authorize/capture/refund через `stockflow.payment`.
 4. Delivery sandbox создаёт отправления через `stockflow.delivery`.
@@ -77,8 +77,8 @@ curl -s -X POST http://localhost:8083/debug/failure-mode \
 - sandbox providers готовы к автономной интеграции и failure testing;
 - market provider saga публикует requests через outbox relay и дедуплицирует
   outcomes через inbox;
-- broker-level E2E тест автоматически поднимает общий стенд и прогоняет один
-  checkout;
+- broker-level E2E тест автоматически поднимает общий стенд, прогоняет checkout
+  и проверяет повторную доставку доменных событий;
 - runbook outcome DLQ описывает поиск, диагностику и ограниченный requeue;
 - Prometheus alert rules контролируют рост DLQ, ready/unacked backlog очередей
   и HTTP p95/p99 latency.

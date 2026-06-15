@@ -60,6 +60,9 @@ docker run --rm \
   check-config /etc/alertmanager/alertmanager.yml
 ```
 
+`stockflow-alerts.test.yml` детерминированно проверяет warning/critical пороги,
+RabbitMQ backlog с unacked сообщениями и HTTP p95/p99 latency.
+
 После запуска стенда состояние правил доступно в Prometheus:
 
 ```text

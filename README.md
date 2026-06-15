@@ -80,6 +80,9 @@ inbox и выполняет компенсации release, refund и shipment c
 | [`docs/architecture.md`](docs/architecture.md) | Контекст четырёх систем, границы интеграции и компромиссы |
 | [`docs/delivery-flow.md`](docs/delivery-flow.md) | Сквозная checkout-последовательность и компенсирующие действия |
 | [`docs/failure-modes.md`](docs/failure-modes.md) | Сценарии отказов и таблица гарантий |
+| [`docs/catalog-demo.md`](docs/catalog-demo.md) | Демонстрация outbox, индексации, search dead-letter и requeue |
+| [`docs/checkout-demo.md`](docs/checkout-demo.md) | Пошаговая демонстрация checkout и асинхронного резервирования |
+| [`docs/api-examples.md`](docs/api-examples.md) | Минимальные примеры запросов к публичному API |
 | [`docs/domain-event-transport.md`](docs/domain-event-transport.md) | RabbitMQ transport доменных событий, retry и повторная доставка |
 | [`docs/provider-outcome-dlq-runbook.md`](docs/provider-outcome-dlq-runbook.md) | Поиск, диагностика и requeue provider outcome DLQ |
 | [`docs/alerting.md`](docs/alerting.md) | Prometheus alert rules, пороги и порядок диагностики |
@@ -124,7 +127,8 @@ inbox и выполняет компенсации release, refund и shipment c
 - поиск умеет возвращать деградированный ответ при недоступности Elasticsearch;
 - добавлен Prometheus-compatible `/metrics` endpoint и локальный Prometheus/Grafana стек для latency, очередей, dead-letter, reservation conflicts, saga outcomes, компенсаций и stale messaging claims;
 - Prometheus собирает per-object метрики RabbitMQ и загружает проверяемые
-  `promtool` правила для роста DLQ, backlog очередей и HTTP p95 latency;
+  `promtool` warning/critical rules для роста DLQ, ready/unacked backlog
+  очередей и HTTP p95/p99 latency;
 - Alertmanager доставляет firing/resolved уведомления в локальный webhook-
   receiver с доступной для проверок историей;
 - автоматизированный failure drill воспроизводит рост DLQ, остановку consumer,
@@ -241,6 +245,8 @@ stockflow-market/
 | `redis` | кеш, сессии, очереди | базовый | `localhost:6379` |
 | `elasticsearch` | поисковый движок | базовый | `http://localhost:9200` |
 | `prometheus` | сбор метрик gateway | базовый | `http://localhost:9090` |
+| `alertmanager` | группировка и доставка alerts | базовый | `http://localhost:9093` |
+| `alert-webhook` | локальная история firing/resolved уведомлений | базовый | `http://localhost:9081/events` |
 | `grafana` | дашборды наблюдаемости | базовый | `http://localhost:3001` |
 | `rabbitmq` | transport для provider saga и доменных событий | `extended` | `localhost:5672`, UI `http://localhost:15672` |
 | `clickhouse` | аналитическая витрина складских движений | `extended` | HTTP `http://localhost:8123`, native `localhost:9000` |
@@ -368,6 +374,8 @@ curl -fsS http://localhost:9200/catalog_products/_count
 - frontend доступен на `http://localhost:3000`;
 - Swagger UI для gateway API доступен на `http://localhost:8084`;
 - Prometheus доступен на `http://localhost:9090`;
+- Alertmanager доступен на `http://localhost:9093`;
+- локальный receiver уведомлений доступен на `http://localhost:9081/events`;
 - Grafana доступна на `http://localhost:3001` с кредами `stockflow / stockflow`.
 
 После запуска профиля `extended` RabbitMQ Management UI доступен на `http://localhost:15672`.
@@ -442,14 +450,18 @@ curl http://localhost:8080/metrics
 | `stockflow_http_request_duration_seconds` | histogram | latency по HTTP method, route endpoint и status |
 | `stockflow_queue_depth` | gauge | глубина очередей `default` и `search-indexing` |
 | `stockflow_search_dead_letter_count` | gauge | количество документов в search indexing dead-letter |
+| `stockflow_dependency_enabled` | gauge | включён ли RabbitMQ как обязательная runtime-зависимость |
 | `stockflow_inventory_reservation_conflicts_total` | counter | конфликты резервирования по причине `idempotency` / `insufficient_stock` |
 | `stockflow_search_indexing_failures_total` | counter | окончательные ошибки Elasticsearch indexing/delete по index и operation |
+| `stockflow_checkout_sagas_total` | counter | результаты provider saga |
+| `stockflow_checkout_saga_compensations_total` | counter | запрошенные и завершённые компенсации saga |
+| `stockflow_messaging_stale_claim_recoveries_total` | counter | восстановленные stale claims inbox/outbox |
 
 Dashboard содержит панели для p95 latency по endpoint, глубины очередей,
 dead-letter count, reservation conflicts rate и Elasticsearch indexing failures
-rate. Prometheus загружает правила для роста DLQ, устойчивого backlog очередей и
-HTTP p95 latency. Пороги и порядок проверки описаны в
-[`docs/alerting.md`](docs/alerting.md).
+rate. Prometheus загружает warning/critical rules для роста DLQ, полного
+ready/unacked backlog очередей и HTTP p95/p99 latency. Пороги и порядок
+проверки описаны в [`docs/alerting.md`](docs/alerting.md).
 
 ### Снимки экрана локального стенда
 
@@ -517,12 +529,15 @@ composer test
 GitHub Actions workflow `.github/workflows/ci.yml` для каждого push и pull
 request запускает `composer test`, `vendor/bin/pint --test`,
 `docker compose config --quiet`, frontend typecheck/build и проверки
-Prometheus-конфигурации и alert rules через `promtool`.
+Prometheus-конфигурации и alert rules через `promtool`. Отдельные jobs проверяют
+baseline AI-ассистента, supply chain и обратную совместимость доменных событий.
 
 Broker-level checkout E2E клонирует market и три provider sandbox-репозитория,
-поднимает чистый общий RabbitMQ-стенд и сохраняет Docker-логи как artifact при
-сбое. Тяжёлый job запускается на push в `main`, вручную через
-`workflow_dispatch` и ежедневно по расписанию.
+поднимает чистый общий RabbitMQ-стенд, проверяет provider saga и повторную
+доставку доменных событий и сохраняет Docker-логи как artifact при сбое.
+Отдельные тяжёлые jobs проверяют доставку operational alerts и восстановление
+PostgreSQL, RabbitMQ и ClickHouse из резервных копий. Они запускаются на push в
+`main`, вручную через `workflow_dispatch` и ежедневно по расписанию.
 
 Тесты страхуют базовый Laravel bootstrap, runtime-конфигурацию, сервисную
 структуру, модель и проекции каталога, OpenAPI-контракты, HTTP read API, блоки
@@ -562,7 +577,8 @@ baseline.
 - Runtime-настройки зафиксированы в `docs/adr/0002-runtime-configuration-boundaries.md`.
 - PostgreSQL выбран как основное хранилище для транзакционных данных.
 - Redis используется для кеша, сессий и быстрых очередей локального контура.
-- RabbitMQ используется для provider saga и остаётся целевым transport для доменных событий между сервисами.
+- RabbitMQ используется для provider saga и межсервисных доменных событий в
+  общем стенде; базовый локальный стек сохраняет in-process fallback.
 - Elasticsearch выделен под поисковые read-модели и индексацию каталога.
 - ClickHouse хранит аналитическую витрину складских движений и остаётся основой для следующих событийных витрин.
 - Контракты сервисов описываются до реализации публичных API.
@@ -571,14 +587,14 @@ baseline.
 
 Приоритетные следующие шаги:
 
-1. **Добавить eval-набор для AI-ассистента.** Зафиксировать пользовательские
-   запросы, ожидаемые ограничения и допустимые product ID, отдельно проверяя
-   отсутствие карточек вне результатов `search_catalog`. Результат: качество
-   рекомендаций измеряется при смене prompt, модели или provider adapter.
-2. **Повторить нагрузочный baseline на реалистичном каталоге.** Подготовить
+1. **Повторить нагрузочный baseline на реалистичном каталоге.** Подготовить
    репрезентативный dataset, устранить основные причины текущего p95 `8.17s` и
    сравнить новый прогон с сохранённым baseline. Результат: следующий этап
    оптимизации опирается на измеримое изменение throughput и latency.
+2. **Вынести RabbitMQ topology provisioning из runtime.** Создать отдельный
+   deployment job для exchanges, queues и bindings, после чего убрать
+   `configure` permission у publishers и consumers. Результат: runtime работает
+   с минимальными RabbitMQ permissions.
 
 ## Лицензия
 

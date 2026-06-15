@@ -7,9 +7,11 @@
 → найти товар через Elasticsearch → получить dead-letter при сбое → выполнить requeue
 ```
 
-RabbitMQ для этой демонстрации не нужен: текущий publisher обрабатывает
-transactional outbox in-process. Очередь поисковой индексации работает через
-Redis, а документы сохраняются в Elasticsearch.
+RabbitMQ для этой демонстрации не нужен: базовый `compose.yaml` использует
+in-process fallback для transactional outbox. В общем стенде
+`docker-compose-all.yml` те же доменные события проходят через RabbitMQ.
+Очередь поисковой индексации работает через Redis, а документы сохраняются в
+Elasticsearch.
 
 ## Подготовка
 

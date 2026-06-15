@@ -113,9 +113,9 @@ ERP использует `8083` только в общем стенде: в со
 | SQLite state в payment sandbox | Повторяемый локальный ledger без отдельной БД | Не моделирует production-конкурентность PostgreSQL |
 
 Prometheus собирает gateway-метрики и per-object метрики RabbitMQ. Alert rules
-сигнализируют о росте DLQ, устойчивом backlog основных очередей и повышенной HTTP
-p95 latency. Пороги и порядок диагностики описаны в
-[`alerting.md`](alerting.md).
+сигнализируют о росте DLQ, устойчивом ready/unacked backlog основных очередей и
+повышенной HTTP p95/p99 latency. Warning и critical пороги и порядок диагностики
+описаны в [`alerting.md`](alerting.md).
 
 Runbook для разбора и повторной постановки provider outcome DLQ находится в
 [`provider-outcome-dlq-runbook.md`](provider-outcome-dlq-runbook.md).
