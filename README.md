@@ -346,7 +346,8 @@ STOCKFLOW_SEED_PRODUCT_COUNT=50000
 
 Для полной переиндексации большого каталога без промежуточной очереди используйте
 bulk-режим. Команда завершится с ошибкой, если Elasticsearch отклонит хотя бы
-один документ:
+один документ. Timeout bulk-запроса настраивается отдельно через
+`STOCKFLOW_SEARCH_INDEX_BULK_TIMEOUT_MS`:
 
 ```bash
 docker compose exec php php artisan search:index:rebuild --sync --chunk=500

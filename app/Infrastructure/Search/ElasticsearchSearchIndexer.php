@@ -88,7 +88,7 @@ class ElasticsearchSearchIndexer implements BulkSearchIndexer, SearchIndexer
 
         try {
             $response = Http::baseUrl(rtrim((string) config('stockflow.dependencies.elasticsearch.host'), '/'))
-                ->timeout((int) ceil(config('stockflow.search.indexing.timeout_ms') / 1000))
+                ->timeout((int) ceil(config('stockflow.search.indexing.bulk_timeout_ms') / 1000))
                 ->withBody($payload, 'application/x-ndjson')
                 ->post('/_bulk')
                 ->throw()

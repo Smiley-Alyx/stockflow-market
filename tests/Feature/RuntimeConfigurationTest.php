@@ -23,6 +23,7 @@ class RuntimeConfigurationTest extends TestCase
         $this->assertSame(1000, config('stockflow.analytics.stock_movements.rebuild_batch_size'));
         $this->assertSame(300, config('stockflow.catalog.cache.product_ttl_seconds'));
         $this->assertSame('search-indexing', config('stockflow.search.indexing.queue'));
+        $this->assertSame(30000, config('stockflow.search.indexing.bulk_timeout_ms'));
         $this->assertSame('search-indexing-dead-letter', config('stockflow.search.indexing.dead_letter_queue'));
         $this->assertSame('redis', config('stockflow.search.indexing.dead_letter_backend'));
         $this->assertSame('search_requeue_audit', config('stockflow.search.indexing.requeue_audit_channel'));
