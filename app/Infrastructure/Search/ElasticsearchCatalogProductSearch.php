@@ -44,6 +44,7 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
                 ->post('/catalog_products/_search', array_filter([
                     'from' => ($query->page - 1) * $query->perPage,
                     'size' => $query->perPage,
+                    'track_total_hits' => true,
                     'query' => $this->searchQuery($query, $category),
                     'post_filter' => $this->priceFilter($query),
                     'sort' => $this->sort($query->sort),
