@@ -33,12 +33,17 @@ wait_for_url() {
 wait_for_alert_event() {
     alertname=$1
     status=$2
+    queue=${3:-}
     attempts=$TIMEOUT_SECONDS
 
     while [ "$attempts" -gt 0 ]; do
         if curl -fsS "$ALERTS_URL/events" |
-            jq -e --arg alertname "$alertname" --arg status "$status" \
-                '.events | any(.labels.alertname == $alertname and .status == $status)' >/dev/null; then
+            jq -e --arg alertname "$alertname" --arg status "$status" --arg queue "$queue" \
+                '.events | any(
+                    .labels.alertname == $alertname
+                    and .status == $status
+                    and ($queue == "" or .labels.queue == $queue)
+                )' >/dev/null; then
             printf '%s: получено состояние %s\n' "$alertname" "$status"
             return
         fi
@@ -161,9 +166,9 @@ reset_alerts
 rabbitmq_api PUT "queues/%2F/$DLQ_NAME" '{"durable":false,"auto_delete":false,"arguments":{}}'
 wait_for_prometheus_series "rabbitmq_queue_messages_ready{queue=\"$DLQ_NAME\"}"
 rabbitmq_api POST 'exchanges/%2F/amq.default/publish' "{\"properties\":{},\"routing_key\":\"$DLQ_NAME\",\"payload\":\"drill\",\"payload_encoding\":\"string\"}"
-wait_for_alert_event StockflowDeadLetterGrowth firing
+wait_for_alert_event StockflowDeadLetterGrowth firing "$DLQ_NAME"
 rabbitmq_api DELETE "queues/%2F/$DLQ_NAME/contents"
-wait_for_alert_event StockflowDeadLetterGrowth resolved
+wait_for_alert_event StockflowDeadLetterGrowth resolved "$DLQ_NAME"
 rabbitmq_api DELETE "queues/%2F/$DLQ_NAME"
 
 printf 'Проверка остановки consumer\n'
