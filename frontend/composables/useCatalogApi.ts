@@ -174,6 +174,18 @@ export type CatalogProductList = {
     meta: CatalogMeta;
 };
 
+export function catalogProductUrl(product: Pick<CatalogProduct, 'category' | 'slug' | 'url'>): string {
+    if (product.url) {
+        return product.url;
+    }
+
+    if (product.category?.url) {
+        return `${product.category.url.replace(/\/+$/g, '')}/${encodeURIComponent(product.slug)}/`;
+    }
+
+    return '/catalog/';
+}
+
 export const useCatalogApi = () => {
     const config = useRuntimeConfig();
     const apiBase = import.meta.server ? config.apiBase : config.public.apiBase;

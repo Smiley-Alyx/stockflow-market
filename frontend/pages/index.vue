@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CatalogCategory, CatalogProduct, HomepageBlock } from '~/composables/useCatalogApi';
+import { catalogProductUrl } from '~/composables/useCatalogApi';
 
 const catalogApi = useCatalogApi();
 const customer = useCustomerState();
@@ -256,12 +257,12 @@ main.market-shell
                     :class="{ active: customer.isFavorite(item.id) }"
                     @click="customer.toggleFavorite(item)"
                 ) {{ customer.isFavorite(item.id) ? '♥' : '♡' }}
-                NuxtLink.product-card-media(:to="item.url ?? `/api/catalog/products/${item.slug}`")
+                NuxtLink.product-card-media(:to="catalogProductUrl(item)")
                     img(v-if="item.image_url" :src="item.image_url" :alt="item.name")
                     span(v-else) SF
                 .product-card-copy
                     small {{ item.category?.name ?? 'Каталог' }}
-                    NuxtLink.product-card-title(:to="item.url ?? `/api/catalog/products/${item.slug}`") {{ item.name }}
+                    NuxtLink.product-card-title(:to="catalogProductUrl(item)") {{ item.name }}
                     .rating-line
                         span ★ {{ ratingLabel(item) }}
                         small {{ item.rating_count }} оценок
@@ -298,12 +299,12 @@ main.market-shell
                     :class="{ active: customer.isFavorite(item.id) }"
                     @click="customer.toggleFavorite(item)"
                 ) {{ customer.isFavorite(item.id) ? '♥' : '♡' }}
-                NuxtLink.product-card-media(:to="item.url ?? `/api/catalog/products/${item.slug}`")
+                NuxtLink.product-card-media(:to="catalogProductUrl(item)")
                     img(v-if="item.image_url" :src="item.image_url" :alt="item.name")
                     span(v-else) SF
                 .product-card-copy
                     small {{ item.category?.name ?? 'Каталог' }}
-                    NuxtLink.product-card-title(:to="item.url ?? `/api/catalog/products/${item.slug}`") {{ item.name }}
+                    NuxtLink.product-card-title(:to="catalogProductUrl(item)") {{ item.name }}
                     .rating-line
                         span ★ {{ ratingLabel(item) }}
                         small {{ item.rating_count }} оценок

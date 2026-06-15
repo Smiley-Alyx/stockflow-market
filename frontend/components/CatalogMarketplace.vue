@@ -6,6 +6,7 @@ import type {
     CatalogQueryParams,
     HomepageCity,
 } from '~/composables/useCatalogApi';
+import { catalogProductUrl } from '~/composables/useCatalogApi';
 
 defineOptions({ name: 'CatalogMarketplace' });
 
@@ -499,12 +500,12 @@ main.catalog-shell
                         :aria-label="customer.isFavorite(item.id) ? 'Убрать из избранного' : 'Добавить в избранное'"
                         @click="customer.toggleFavorite(item)"
                     ) {{ customer.isFavorite(item.id) ? '♥' : '♡' }}
-                    NuxtLink.catalog-card-media(:to="item.url ?? `/api/catalog/products/${item.slug}`")
+                    NuxtLink.catalog-card-media(:to="catalogProductUrl(item)")
                         img(v-if="item.image_url" :src="item.image_url" :alt="item.name")
                         span(v-else) SF
                     .catalog-card-copy
                         small {{ item.category?.name ?? 'Каталог' }}
-                        NuxtLink.catalog-card-title(:to="item.url ?? `/api/catalog/products/${item.slug}`")
+                        NuxtLink.catalog-card-title(:to="catalogProductUrl(item)")
                             h2 {{ item.name }}
                         .rating-line
                             span ★ {{ ratingLabel(item) }}
