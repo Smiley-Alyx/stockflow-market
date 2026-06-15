@@ -327,10 +327,22 @@ docker compose exec php php artisan migrate
 docker compose exec php php artisan db:seed
 ```
 
-`db:seed` создает каталог из 2000 товаров, склады, цены и контент главной
-страницы. После наполнения команда автоматически ставит весь каталог в очередь
-индексации Elasticsearch. Прогресс обработки виден через
-`docker compose logs -f search-index-worker`.
+`db:seed` создает каталог из 50 000 товаров, склады, цены и контент главной
+страницы. Серийные товары воспроизводимо распределены по цветам, размерам,
+ценовым диапазонам, категориям и брендам. Массовые записи создаются chunked
+upsert-операциями, поэтому seeder не держит весь каталог в памяти.
+
+Объём можно изменить через `STOCKFLOW_SEED_PRODUCT_COUNT`. Минимум — 20
+детализированных витринных товаров:
+
+```dotenv
+STOCKFLOW_SEED_PRODUCT_COUNT=50000
+```
+
+При `STOCKFLOW_SEED_SEARCH_INDEX=true` после наполнения весь каталог ставится в
+очередь индексации Elasticsearch. Для отдельной быстрой проверки PostgreSQL
+наполнение можно запустить с `STOCKFLOW_SEED_SEARCH_INDEX=false`. Прогресс
+индексации виден через `docker compose logs -f search-index-worker`.
 
 После базового запуска:
 
