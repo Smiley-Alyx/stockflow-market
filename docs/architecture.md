@@ -39,8 +39,9 @@ RabbitMQ. Они объявляют topic exchanges, входящие очере
 В `stockflow-market` реализованы draft order, price snapshot, checkout
 configuration и lifecycle заказа. Provider saga публикует
 inventory/payment/delivery requests через transactional outbox relay, потребляет
-outcomes через inbox-дедупликацию и проецирует статусы резервов в checkout
-read-модель.
+reservation requests и outcomes через inbox-дедупликацию и проецирует статусы
+резервов в отдельную checkout read-модель. Gateway не читает orchestration state
+из `orders_checkout_saga_reservations`.
 
 Общие доменные события проходят через transactional outbox и topic exchange
 `stockflow.domain.events`. Market consumer использует inbox для защиты от
@@ -63,7 +64,7 @@ Marketplace хранит saga state по `order_id` и выполняет шаг
 1. Опубликовать `inventory.reservation.requested.v1`.
 2. После всех `inventory.reservation.confirmed.v1` подтвердить заказ и
    опубликовать `payment.authorization.requested.v1`.
-3. Проецировать каждый reservation outcome для checkout read endpoint.
+3. Проецировать каждый reservation request и outcome для checkout read endpoint.
 4. Опубликовать `payment.capture.requested.v1`.
 5. После `payment.capture.completed.v1` опубликовать
    `delivery.shipment.requested.v1`.

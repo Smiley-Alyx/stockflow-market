@@ -180,8 +180,9 @@ docker compose -f docker-compose-all.yml exec php php artisan messaging:outbox:p
 docker compose -f docker-compose-all.yml exec php php artisan messaging:provider-outbox:publish
 ```
 
-Provider outcome worker спроецирует ответ ERP в
-`orders_checkout_saga_reservations`. После подтверждения всех резервов заказ
+Provider outcome worker обновит orchestration state в
+`orders_checkout_saga_reservations` и отдельную gateway read-модель в
+`orders_reservation_status_projections`. После подтверждения всех резервов заказ
 перейдёт в `confirmed`, а в outbox появятся события
 `order.reservation_succeeded` и `orders.order.created`.
 
@@ -201,7 +202,7 @@ docker compose exec postgres psql -U stockflow -d stockflow -c \
 
 ```bash
 docker compose exec postgres psql -U stockflow -d stockflow -c \
-  "select reservation_id, status from orders_checkout_saga_reservations order by id desc limit 5;"
+  "select reservation_id, status, last_routing_key, projected_at from orders_reservation_status_projections order by id desc limit 5;"
 ```
 
 Ожидаемые значения:
