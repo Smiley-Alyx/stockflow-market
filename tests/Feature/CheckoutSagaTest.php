@@ -118,6 +118,13 @@ class CheckoutSagaTest extends TestCase
 
         $release = $this->assertProviderMessage('inventory.reservation.release.requested.v1');
         $this->assertSame($reservations[0]->reservation_id, $release->payload['reservation_id']);
+        $this->providerMessage($release);
+
+        $this->assertDatabaseHas('orders_reservation_status_projections', [
+            'reservation_id' => $reservations[0]->reservation_id,
+            'status' => CheckoutSagaReservation::STATUS_RELEASE_PENDING,
+            'last_routing_key' => 'inventory.reservation.release.requested.v1',
+        ]);
     }
 
     public function test_checkout_read_model_exposes_projected_reservation_statuses(): void
@@ -239,6 +246,11 @@ class CheckoutSagaTest extends TestCase
         $this->assertDatabaseHas('orders_checkout_saga_reservations', [
             'reservation_id' => $reservation->reservation_id,
             'status' => CheckoutSagaReservation::STATUS_RELEASED,
+        ]);
+        $this->assertDatabaseHas('orders_reservation_status_projections', [
+            'reservation_id' => $reservation->reservation_id,
+            'status' => CheckoutSagaReservation::STATUS_RELEASED,
+            'last_routing_key' => 'inventory.reservation.released.v1',
         ]);
         $this->assertSame(1, $this->metric('stockflow_checkout_sagas_total', ['outcome' => 'failed']));
         $this->assertSame(1, $this->metric('stockflow_checkout_saga_compensations_total', [

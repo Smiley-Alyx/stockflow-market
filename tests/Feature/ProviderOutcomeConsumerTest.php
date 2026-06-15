@@ -42,6 +42,34 @@ class ProviderOutcomeConsumerTest extends TestCase
         $this->consumer()->consumeMessage($message);
     }
 
+    public function test_provider_outcome_topology_subscribes_projection_to_reservation_requests(): void
+    {
+        $bindings = [];
+        $channel = Mockery::mock(AMQPChannel::class);
+        $channel->shouldReceive('exchange_declare')->times(6);
+        $channel->shouldReceive('queue_bind')
+            ->times(20)
+            ->withArgs(function (string $queue, string $exchange, string $routingKey) use (&$bindings): bool {
+                $bindings[] = [$queue, $exchange, $routingKey];
+
+                return true;
+            });
+        $topology = new ProviderOutcomeTopology;
+
+        $topology->declare($channel);
+
+        $this->assertContains([
+            $topology->queue(),
+            'stockflow.inventory',
+            'inventory.reservation.requested.v1',
+        ], $bindings);
+        $this->assertContains([
+            $topology->queue(),
+            'stockflow.inventory',
+            'inventory.reservation.release.requested.v1',
+        ], $bindings);
+    }
+
     /**
      * @return array{exchange: string, headers: array<string, mixed>}
      */

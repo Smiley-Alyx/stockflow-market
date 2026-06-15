@@ -21,6 +21,17 @@ provider_saga_assert_sql \
     paid \
     "Статус заказа $ORDER_ID"
 
+provider_saga_wait_sql \
+    "select status from orders_reservation_status_projections where reservation_id = '$RESERVATION_ID';" \
+    confirmed \
+    "Асинхронная проекция резерва $RESERVATION_ID"
+
+provider_saga_assert_http_json \
+    "$MARKET_URL/api/orders/$ORDER_ID/checkout" \
+    data.order.reservations.0.status \
+    confirmed \
+    "Статус резерва $RESERVATION_ID в checkout API"
+
 published_messages=$(provider_saga_sql_value "select count(*) from messaging_provider_outbox where correlation_id = (select correlation_id from orders_checkout_sagas where order_id = $ORDER_ID) and status = 'published';")
 
 if [ "$published_messages" -lt 4 ]; then
