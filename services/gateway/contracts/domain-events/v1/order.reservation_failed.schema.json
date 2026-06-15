@@ -1,0 +1,13 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://stockflow.local/contracts/domain-events/v1/order.reservation_failed.schema.json",
+    "title": "order.reservation_failed payload v1",
+    "type": "object",
+    "required": ["event", "order_id", "reason"],
+    "properties": {
+        "event": {"const": "order.reservation_failed"},
+        "order_id": {"type": "integer"},
+        "reason": {"type": "string"}
+    },
+    "additionalProperties": true
+}

@@ -1,0 +1,13 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://stockflow.local/contracts/domain-events/v1/search.index.deletion_requested.schema.json",
+    "title": "search.index.deletion_requested payload v1",
+    "type": "object",
+    "required": ["event", "index", "document_id"],
+    "properties": {
+        "event": {"const": "search.index.deletion_requested"},
+        "index": {"type": "string"},
+        "document_id": {"type": "string"}
+    },
+    "additionalProperties": true
+}

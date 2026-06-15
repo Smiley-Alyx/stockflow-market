@@ -1,0 +1,14 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://stockflow.local/contracts/domain-events/v1/orders.order.expired.schema.json",
+    "title": "orders.order.expired payload v1",
+    "type": "object",
+    "required": ["event", "order_id", "status", "expired_at"],
+    "properties": {
+        "event": {"const": "orders.order.expired"},
+        "order_id": {"type": "integer"},
+        "status": {"type": "string"},
+        "expired_at": {"type": ["string", "null"]}
+    },
+    "additionalProperties": true
+}

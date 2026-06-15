@@ -1,0 +1,13 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://stockflow.local/contracts/domain-events/v1/order.reservation_succeeded.schema.json",
+    "title": "order.reservation_succeeded payload v1",
+    "type": "object",
+    "required": ["event", "order_id", "reserved_at"],
+    "properties": {
+        "event": {"const": "order.reservation_succeeded"},
+        "order_id": {"type": "integer"},
+        "reserved_at": {"type": ["string", "null"]}
+    },
+    "additionalProperties": true
+}

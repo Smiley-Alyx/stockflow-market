@@ -1,0 +1,15 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://stockflow.local/contracts/domain-events/v1/search.index.failed.schema.json",
+    "title": "search.index.failed payload v1",
+    "type": "object",
+    "required": ["event", "index", "document_id", "attempts", "failure"],
+    "properties": {
+        "event": {"const": "search.index.failed"},
+        "index": {"type": "string"},
+        "document_id": {"type": "string"},
+        "attempts": {"type": "integer"},
+        "failure": {"type": "string"}
+    },
+    "additionalProperties": true
+}

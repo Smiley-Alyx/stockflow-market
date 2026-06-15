@@ -1,0 +1,25 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://stockflow.local/contracts/domain-events/v1/order.confirmation.requested.schema.json",
+    "title": "order.confirmation.requested payload v1",
+    "type": "object",
+    "required": ["event", "order_id", "items"],
+    "properties": {
+        "event": {"const": "order.confirmation.requested"},
+        "order_id": {"type": "integer"},
+        "items": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["product_id", "sku", "quantity"],
+                "properties": {
+                    "product_id": {"type": "integer"},
+                    "sku": {"type": "string"},
+                    "quantity": {"type": "integer"}
+                },
+                "additionalProperties": true
+            }
+        }
+    },
+    "additionalProperties": true
+}

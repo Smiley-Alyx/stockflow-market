@@ -27,6 +27,8 @@ class DomainEventContractRegistry
 {
     public const VERSION = 1;
 
+    public function __construct(private readonly DomainEventSchemaRegistry $schemas) {}
+
     /**
      * @return array{event_name: string, schema_version: int, payload: array<string, mixed>}
      */
@@ -52,6 +54,8 @@ class DomainEventContractRegistry
             throw new InvalidArgumentException('Domain event payload does not match its registered name.');
         }
 
+        $this->schemas->validate($eventName, $payload);
+
         return [
             'event_name' => $eventName,
             'schema_version' => self::VERSION,
@@ -71,6 +75,8 @@ class DomainEventContractRegistry
         if (($payload['event'] ?? null) !== $eventName) {
             throw new InvalidArgumentException('Domain event payload does not match its envelope name.');
         }
+
+        $this->schemas->validate($eventName, $payload);
 
         return match ($eventName) {
             ProductCreated::NAME => new ProductCreated($this->product($payload)),
@@ -119,7 +125,7 @@ class DomainEventContractRegistry
     /**
      * @return array<string, class-string>
      */
-    private function eventClasses(): array
+    public function eventClasses(): array
     {
         return [
             ProductCreated::NAME => ProductCreated::class,

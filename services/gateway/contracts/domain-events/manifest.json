@@ -1,0 +1,20 @@
+{
+    "schema_version": 1,
+    "events": {
+        "catalog.product.archived": "v1/catalog.product.archived.schema.json",
+        "catalog.product.created": "v1/catalog.product.created.schema.json",
+        "catalog.product.updated": "v1/catalog.product.updated.schema.json",
+        "inventory.stock.changed": "v1/inventory.stock.changed.schema.json",
+        "order.confirmation.requested": "v1/order.confirmation.requested.schema.json",
+        "order.reservation_failed": "v1/order.reservation_failed.schema.json",
+        "order.reservation_succeeded": "v1/order.reservation_succeeded.schema.json",
+        "orders.order.cancelled": "v1/orders.order.cancelled.schema.json",
+        "orders.order.created": "v1/orders.order.created.schema.json",
+        "orders.order.expired": "v1/orders.order.expired.schema.json",
+        "orders.order.paid": "v1/orders.order.paid.schema.json",
+        "search.index.completed": "v1/search.index.completed.schema.json",
+        "search.index.deletion_requested": "v1/search.index.deletion_requested.schema.json",
+        "search.index.failed": "v1/search.index.failed.schema.json",
+        "search.index.requested": "v1/search.index.requested.schema.json"
+    }
+}

@@ -1,0 +1,14 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://stockflow.local/contracts/domain-events/v1/orders.order.cancelled.schema.json",
+    "title": "orders.order.cancelled payload v1",
+    "type": "object",
+    "required": ["event", "order_id", "status", "cancelled_at"],
+    "properties": {
+        "event": {"const": "orders.order.cancelled"},
+        "order_id": {"type": "integer"},
+        "status": {"type": "string"},
+        "cancelled_at": {"type": ["string", "null"]}
+    },
+    "additionalProperties": true
+}

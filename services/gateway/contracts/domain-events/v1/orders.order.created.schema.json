@@ -1,0 +1,16 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://stockflow.local/contracts/domain-events/v1/orders.order.created.schema.json",
+    "title": "orders.order.created payload v1",
+    "type": "object",
+    "required": ["event", "order_id", "status", "total_amount_minor", "currency", "created_at"],
+    "properties": {
+        "event": {"const": "orders.order.created"},
+        "order_id": {"type": "integer"},
+        "status": {"type": "string"},
+        "total_amount_minor": {"type": "integer"},
+        "currency": {"type": "string"},
+        "created_at": {"type": ["string", "null"]}
+    },
+    "additionalProperties": true
+}

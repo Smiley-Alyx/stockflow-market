@@ -1,0 +1,13 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://stockflow.local/contracts/domain-events/v1/search.index.completed.schema.json",
+    "title": "search.index.completed payload v1",
+    "type": "object",
+    "required": ["event", "index", "document_id"],
+    "properties": {
+        "event": {"const": "search.index.completed"},
+        "index": {"type": "string"},
+        "document_id": {"type": "string"}
+    },
+    "additionalProperties": true
+}

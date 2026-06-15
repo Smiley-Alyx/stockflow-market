@@ -1,0 +1,25 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://stockflow.local/contracts/domain-events/v1/catalog.product.updated.schema.json",
+    "title": "catalog.product.updated payload v1",
+    "type": "object",
+    "required": ["event", "product"],
+    "properties": {
+        "event": {"const": "catalog.product.updated"},
+        "product": {
+            "type": "object",
+            "required": ["id", "category_id", "name", "slug", "sku", "status", "published_at"],
+            "properties": {
+                "id": {"type": "integer"},
+                "category_id": {"type": "integer"},
+                "name": {"type": "string"},
+                "slug": {"type": "string"},
+                "sku": {"type": "string"},
+                "status": {"type": "string"},
+                "published_at": {"type": ["string", "null"]}
+            },
+            "additionalProperties": true
+        }
+    },
+    "additionalProperties": true
+}

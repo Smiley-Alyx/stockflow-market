@@ -1,0 +1,14 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://stockflow.local/contracts/domain-events/v1/orders.order.paid.schema.json",
+    "title": "orders.order.paid payload v1",
+    "type": "object",
+    "required": ["event", "order_id", "status", "paid_at"],
+    "properties": {
+        "event": {"const": "orders.order.paid"},
+        "order_id": {"type": "integer"},
+        "status": {"type": "string"},
+        "paid_at": {"type": ["string", "null"]}
+    },
+    "additionalProperties": true
+}
