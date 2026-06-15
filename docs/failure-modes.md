@@ -62,9 +62,12 @@ happy path сам поднимает стенд, прогоняет один che
 ```bash
 ./scripts/test-provider-saga-e2e.sh
 ./scripts/test-provider-saga-compensations-e2e.sh
+./scripts/test-domain-event-redelivery-e2e.sh
 ```
 
-Доставку и восстановление operational alerts проверяет отдельный drill:
+Третий сценарий проверяет дедупликацию повторной доставки доменного события,
+TTL retry и перевод несовместимой версии в DLQ. Доставку и восстановление
+operational alerts проверяет отдельный drill:
 
 ```bash
 ./scripts/test-alert-drills.sh

@@ -13,6 +13,10 @@
 только явно зарегистрированные типы событий из JSON-контракта и отклоняет
 неизвестные события или версии до запуска listeners.
 
+Producer объявляет только durable topic exchange. Consumer отдельно объявляет
+свои основную, retry и dead-letter очереди и bindings, поэтому добавление нового
+межсервисного consumer не требует менять producer.
+
 Машиночитаемый формат envelope зафиксирован в
 `services/gateway/contracts/domain-event-envelope.v1.schema.json`.
 Payload каждого зарегистрированного события описан отдельной JSON Schema в
@@ -49,6 +53,7 @@ Payload каждого зарегистрированного события о�
 - ошибка consumer отправляет сообщение в TTL retry queue;
 - после `STOCKFLOW_DOMAIN_EVENTS_MAX_RETRY_COUNT` сообщение попадает в
   `stockflow.market.domain.events.dlq`;
+- retry и DLQ публикации ожидают publisher confirm до ack исходной доставки;
 - если публикация в retry exchange не удалась, исходное сообщение возвращается
   в основную очередь через `nack(requeue=true)`.
 
@@ -56,6 +61,19 @@ Payload каждого зарегистрированного события о�
 effect один раз, временная ошибка отправляет сообщение в retry queue,
 исчерпанные попытки отправляют сообщение в DLQ, а ошибка retry-публикации
 возвращает исходное сообщение в очередь.
+
+Broker-level сценарий публикует одно валидное событие дважды с одинаковым
+`message_id` и проверяет однократную обработку через inbox. Затем он публикует
+несовместимую версию события и проверяет TTL retry, итоговый `retry_count` и
+маршрутизацию в DLQ:
+
+```bash
+./scripts/test-domain-event-redelivery-e2e.sh
+```
+
+Сценарий требует уже запущенные `postgres`, `rabbitmq` и
+`domain-event-worker`. Полный `test-broker-checkout-e2e.sh` запускает его
+автоматически после provider saga.
 
 ## Эволюция контрактов
 

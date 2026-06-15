@@ -292,10 +292,18 @@ docker compose -f docker-compose-all.yml up -d --build
 [`docs/demo.md`](docs/demo.md).
 
 Автономный broker-level E2E тест поднимает market, три provider sandbox-сервиса
-и RabbitMQ, прогоняет один checkout и останавливает созданные контейнеры:
+и RabbitMQ, прогоняет checkout, повторную доставку доменных событий, retry/DLQ
+и останавливает созданные контейнеры:
 
 ```bash
 ./scripts/test-broker-checkout-e2e.sh
+```
+
+Для уже запущенного стенда повторную доставку доменных событий можно проверить
+отдельно:
+
+```bash
+./scripts/test-domain-event-redelivery-e2e.sh
 ```
 
 Воспроизводимый сценарий `создать товар → событие → индексация → поиск → dead-letter/requeue` описан в [`docs/catalog-demo.md`](docs/catalog-demo.md).

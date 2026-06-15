@@ -95,6 +95,7 @@ docker compose -f docker-compose-all.yml exec php php artisan messaging:provider
 ./scripts/test-broker-checkout-e2e.sh
 ./scripts/test-provider-saga-e2e.sh
 ./scripts/test-provider-saga-compensations-e2e.sh
+./scripts/test-domain-event-redelivery-e2e.sh
 docker compose -f docker-compose-all.yml down
 ```
 
