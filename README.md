@@ -252,7 +252,7 @@ stockflow-market/
 | PostgreSQL | транзакционные данные каталога, складов, цен, корзин, заказов, outbox и inbox | используется |
 | Redis | кеш каталога, Laravel queues, сессии и search dead-letter storage | используется |
 | Elasticsearch | индексация каталога, поисковый read endpoint и деградированный ответ при недоступности | используется |
-| Prometheus | gateway/RabbitMQ scrape и alert rules для DLQ, backlog очередей и HTTP p95 latency | используется |
+| Prometheus | gateway/RabbitMQ scrape и warning/critical rules для DLQ, backlog очередей и HTTP tail latency | используется |
 | Grafana | автоматически provisioned dashboard `StockFlow Observability` поверх Prometheus | используется |
 | RabbitMQ | provider saga и transport доменных событий с outbox/inbox, retry и DLQ | профиль `extended`, используется |
 | ClickHouse | витрина `inventory_stock_movements`, заполняемая из outbox-событий с inbox-защитой от повторной доставки | профиль `extended`, используется |

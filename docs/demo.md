@@ -80,8 +80,8 @@ curl -s -X POST http://localhost:8083/debug/failure-mode \
 - broker-level E2E тест автоматически поднимает общий стенд и прогоняет один
   checkout;
 - runbook outcome DLQ описывает поиск, диагностику и ограниченный requeue;
-- Prometheus alert rules контролируют рост DLQ, backlog очередей и HTTP p95
-  latency.
+- Prometheus alert rules контролируют рост DLQ, ready/unacked backlog очередей
+  и HTTP p95/p99 latency.
 
 Это важная граница: compose запускает всю экосистему и market-orchestrator, а
 broker-level E2E сценарий проверяет happy path через реальный RabbitMQ.

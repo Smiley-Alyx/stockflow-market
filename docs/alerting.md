@@ -11,10 +11,17 @@ dead-letter count. RabbitMQ scrape использует `/metrics/per-object`, �
 | Alert | Порог | Назначение |
 | --- | --- | --- |
 | `StockflowDeadLetterGrowth` | search или RabbitMQ DLQ не пуста в течение `30s` | Требует немедленной диагностики необработанных сообщений |
-| `StockflowQueueBacklogHigh` | основная очередь содержит больше `100` ready сообщений в течение `10m` | Показывает устойчивое отставание consumer |
+| `StockflowQueueBacklogHigh` | основная очередь содержит больше `100` pending сообщений в течение `10m` | Показывает устойчивое отставание consumer |
+| `StockflowQueueBacklogCritical` | основная очередь содержит больше `500` pending сообщений в течение `5m` | Требует немедленного восстановления пропускной способности consumer |
 | `StockflowHttpLatencyP95High` | p95 HTTP latency за `2m` выше `1s` в течение `30s` | Показывает устойчивую деградацию gateway |
+| `StockflowHttpLatencyP99Critical` | p99 HTTP latency за `2m` выше `2.5s` в течение `2m` | Показывает критическую деградацию tail latency |
 | `StockflowRabbitMqUnavailable` | обязательный RabbitMQ не scrape-ится в течение `30s` | Показывает недоступность broker для runtime, где он включён |
 | `StockflowConsumerDown` | очередь market остаётся без consumer в течение `30s` | Показывает остановленный domain-event или provider-outcome worker |
+
+Для Redis очередей используется `stockflow_queue_depth`. Для RabbitMQ
+используется `rabbitmq_queue_messages`, поэтому backlog включает как ready, так
+и unacked сообщения. DLQ исключены из backlog rules и контролируются отдельным
+критическим alert.
 
 Prometheus отправляет alerts в Alertmanager. Локальный receiver сохраняет
 доставленные firing/resolved уведомления и доступен по адресу
@@ -88,6 +95,8 @@ http://localhost:9093
 При `StockflowDeadLetterGrowth` сначала остановить массовый requeue и определить
 причину ошибки. Для provider outcomes использовать
 [`provider-outcome-dlq-runbook.md`](provider-outcome-dlq-runbook.md).
-При `StockflowQueueBacklogHigh` проверить consumers, глубину retry queues и
-доступность зависимостей. При `StockflowHttpLatencyP95High` сравнить endpoint с
-нагрузочным baseline и проверить PostgreSQL, Redis и downstream-зависимости.
+При `StockflowQueueBacklogHigh` или `StockflowQueueBacklogCritical` проверить
+consumers, ready/unacked разбиение, глубину retry queues и доступность
+зависимостей. При `StockflowHttpLatencyP95High` или
+`StockflowHttpLatencyP99Critical` сравнить endpoint с нагрузочным baseline и
+проверить PostgreSQL, Redis и downstream-зависимости.
