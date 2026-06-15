@@ -25,8 +25,6 @@ class ProviderOutcomeConsumer
         $channel = $connection->channel();
 
         try {
-            $this->topology->declareQueue($channel);
-            $this->topology->declare($channel);
             $channel->basic_qos(0, 10, false);
             $channel->basic_consume(
                 queue: $this->topology->queue(),

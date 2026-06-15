@@ -34,6 +34,9 @@ class RuntimeConfigurationTest extends TestCase
         $this->assertSame('in_process', config('stockflow.messaging.event_bus'));
         $this->assertSame('stockflow.domain.events', config('stockflow.messaging.rabbitmq.exchange'));
         $this->assertSame('stockflow.market.domain.events', config('stockflow.messaging.rabbitmq.queue'));
+        $this->assertSame('stockflow-market-runtime', config('stockflow.messaging.rabbitmq.provisioning.runtime_user'));
+        $this->assertStringContainsString('domain', config('stockflow.messaging.rabbitmq.provisioning.runtime_write_permission'));
+        $this->assertStringContainsString('provider', config('stockflow.messaging.rabbitmq.provisioning.runtime_read_permission'));
         $this->assertSame(5, config('stockflow.messaging.retry.max_attempts'));
     }
 
@@ -57,6 +60,8 @@ class RuntimeConfigurationTest extends TestCase
         $this->assertStringContainsString('STOCKFLOW_EVENT_BUS=in_process', $envExample);
         $this->assertStringContainsString('STOCKFLOW_DOMAIN_EVENTS_QUEUE=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_DOMAIN_EVENTS_DLQ=', $envExample);
+        $this->assertStringContainsString('STOCKFLOW_RABBITMQ_RUNTIME_USER=', $envExample);
+        $this->assertStringContainsString('STOCKFLOW_RABBITMQ_RUNTIME_PASSWORD=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_MESSAGE_RETRY_ATTEMPTS=', $envExample);
         $this->assertStringContainsString('STOCKFLOW_MESSAGE_DEAD_LETTER_AFTER=', $envExample);
     }

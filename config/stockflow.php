@@ -137,6 +137,18 @@ return [
             'retry_delay_ms' => (int) env('STOCKFLOW_DOMAIN_EVENTS_RETRY_DELAY_MS', 2000),
             'max_retry_count' => (int) env('STOCKFLOW_DOMAIN_EVENTS_MAX_RETRY_COUNT', 3),
             'publisher_confirm_timeout_seconds' => (int) env('STOCKFLOW_DOMAIN_EVENTS_CONFIRM_TIMEOUT_SECONDS', 5),
+            'provisioning' => [
+                'runtime_user' => env('STOCKFLOW_RABBITMQ_RUNTIME_USER', 'stockflow-market-runtime'),
+                'runtime_password' => env('STOCKFLOW_RABBITMQ_RUNTIME_PASSWORD', 'stockflow-runtime-secret'),
+                'runtime_write_permission' => env(
+                    'STOCKFLOW_RABBITMQ_RUNTIME_WRITE_PERMISSION',
+                    '^(stockflow\.(domain\.events(\.(retry|dlx))?|inventory|payment|delivery|market\.provider\.outcomes\.(retry|retry-return|dlx)))$',
+                ),
+                'runtime_read_permission' => env(
+                    'STOCKFLOW_RABBITMQ_RUNTIME_READ_PERMISSION',
+                    '^(stockflow\.market\.(domain\.events|provider\.outcomes)(\.(retry|dlq))?)$',
+                ),
+            ],
         ],
         'inbox' => [
             'processing_timeout_seconds' => (int) env('STOCKFLOW_INBOX_PROCESSING_TIMEOUT_SECONDS', 60),

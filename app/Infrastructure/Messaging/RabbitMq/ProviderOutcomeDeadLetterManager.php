@@ -22,8 +22,6 @@ class ProviderOutcomeDeadLetterManager
         $messages = [];
 
         try {
-            $this->declareTopology($channel);
-
             while (count($messages) < max(1, $limit)) {
                 $message = $channel->basic_get($this->topology->deadLetterQueue());
 
@@ -57,7 +55,6 @@ class ProviderOutcomeDeadLetterManager
         $messages = [];
 
         try {
-            $this->declareTopology($channel);
             $channel->confirm_select();
 
             while (count($messages) < max(1, $limit)) {
@@ -96,12 +93,6 @@ class ProviderOutcomeDeadLetterManager
             $channel->close();
             $connection->close();
         }
-    }
-
-    private function declareTopology(mixed $channel): void
-    {
-        $this->topology->declareQueue($channel);
-        $this->topology->declare($channel);
     }
 
     /**

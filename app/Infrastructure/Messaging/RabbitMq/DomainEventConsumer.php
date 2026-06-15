@@ -25,7 +25,6 @@ class DomainEventConsumer
         $channel = $connection->channel();
 
         try {
-            $this->topology->declareConsumer($channel);
             $channel->confirm_select();
             $channel->basic_qos(0, 10, false);
             $channel->basic_consume(

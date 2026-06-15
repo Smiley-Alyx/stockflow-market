@@ -19,7 +19,8 @@ class ProviderOutcomeDeadLetterManagerTest extends TestCase
         $message = $this->message();
         $message->shouldReceive('reject')->once()->with(true);
         [$manager, $channel, $connection, $topology] = $this->manager();
-        $this->expectTopology($topology, $channel);
+        $topology->shouldNotReceive('declareQueue');
+        $topology->shouldNotReceive('declare');
         $topology->shouldReceive('deadLetterQueue')->twice()->andReturn('stockflow.market.provider.outcomes.dlq');
         $channel->shouldReceive('basic_get')->once()->with('stockflow.market.provider.outcomes.dlq')->andReturn($message);
         $channel->shouldReceive('basic_get')->once()->with('stockflow.market.provider.outcomes.dlq')->andReturn(null);
@@ -38,7 +39,8 @@ class ProviderOutcomeDeadLetterManagerTest extends TestCase
         $message = $this->message();
         $message->shouldReceive('ack')->once();
         [$manager, $channel, $connection, $topology] = $this->manager();
-        $this->expectTopology($topology, $channel);
+        $topology->shouldNotReceive('declareQueue');
+        $topology->shouldNotReceive('declare');
         $topology->shouldReceive('deadLetterQueue')->twice()->andReturn('stockflow.market.provider.outcomes.dlq');
         $topology->shouldReceive('retryReturnExchange')->once()->andReturn('stockflow.market.provider.outcomes.retry-return');
         $channel->shouldReceive('confirm_select')->once();
@@ -73,12 +75,6 @@ class ProviderOutcomeDeadLetterManagerTest extends TestCase
         $topology = Mockery::mock(ProviderOutcomeTopology::class);
 
         return [new ProviderOutcomeDeadLetterManager($connections, $topology), $channel, $connection, $topology];
-    }
-
-    private function expectTopology(ProviderOutcomeTopology $topology, AMQPChannel $channel): void
-    {
-        $topology->shouldReceive('declareQueue')->once()->with($channel);
-        $topology->shouldReceive('declare')->once()->with($channel);
     }
 
     private function message(): AMQPMessage
