@@ -63,3 +63,4 @@ wait_for_url "Delivery sandbox" "http://localhost:8082/health"
 wait_for_url "ERP sandbox" "http://localhost:8083/health"
 
 "$ROOT_DIR/scripts/test-provider-saga-e2e.sh"
+"$ROOT_DIR/scripts/test-domain-event-redelivery-e2e.sh"

@@ -68,6 +68,11 @@ class ArchitectureStructureTest extends TestCase
         $this->assertStringContainsString('STOCKFLOW_EVENT_BUS: rabbitmq', $compose);
         $this->assertStringContainsString('domain-event-worker:', $compose);
         $this->assertStringContainsString('php artisan messaging:domain-events:consume', $compose);
+        $this->assertFileExists(base_path('scripts/test-domain-event-redelivery-e2e.sh'));
+        $this->assertStringContainsString(
+            'test-domain-event-redelivery-e2e.sh',
+            (string) file_get_contents(base_path('scripts/test-broker-checkout-e2e.sh')),
+        );
     }
 
     public function test_domain_event_transport_exposes_versioned_json_contract(): void
