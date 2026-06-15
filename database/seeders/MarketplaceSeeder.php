@@ -13,7 +13,9 @@ use Illuminate\Support\Facades\Hash;
 
 class MarketplaceSeeder extends Seeder
 {
-    private const PRODUCT_COUNT = 2000;
+    private const FEATURED_PRODUCT_COUNT = 20;
+
+    private const UPSERT_CHUNK_SIZE = 500;
 
     /** @var array<string, int> */
     private array $fileIds = [];
@@ -149,50 +151,93 @@ class MarketplaceSeeder extends Seeder
 
     private function seedProducts(): void
     {
+        $chunk = [];
+
         foreach ($this->products() as $index => $product) {
+            $chunk[] = [$index, $product];
+
+            if (count($chunk) === self::UPSERT_CHUNK_SIZE) {
+                $this->seedProductChunk($chunk);
+                $chunk = [];
+            }
+        }
+
+        if ($chunk !== []) {
+            $this->seedProductChunk($chunk);
+        }
+    }
+
+    /**
+     * @param  list<array{0: int, 1: array<string, mixed>}>  $products
+     */
+    private function seedProductChunk(array $products): void
+    {
+        $rows = [];
+        $slugs = [];
+        $now = now();
+
+        foreach ($products as [$index, $product]) {
             $slug = $product['slug'];
             $imageFileId = $this->svgFile($product['image'] ?? "product-{$slug}", $product['image_title'] ?? $product['name'], $product['sku'], $product['colors'][0], $product['colors'][1]);
 
-            DB::table('catalog_products')->updateOrInsert(
-                ['slug' => $slug],
-                [
-                    'category_id' => $this->categoryIds[$product['category']],
-                    'brand_id' => $this->brandIds[$product['brand']],
-                    'image_file_id' => $imageFileId,
-                    'name' => $product['name'],
-                    'sku' => $product['sku'],
-                    'description' => $product['description'],
-                    'short_description' => $product['short'],
-                    'rating' => $product['rating'],
-                    'rating_count' => $product['rating_count'],
-                    'status' => 'published',
-                    'published_at' => now()->subDays($index % 90),
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ],
-            );
+            $rows[] = [
+                'category_id' => $this->categoryIds[$product['category']],
+                'brand_id' => $this->brandIds[$product['brand']],
+                'image_file_id' => $imageFileId,
+                'name' => $product['name'],
+                'slug' => $slug,
+                'sku' => $product['sku'],
+                'description' => $product['description'],
+                'short_description' => $product['short'],
+                'rating' => $product['rating'],
+                'rating_count' => $product['rating_count'],
+                'status' => 'published',
+                'published_at' => $now->copy()->subDays($index % 90),
+                'updated_at' => $now,
+                'created_at' => $now,
+            ];
+            $slugs[] = $slug;
+        }
 
-            $productId = (int) DB::table('catalog_products')->where('slug', $slug)->value('id');
+        DB::table('catalog_products')->upsert(
+            $rows,
+            ['slug'],
+            ['category_id', 'brand_id', 'image_file_id', 'name', 'sku', 'description', 'short_description', 'rating', 'rating_count', 'status', 'published_at', 'updated_at'],
+        );
+
+        $ids = DB::table('catalog_products')
+            ->whereIn('slug', $slugs)
+            ->pluck('id', 'slug');
+        $attributeRows = [];
+
+        foreach ($products as [, $product]) {
+            $slug = $product['slug'];
+            $productId = (int) $ids[$slug];
             $this->productIds[$slug] = $productId;
             $this->productSkus[$productId] = $product['sku'];
-            $this->seedAttributes($productId, $product['attributes']);
+
+            foreach ($product['attributes'] as $name => $value) {
+                $attributeRows[] = [
+                    'product_id' => $productId,
+                    'name' => $name,
+                    'value' => $value,
+                    'updated_at' => $now,
+                    'created_at' => $now,
+                ];
+            }
+
             $this->seedOffers($productId, $product);
 
             if ($product['gallery'] ?? true) {
                 $this->seedGallery($productId, $product);
             }
         }
-    }
 
-    /**
-     * @param  array<string, string>  $attributes
-     */
-    private function seedAttributes(int $productId, array $attributes): void
-    {
-        foreach ($attributes as $name => $value) {
-            DB::table('catalog_product_attributes')->updateOrInsert(
-                ['product_id' => $productId, 'name' => $name],
-                ['value' => $value, 'updated_at' => now(), 'created_at' => now()],
+        foreach (array_chunk($attributeRows, self::UPSERT_CHUNK_SIZE) as $chunk) {
+            DB::table('catalog_product_attributes')->upsert(
+                $chunk,
+                ['product_id', 'name'],
+                ['value', 'updated_at'],
             );
         }
     }
@@ -280,6 +325,7 @@ class MarketplaceSeeder extends Seeder
     {
         $warehouseCodes = array_keys($this->warehouseIds);
         $rows = [];
+        $now = now();
 
         foreach (array_values($this->productIds) as $productIndex => $productId) {
             foreach ($warehouseCodes as $warehouseIndex => $warehouseCode) {
@@ -291,27 +337,42 @@ class MarketplaceSeeder extends Seeder
                     'sku' => $this->productSkus[$productId],
                     'on_hand_quantity' => $quantity,
                     'reserved_quantity' => 0,
-                    'updated_at' => now(),
-                    'created_at' => now(),
+                    'updated_at' => $now,
+                    'created_at' => $now,
                 ];
+
+                if (count($rows) === self::UPSERT_CHUNK_SIZE) {
+                    $this->upsertStock($rows);
+                    $rows = [];
+                }
             }
         }
 
-        foreach (array_chunk($rows, 500) as $chunk) {
-            DB::table('inventory_stock_items')->upsert(
-                $chunk,
-                ['warehouse_id', 'product_id'],
-                ['sku', 'on_hand_quantity', 'reserved_quantity', 'updated_at'],
-            );
+        if ($rows !== []) {
+            $this->upsertStock($rows);
         }
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function upsertStock(array $rows): void
+    {
+        DB::table('inventory_stock_items')->upsert(
+            $rows,
+            ['warehouse_id', 'product_id'],
+            ['sku', 'on_hand_quantity', 'reserved_quantity', 'updated_at'],
+        );
     }
 
     private function seedPrices(): void
     {
         $rows = [];
+        $productIds = [];
 
         foreach ($this->products() as $index => $product) {
             $productId = $this->productIds[$product['slug']];
+            $productIds[] = $productId;
             $retail = $product['price'];
 
             $rows[] = $this->price($productId, 'retail', null, 1, $retail);
@@ -329,11 +390,28 @@ class MarketplaceSeeder extends Seeder
             if ($index % 5 === 0) {
                 $rows[] = $this->price($productId, 'retail', 'krk', 1, $retail + 300);
             }
+
+            if (count($productIds) === self::UPSERT_CHUNK_SIZE) {
+                $this->replacePrices($productIds, $rows);
+                $rows = [];
+                $productIds = [];
+            }
         }
 
-        DB::table('pricing_product_prices')->whereIn('product_id', array_values($this->productIds))->delete();
+        if ($productIds !== []) {
+            $this->replacePrices($productIds, $rows);
+        }
+    }
 
-        foreach (array_chunk($rows, 500) as $chunk) {
+    /**
+     * @param  list<int>  $productIds
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function replacePrices(array $productIds, array $rows): void
+    {
+        DB::table('pricing_product_prices')->whereIn('product_id', $productIds)->delete();
+
+        foreach (array_chunk($rows, self::UPSERT_CHUNK_SIZE) as $chunk) {
             DB::table('pricing_product_prices')->insert($chunk);
         }
     }
@@ -494,11 +572,23 @@ SVG;
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return iterable<int, array<string, mixed>>
      */
-    private function products(): array
+    private function products(): iterable
     {
-        return array_merge([
+        foreach ($this->featuredProducts() as $product) {
+            yield $product;
+        }
+
+        yield from $this->generatedProducts();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function featuredProducts(): array
+    {
+        return [
             $this->product('smart-hub-mini', 'Aurora Smart Hub Mini', 'AUR-HUB-MINI', 'smart-home', 'aurora', 29900, 'Компактный центр управления умным домом.', 'Подключает датчики, розетки и сценарии в одном приложении.', ['Подключение' => 'Wi-Fi, Zigbee', 'Цвет' => 'Белый', 'Гарантия' => '24 месяца'], 4.82, 126, ['#3B1C5A', '#C77DFF']),
             $this->product('smart-plug-duo', 'Aurora Smart Plug Duo', 'AUR-PLUG-DUO', 'smart-home', 'aurora', 15900, 'Комплект из двух умных розеток.', 'Удаленное включение, расписания и контроль энергопотребления.', ['Подключение' => 'Wi-Fi', 'Цвет' => 'Белый', 'Комплектация' => '2 розетки'], 4.74, 89, ['#274C77', '#A3CEF1']),
             $this->product('headphones-wave', 'Aurora Wave ANC', 'AUR-WAVE-ANC', 'audio', 'aurora', 54900, 'Беспроводные наушники с шумоподавлением.', 'До 36 часов музыки и комфортная посадка для долгих поездок.', ['Подключение' => 'Bluetooth 5.3', 'Автономность' => '36 часов', 'Цвет' => 'Графит'], 4.91, 214, ['#22223B', '#9A8C98'], [
@@ -522,50 +612,57 @@ SVG;
             $this->product('cork-desk-mat', 'Paperfox Cork Desk Mat', 'PAP-MAT-CORK', 'desk', 'paperfox', 9900, 'Пробковый коврик для рабочего стола.', 'Защищает поверхность стола и делает рабочее место аккуратнее.', ['Материал' => 'Пробка', 'Цвет' => 'Натуральный', 'Размер' => '80 x 40 см'], 4.72, 68, ['#7F4F24', '#DDA15E']),
             $this->product('notebook-grid-trio', 'Paperfox Grid Notebook Trio', 'PAP-NOTE-3', 'desk', 'paperfox', 5900, 'Набор тетрадей в точку для планирования.', 'Три спокойных оттенка и плотная бумага для заметок и схем.', ['Материал' => 'Бумага', 'Цвет' => 'Ассорти', 'Комплектация' => '3 тетради'], 4.61, 51, ['#7209B7', '#F7B801']),
             $this->product('monitor-stand-oak', 'Paperfox Monitor Stand Oak', 'PAP-STAND-OAK', 'desk', 'paperfox', 19900, 'Подставка для монитора с местом для мелочей.', 'Поднимает экран на удобную высоту и помогает организовать стол.', ['Материал' => 'Дуб, металл', 'Цвет' => 'Натуральный', 'Ширина' => '52 см'], 4.87, 119, ['#6F4518', '#BC8A5F']),
-        ], $this->generatedProducts());
+        ];
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return iterable<int, array<string, mixed>>
      */
-    private function generatedProducts(): array
+    private function generatedProducts(): iterable
     {
         $templates = [
-            ['smart-home', 'aurora', 'Датчик климата', 'AUR-CLIMATE', 12900, ['connection' => 'Zigbee', 'color' => 'Белый', 'room' => 'Для дома'], ['#003049', '#669BBC']],
-            ['audio', 'aurora', 'Портативная колонка', 'AUR-PORTABLE', 21900, ['connection' => 'Bluetooth 5.3', 'battery_life' => '18 часов', 'color' => 'Темно-синий'], ['#023047', '#219EBC']],
-            ['kitchen', 'nordwerk', 'Погружной блендер', 'NOR-BLENDER', 26900, ['material' => 'Сталь, пластик', 'power' => '900 Вт', 'kit' => '3 насадки'], ['#6A040F', '#F48C06']],
-            ['interior', 'mellow', 'Настенная полка', 'MEL-SHELF', 11900, ['material' => 'Дерево', 'color' => 'Натуральный', 'width' => '60 см'], ['#606C38', '#DDA15E']],
-            ['power-tools', 'vertex', 'Набор сверл', 'VER-DRILLS', 15900, ['voltage' => 'Для 18 В', 'kit' => '18 предметов', 'material' => 'Сталь'], ['#264653', '#E9C46A']],
-            ['fitness', 'trailhead', 'Массажный ролик', 'TRA-ROLLER', 9900, ['material' => 'EVA', 'weight' => '650 г', 'color' => 'Синий'], ['#386641', '#A7C957']],
-            ['desk', 'paperfox', 'Лоток для документов', 'PAP-TRAY', 7900, ['material' => 'Металл', 'color' => 'Графит', 'kit' => '2 уровня'], ['#3C096C', '#FFB703']],
+            ['smart-home', 'aurora', 'Датчик климата', 'AUR-CLIMATE', 12900, ['connection' => 'Zigbee', 'room' => 'Для дома'], ['Компактный', 'Стандартный', 'Расширенный'], ['#003049', '#669BBC']],
+            ['audio', 'aurora', 'Портативная колонка', 'AUR-PORTABLE', 21900, ['connection' => 'Bluetooth 5.3', 'battery_life' => '18 часов'], ['Мини', 'Средний', 'Большой'], ['#023047', '#219EBC']],
+            ['kitchen', 'nordwerk', 'Погружной блендер', 'NOR-BLENDER', 26900, ['material' => 'Сталь, пластик', 'power' => '900 Вт', 'kit' => '3 насадки'], ['600 мл', '900 мл', '1200 мл'], ['#6A040F', '#F48C06']],
+            ['interior', 'mellow', 'Настенная полка', 'MEL-SHELF', 11900, ['material' => 'Дерево'], ['40 см', '60 см', '80 см', '100 см'], ['#606C38', '#DDA15E']],
+            ['power-tools', 'vertex', 'Набор сверл', 'VER-DRILLS', 15900, ['voltage' => 'Для 18 В', 'material' => 'Сталь'], ['12 предметов', '18 предметов', '32 предмета'], ['#264653', '#E9C46A']],
+            ['fitness', 'trailhead', 'Массажный ролик', 'TRA-ROLLER', 9900, ['material' => 'EVA', 'weight' => '650 г'], ['30 см', '45 см', '60 см'], ['#386641', '#A7C957']],
+            ['desk', 'paperfox', 'Лоток для документов', 'PAP-TRAY', 7900, ['material' => 'Металл'], ['A5', 'A4', 'A3'], ['#3C096C', '#FFB703']],
         ];
-        $products = [];
+        $colors = ['Белый', 'Графит', 'Темно-синий', 'Оливковый', 'Бежевый', 'Терракотовый', 'Сиреневый', 'Красный'];
 
-        for ($index = 20; $index < self::PRODUCT_COUNT; $index++) {
-            [$category, $brand, $name, $skuPrefix, $price, $attributes, $colors] = $templates[$index % count($templates)];
-            $number = str_pad((string) ($index + 1), 4, '0', STR_PAD_LEFT);
+        for ($index = self::FEATURED_PRODUCT_COUNT; $index < $this->productCount(); $index++) {
+            [$category, $brand, $name, $skuPrefix, $basePrice, $attributes, $sizes, $palette] = $templates[$index % count($templates)];
+            $number = str_pad((string) ($index + 1), 5, '0', STR_PAD_LEFT);
+            $colorIndex = $index % count($colors);
+            $sizeIndex = intdiv($index, count($colors)) % count($sizes);
+            $attributes['color'] = $colors[$colorIndex];
+            $attributes['size'] = $sizes[$sizeIndex];
 
-            $products[] = $this->product(
+            yield $this->product(
                 slug: "catalog-{$category}-{$number}",
                 name: "{$name} {$number}",
                 sku: "{$skuPrefix}-{$number}",
                 category: $category,
                 brand: $brand,
-                price: $price + ($index % 17) * 300,
+                price: $basePrice + ($index % 31) * 275 + $colorIndex * 125 + $sizeIndex * 450,
                 short: "{$name} из расширенного каталога.",
-                description: "Серийная модель {$number} для проверки поиска, фильтрации, сортировки и складских сценариев.",
+                description: "Серийная модель {$number}, цвет {$attributes['color']}, размер {$attributes['size']}, для проверки поиска, фильтрации, сортировки и складских сценариев.",
                 attributes: $attributes,
                 rating: 3.80 + ($index % 116) / 100,
                 ratingCount: 12 + ($index * 7) % 480,
-                colors: $colors,
+                colors: $palette,
             ) + [
                 'gallery' => false,
                 'image' => "series-{$category}",
                 'image_title' => $name,
             ];
         }
+    }
 
-        return $products;
+    private function productCount(): int
+    {
+        return max(self::FEATURED_PRODUCT_COUNT, (int) config('stockflow.seed.product_count'));
     }
 
     /**

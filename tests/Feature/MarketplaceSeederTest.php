@@ -11,21 +11,38 @@ class MarketplaceSeederTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_marketplace_seeder_defaults_to_fifty_thousand_products(): void
+    {
+        $this->assertSame(50000, config('stockflow.seed.product_count'));
+    }
+
     public function test_marketplace_seeder_builds_complete_idempotent_demo_catalog(): void
     {
+        config([
+            'stockflow.seed.product_count' => 250,
+            'stockflow.seed.search_index' => false,
+        ]);
+
         $this->seed(DatabaseSeeder::class);
         $this->seed(DatabaseSeeder::class);
 
         $this->assertDatabaseCount('catalog_categories', 12);
         $this->assertDatabaseCount('catalog_brands', 6);
-        $this->assertDatabaseCount('catalog_products', 2000);
-        $this->assertDatabaseCount('catalog_product_projections', 2000);
+        $this->assertDatabaseCount('catalog_products', 250);
+        $this->assertDatabaseCount('catalog_product_projections', 250);
         $this->assertDatabaseCount('inventory_warehouses', 7);
-        $this->assertDatabaseCount('inventory_stock_items', 14000);
-        $this->assertDatabaseCount('pricing_product_prices', 7567);
+        $this->assertDatabaseCount('inventory_stock_items', 1750);
+        $this->assertDatabaseCount('pricing_product_prices', 947);
         $this->assertDatabaseCount('pricing_promotions', 3);
         $this->assertDatabaseCount('homepage_blocks', 6);
         $this->assertDatabaseCount('storage_files', 68);
+        $this->assertGreaterThanOrEqual(8, DB::table('catalog_product_attributes')->where('name', 'color')->distinct()->count('value'));
+        $this->assertGreaterThanOrEqual(10, DB::table('catalog_product_attributes')->where('name', 'size')->distinct()->count('value'));
+        $this->assertGreaterThan(
+            10000,
+            DB::table('pricing_product_prices')->where('price_type', 'retail')->max('amount_minor')
+                - DB::table('pricing_product_prices')->where('price_type', 'retail')->min('amount_minor'),
+        );
 
         $headphonesId = (int) DB::table('catalog_products')
             ->where('slug', 'headphones-wave')
