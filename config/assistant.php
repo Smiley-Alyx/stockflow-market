@@ -11,6 +11,7 @@ return [
             'name' => 'OpenAI',
             'api_key' => env('OPENAI_API_KEY'),
             'model' => env('OPENAI_MODEL', 'gpt-5.4-mini'),
+            'prompt_version' => env('OPENAI_PROMPT_VERSION', 'v1'),
             'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com'),
             'timeout_seconds' => (int) env('OPENAI_TIMEOUT_SECONDS', 30),
         ],

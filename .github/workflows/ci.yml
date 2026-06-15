@@ -76,6 +76,26 @@ jobs:
       - name: Check backward compatibility
         run: php scripts/check-event-contract-compatibility.php "${{ github.event.pull_request.base.sha }}"
 
+  assistant-eval:
+    name: Assistant evaluation baseline
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Evaluate assistant baseline
+        run: composer assistant-eval
+
   compose:
     name: Docker Compose config
     runs-on: ubuntu-latest

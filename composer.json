@@ -56,6 +56,9 @@
             "@php artisan config:clear --ansi @no_additional_args",
             "@php scripts/test.php"
         ],
+        "assistant-eval": [
+            "@php scripts/evaluate-assistant.php tests/evals/assistant/runs/baseline.json"
+        ],
         "install-git-hooks": [
             "@php scripts/install-git-hooks.php"
         ],
