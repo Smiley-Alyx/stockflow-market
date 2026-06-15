@@ -344,6 +344,15 @@ STOCKFLOW_SEED_PRODUCT_COUNT=50000
 наполнение можно запустить с `STOCKFLOW_SEED_SEARCH_INDEX=false`. Прогресс
 индексации виден через `docker compose logs -f search-index-worker`.
 
+Для полной переиндексации большого каталога без промежуточной очереди используйте
+bulk-режим. Команда завершится с ошибкой, если Elasticsearch отклонит хотя бы
+один документ:
+
+```bash
+docker compose exec php php artisan search:index:rebuild --sync --chunk=500
+curl -fsS http://localhost:9200/catalog_products/_count
+```
+
 После базового запуска:
 
 - backend доступен на `http://localhost:8080`;
