@@ -24,7 +24,7 @@ tests:
   - name: sustained queue backlog becomes warning
     interval: 1m
     input_series:
-      - series: 'rabbitmq_queue_messages_ready{queue="stockflow.market.domain.events",vhost="/"}'
+      - series: 'rabbitmq_queue_messages{queue="stockflow.market.domain.events",vhost="/"}'
         values: '101+0x12'
     alert_rule_test:
       - eval_time: 11m
@@ -37,7 +37,46 @@ tests:
               vhost: /
             exp_annotations:
               summary: Queue backlog remains high
-              description: Queue stockflow.market.domain.events has held more than 100 ready messages for 10 minutes.
+              description: Queue stockflow.market.domain.events has held more than 100 pending messages for 10 minutes.
+
+  - name: sustained unacked queue backlog becomes warning
+    interval: 1m
+    input_series:
+      - series: 'rabbitmq_queue_messages{queue="stockflow.market.provider.outcomes",vhost="/"}'
+        values: '101+0x12'
+      - series: 'rabbitmq_queue_messages_ready{queue="stockflow.market.provider.outcomes",vhost="/"}'
+        values: '0+0x12'
+      - series: 'rabbitmq_queue_messages_unacked{queue="stockflow.market.provider.outcomes",vhost="/"}'
+        values: '101+0x12'
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: StockflowQueueBacklogHigh
+        exp_alerts:
+          - exp_labels:
+              queue: stockflow.market.provider.outcomes
+              service: stockflow
+              severity: warning
+              vhost: /
+            exp_annotations:
+              summary: Queue backlog remains high
+              description: Queue stockflow.market.provider.outcomes has held more than 100 pending messages for 10 minutes.
+
+  - name: critical queue backlog becomes critical
+    interval: 1m
+    input_series:
+      - series: 'stockflow_queue_depth{queue="search-indexing"}'
+        values: '501+0x7'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: StockflowQueueBacklogCritical
+        exp_alerts:
+          - exp_labels:
+              queue: search-indexing
+              service: stockflow
+              severity: critical
+            exp_annotations:
+              summary: Queue backlog is critical
+              description: Queue search-indexing has held more than 500 pending messages for 5 minutes.
 
   - name: sustained endpoint latency becomes warning
     interval: 1m
@@ -59,6 +98,27 @@ tests:
             exp_annotations:
               summary: HTTP p95 latency remains high
               description: Endpoint /api/orders p95 latency has exceeded 1 second for 30 seconds.
+
+  - name: critical endpoint latency becomes critical
+    interval: 1m
+    input_series:
+      - series: 'stockflow_http_request_duration_seconds_bucket{endpoint="/api/orders",le="2.5"}'
+        values: '0+0x20'
+      - series: 'stockflow_http_request_duration_seconds_bucket{endpoint="/api/orders",le="5"}'
+        values: '0+100x20'
+      - series: 'stockflow_http_request_duration_seconds_bucket{endpoint="/api/orders",le="+Inf"}'
+        values: '0+100x20'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: StockflowHttpLatencyP99Critical
+        exp_alerts:
+          - exp_labels:
+              endpoint: /api/orders
+              service: stockflow
+              severity: critical
+            exp_annotations:
+              summary: HTTP p99 latency is critical
+              description: Endpoint /api/orders p99 latency has exceeded 2.5 seconds for 2 minutes.
 
   - name: required rabbitmq outage becomes critical
     interval: 1m

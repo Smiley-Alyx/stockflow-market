@@ -18,14 +18,27 @@ groups:
         expr: |
           stockflow_queue_depth > 100
           or
-          rabbitmq_queue_messages_ready{queue!~".*\\.dlq"} > 100
+          rabbitmq_queue_messages{queue!~".*\\.dlq"} > 100
         for: 10m
         labels:
           severity: warning
           service: stockflow
         annotations:
           summary: Queue backlog remains high
-          description: Queue {{ $labels.queue }} has held more than 100 ready messages for 10 minutes.
+          description: Queue {{ $labels.queue }} has held more than 100 pending messages for 10 minutes.
+
+      - alert: StockflowQueueBacklogCritical
+        expr: |
+          stockflow_queue_depth > 500
+          or
+          rabbitmq_queue_messages{queue!~".*\\.dlq"} > 500
+        for: 5m
+        labels:
+          severity: critical
+          service: stockflow
+        annotations:
+          summary: Queue backlog is critical
+          description: Queue {{ $labels.queue }} has held more than 500 pending messages for 5 minutes.
 
       - alert: StockflowHttpLatencyP95High
         expr: |
@@ -42,6 +55,22 @@ groups:
         annotations:
           summary: HTTP p95 latency remains high
           description: Endpoint {{ $labels.endpoint }} p95 latency has exceeded 1 second for 30 seconds.
+
+      - alert: StockflowHttpLatencyP99Critical
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum by (le, endpoint) (
+              rate(stockflow_http_request_duration_seconds_bucket[2m])
+            )
+          ) > 2.5
+        for: 2m
+        labels:
+          severity: critical
+          service: stockflow
+        annotations:
+          summary: HTTP p99 latency is critical
+          description: Endpoint {{ $labels.endpoint }} p99 latency has exceeded 2.5 seconds for 2 minutes.
 
       - alert: StockflowRabbitMqUnavailable
         expr: |

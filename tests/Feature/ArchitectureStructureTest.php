@@ -101,7 +101,9 @@ class ArchitectureStructureTest extends TestCase
         $this->assertStringContainsString('rabbitmq:15692', $prometheus);
         $this->assertStringContainsString('alert: StockflowDeadLetterGrowth', $rules);
         $this->assertStringContainsString('alert: StockflowQueueBacklogHigh', $rules);
+        $this->assertStringContainsString('alert: StockflowQueueBacklogCritical', $rules);
         $this->assertStringContainsString('alert: StockflowHttpLatencyP95High', $rules);
+        $this->assertStringContainsString('alert: StockflowHttpLatencyP99Critical', $rules);
         $this->assertStringContainsString('alert: StockflowRabbitMqUnavailable', $rules);
         $this->assertStringContainsString('alert: StockflowConsumerDown', $rules);
         $this->assertStringContainsString('alertmanager:9093', $prometheus);
