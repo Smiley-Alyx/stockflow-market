@@ -1,0 +1,45 @@
+{
+    "version": 1,
+    "cases": [
+        {
+            "id": "blue-speaker-budget",
+            "query": "Нужна синяя колонка для кухни до 250",
+            "catalog_products": [
+                {"id": 101, "name": "Aurora Room Speaker"},
+                {"id": 102, "name": "Aurora Pocket Speaker"},
+                {"id": 201, "name": "Office Lamp"}
+            ],
+            "allowed_product_ids": [101],
+            "forbidden_product_ids": [102, 201]
+        },
+        {
+            "id": "compact-office-speaker",
+            "query": "Подбери компактную колонку для небольшого офиса",
+            "catalog_products": [
+                {"id": 101, "name": "Aurora Room Speaker"},
+                {"id": 102, "name": "Aurora Pocket Speaker"},
+                {"id": 201, "name": "Office Lamp"}
+            ],
+            "allowed_product_ids": [102],
+            "forbidden_product_ids": [101, 201]
+        },
+        {
+            "id": "speaker-comparison",
+            "query": "Сравни две колонки и покажи подходящие варианты",
+            "catalog_products": [
+                {"id": 101, "name": "Aurora Room Speaker"},
+                {"id": 102, "name": "Aurora Pocket Speaker"},
+                {"id": 201, "name": "Office Lamp"}
+            ],
+            "allowed_product_ids": [101, 102],
+            "forbidden_product_ids": [201]
+        },
+        {
+            "id": "no-matching-products",
+            "query": "Нужен игровой ноутбук до 100",
+            "catalog_products": [],
+            "allowed_product_ids": [],
+            "forbidden_product_ids": [101, 102, 201, 999]
+        }
+    ]
+}

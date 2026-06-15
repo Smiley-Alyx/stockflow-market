@@ -1,0 +1,37 @@
+{
+    "metadata": {
+        "provider": "reference",
+        "model": "deterministic",
+        "prompt_version": "v1"
+    },
+    "results": [
+        {
+            "case_id": "blue-speaker-budget",
+            "message": "Подойдёт Aurora Room Speaker.",
+            "searched_product_ids": [101, 102],
+            "selected_product_ids": [101],
+            "product_card_ids": [101]
+        },
+        {
+            "case_id": "compact-office-speaker",
+            "message": "Для небольшого офиса подойдёт Aurora Pocket Speaker.",
+            "searched_product_ids": [101, 102],
+            "selected_product_ids": [102],
+            "product_card_ids": [102]
+        },
+        {
+            "case_id": "speaker-comparison",
+            "message": "Можно сравнить Aurora Room Speaker и Aurora Pocket Speaker.",
+            "searched_product_ids": [101, 102],
+            "selected_product_ids": [101, 102],
+            "product_card_ids": [101, 102]
+        },
+        {
+            "case_id": "no-matching-products",
+            "message": "Подходящих товаров нет, попробуйте увеличить бюджет.",
+            "searched_product_ids": [],
+            "selected_product_ids": [],
+            "product_card_ids": []
+        }
+    ]
+}
