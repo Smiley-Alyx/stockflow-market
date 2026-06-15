@@ -2,6 +2,7 @@
 
 namespace App\Infrastructure\Messaging\RabbitMq;
 
+use App\Domains\Orders\Read\ReservationStatusProjector;
 use App\Domains\Orders\Services\CheckoutSagaService;
 use App\Infrastructure\Messaging\InboxConsumer;
 use InvalidArgumentException;
@@ -10,6 +11,7 @@ class ProviderOutcomeProcessor
 {
     public function __construct(
         private readonly InboxConsumer $inbox,
+        private readonly ReservationStatusProjector $reservations,
         private readonly CheckoutSagaService $sagas,
     ) {}
 
@@ -23,6 +25,7 @@ class ProviderOutcomeProcessor
         $correlationId = $this->requiredHeader($headers, 'correlation_id');
 
         $this->inbox->consume($messageId, self::class, function () use ($routingKey, $correlationId, $messageId, $payload): void {
+            $this->reservations->project($routingKey, $messageId, $correlationId, $payload);
             $this->sagas->handle($routingKey, $correlationId, $messageId, $payload);
         });
     }

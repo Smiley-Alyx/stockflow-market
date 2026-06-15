@@ -85,8 +85,10 @@ class ProviderOutcomeTopology
     {
         return [
             'stockflow.inventory' => [
+                'inventory.reservation.requested.v1',
                 'inventory.reservation.confirmed.v1',
                 'inventory.reservation.rejected.v1',
+                'inventory.reservation.release.requested.v1',
                 'inventory.reservation.released.v1',
                 'inventory.reservation.release_failed.v1',
             ],

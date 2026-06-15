@@ -60,6 +60,14 @@ class Order extends Model
     }
 
     /**
+     * @return HasMany<ReservationStatusProjection, $this>
+     */
+    public function reservationStatusProjections(): HasMany
+    {
+        return $this->hasMany(ReservationStatusProjection::class);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

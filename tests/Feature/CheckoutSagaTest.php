@@ -125,6 +125,13 @@ class CheckoutSagaTest extends TestCase
         $order = $this->orderWithItems();
         $saga = $this->app->make(CheckoutSagaService::class)->start($order->id);
         $reservation = $saga->reservations->firstOrFail();
+        $request = $this->assertProviderMessage('inventory.reservation.requested.v1');
+
+        $this->getJson('/api/orders/'.$order->id.'/checkout')
+            ->assertOk()
+            ->assertJsonCount(0, 'data.order.reservations');
+
+        $this->providerMessage($request);
 
         $this->getJson('/api/orders/'.$order->id.'/checkout')
             ->assertOk()
@@ -139,6 +146,33 @@ class CheckoutSagaTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.order.status', Order::STATUS_CONFIRMED)
             ->assertJsonPath('data.order.reservations.0.status', CheckoutSagaReservation::STATUS_CONFIRMED);
+
+        $this->assertDatabaseHas('orders_reservation_status_projections', [
+            'order_id' => $order->id,
+            'order_item_id' => $reservation->order_item_id,
+            'reservation_id' => $reservation->reservation_id,
+            'status' => CheckoutSagaReservation::STATUS_CONFIRMED,
+            'last_routing_key' => 'inventory.reservation.confirmed.v1',
+        ]);
+    }
+
+    public function test_reservation_projection_does_not_regress_on_late_request_message(): void
+    {
+        $order = $this->orderWithItems();
+        $saga = $this->app->make(CheckoutSagaService::class)->start($order->id);
+        $reservation = $saga->reservations->firstOrFail();
+        $request = $this->assertProviderMessage('inventory.reservation.requested.v1');
+
+        $this->outcome($saga, 'inventory.reservation.confirmed.v1', [
+            'reservation_id' => $reservation->reservation_id,
+        ]);
+        $this->providerMessage($request);
+
+        $this->assertDatabaseHas('orders_reservation_status_projections', [
+            'reservation_id' => $reservation->reservation_id,
+            'status' => CheckoutSagaReservation::STATUS_CONFIRMED,
+            'last_routing_key' => 'inventory.reservation.confirmed.v1',
+        ]);
     }
 
     public function test_provider_saga_compensates_payment_inventory_and_created_shipments_after_delivery_failure(): void
@@ -321,6 +355,15 @@ class CheckoutSagaTest extends TestCase
             'message_id' => $messageId ?? (string) Str::uuid(),
             'correlation_id' => $saga->correlation_id,
         ], $payload);
+    }
+
+    private function providerMessage(ProviderOutboxMessage $message): void
+    {
+        $this->app->make(ProviderOutcomeProcessor::class)->process(
+            $message->routing_key,
+            $message->headers,
+            $message->payload,
+        );
     }
 
     private function assertProviderMessage(string $routingKey): ProviderOutboxMessage
