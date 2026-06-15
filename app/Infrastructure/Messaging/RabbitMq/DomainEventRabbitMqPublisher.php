@@ -19,7 +19,7 @@ class DomainEventRabbitMqPublisher
         $channel = $connection->channel();
 
         try {
-            $this->topology->declareConsumer($channel);
+            $this->topology->declarePublisher($channel);
             $channel->confirm_select();
             $channel->basic_publish(
                 new AMQPMessage(

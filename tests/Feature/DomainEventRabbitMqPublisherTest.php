@@ -55,7 +55,8 @@ class DomainEventRabbitMqPublisherTest extends TestCase
         $connections = Mockery::mock(RabbitMqConnectionFactory::class);
         $connections->shouldReceive('create')->once()->andReturn($connection);
         $topology = Mockery::mock(DomainEventTopology::class);
-        $topology->shouldReceive('declareConsumer')->once()->with($channel);
+        $topology->shouldReceive('declarePublisher')->once()->with($channel);
+        $topology->shouldNotReceive('declareConsumer');
         $topology->shouldReceive('exchange')->once()->andReturn('stockflow.domain.events');
 
         $publisher = new DomainEventRabbitMqPublisher($connections, $topology);

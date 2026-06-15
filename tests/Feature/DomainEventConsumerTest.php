@@ -111,6 +111,7 @@ class DomainEventConsumerTest extends TestCase
     {
         $channel = Mockery::mock(AMQPChannel::class);
         $channel->shouldReceive('basic_publish')->once()->andThrow(new RuntimeException('RabbitMQ is unavailable.'));
+        $channel->shouldNotReceive('wait_for_pending_acks');
 
         $message = $this->failedMessage($channel, 0);
         $message->shouldReceive('nack')->once()->with(true);
@@ -135,6 +136,7 @@ class DomainEventConsumerTest extends TestCase
 
                 return $routingKey === SearchIndexRequested::NAME;
             });
+        $channel->shouldReceive('wait_for_pending_acks')->once()->with(5);
 
         $message = $this->failedMessage($channel, $retryCount);
         $message->shouldReceive('ack')->once();

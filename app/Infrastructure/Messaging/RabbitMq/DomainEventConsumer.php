@@ -26,6 +26,7 @@ class DomainEventConsumer
 
         try {
             $this->topology->declareConsumer($channel);
+            $channel->confirm_select();
             $channel->basic_qos(0, 10, false);
             $channel->basic_consume(
                 queue: $this->topology->queue(),
@@ -87,6 +88,7 @@ class DomainEventConsumer
             $exchange,
             (string) $message->getRoutingKey(),
         );
+        $message->getChannel()->wait_for_pending_acks($this->publisherConfirmTimeoutSeconds());
     }
 
     /**
@@ -104,6 +106,11 @@ class DomainEventConsumer
     private function maxRetryCount(): int
     {
         return max(0, (int) config('stockflow.messaging.rabbitmq.max_retry_count'));
+    }
+
+    private function publisherConfirmTimeoutSeconds(): int
+    {
+        return max(1, (int) config('stockflow.messaging.rabbitmq.publisher_confirm_timeout_seconds'));
     }
 
     private function registerSignalHandlers(): void
