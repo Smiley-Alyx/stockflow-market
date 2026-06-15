@@ -84,6 +84,7 @@ inbox и выполняет компенсации release, refund и shipment c
 | [`docs/provider-outcome-dlq-runbook.md`](docs/provider-outcome-dlq-runbook.md) | Поиск, диагностика и requeue provider outcome DLQ |
 | [`docs/alerting.md`](docs/alerting.md) | Prometheus alert rules, пороги и порядок диагностики |
 | [`docs/ai-assistant-providers.md`](docs/ai-assistant-providers.md) | Подключение OpenAI, GigaChat, Yandex AI и других AI-провайдеров |
+| [`docs/assistant-evals.md`](docs/assistant-evals.md) | Eval-набор, метрики grounding и сравнение AI-конфигураций |
 | [`docs/demo.md`](docs/demo.md) | Пятиминутный сценарий демонстрации техлиду |
 
 ## Текущий статус
@@ -129,6 +130,8 @@ inbox и выполняет компенсации release, refund и shipment c
 - provider-backed AI-ассистент использует `search_catalog`, структурированный
   ответ и серверную проверку выбранных product ID; старый браузерный
   эвристический подбор удалён;
+- eval-набор AI-ассистента фиксирует допустимые и запрещённые рекомендации,
+  проверяет grounding, релевантность и карточки и сравнивает provider/model/prompt;
 - добавлен `config/stockflow.php` для runtime-настроек таймаутов, кеша, очередей, retry и backpressure limits;
 - описан первый ADR по переходной архитектуре Laravel gateway + service workspace;
 - добавлен архитектурный тест, который проверяет наличие сервисной структуры.
