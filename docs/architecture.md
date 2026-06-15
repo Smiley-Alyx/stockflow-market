@@ -33,8 +33,9 @@ flowchart TB
 ## Текущее состояние интеграции
 
 Provider sandbox-сервисы готовы к автономному запуску и ручному контрактному
-тестированию через общий
-RabbitMQ. Они объявляют topic exchanges, входящие очереди, retry queues и DLQ.
+тестированию через общий RabbitMQ. Market topology создаёт отдельный deployment
+job; market runtime только публикует и читает сообщения без `configure`
+permission.
 
 В `stockflow-market` реализованы draft order, price snapshot, checkout
 configuration и lifecycle заказа. Provider saga публикует
@@ -90,6 +91,9 @@ Marketplace хранит saga state по `order_id` и выполняет шаг
 
 [`docker-compose-all.yml`](../docker-compose-all.yml) поднимает market,
 инфраструктуру и три provider sandbox-сервиса на одном broker:
+
+Перед market publishers и consumers одноразовый `rabbitmq-topology` создаёт
+exchanges, queues и bindings и назначает минимальные runtime permissions.
 
 | Компонент | Адрес |
 | --- | --- |

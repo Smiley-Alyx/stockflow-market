@@ -13,9 +13,11 @@
 только явно зарегистрированные типы событий из JSON-контракта и отклоняет
 неизвестные события или версии до запуска listeners.
 
-Producer объявляет только durable topic exchange. Consumer отдельно объявляет
-свои основную, retry и dead-letter очереди и bindings, поэтому добавление нового
-межсервисного consumer не требует менять producer.
+Producer и consumer используют только заранее созданные объекты RabbitMQ.
+Отдельный deployment job `rabbitmq-topology` запускает команду
+`messaging:rabbitmq:provision`, которая объявляет durable exchanges, основную,
+retry и dead-letter очереди и bindings. Runtime-пользователь имеет
+`configure=^$`.
 
 Машиночитаемый формат envelope зафиксирован в
 `services/gateway/contracts/domain-event-envelope.v1.schema.json`.

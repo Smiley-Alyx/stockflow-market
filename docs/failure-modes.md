@@ -18,6 +18,7 @@
 | Broker недоступен при публикации market | Outbox сохраняет событие | Relay повторяет публикацию после восстановления |
 | Consumer остановлен | RabbitMQ сохраняет сообщения в очереди, Alertmanager доставляет `StockflowConsumerDown` | После запуска consumer очередь продолжает обработку, alert переходит в `resolved` |
 | RabbitMQ недоступен | Alertmanager доставляет `StockflowRabbitMqUnavailable` только для runtime с включённым broker | После восстановления scrape alert переходит в `resolved` |
+| RabbitMQ topology отсутствует | Publishers/consumers завершаются с ошибкой доступа к объекту и не создают его сами | Повторно выполнить `rabbitmq-topology`, затем перезапустить workers |
 | Устойчивый backlog очереди | Alertmanager доставляет warning `StockflowQueueBacklogHigh` или critical `StockflowQueueBacklogCritical` | Восстановить consumer throughput и проверить ready/unacked сообщения |
 | Высокая HTTP latency | Alertmanager доставляет warning `StockflowHttpLatencyP95High` или critical `StockflowHttpLatencyP99Critical` | После прекращения деградации alert переходит в `resolved` |
 
@@ -56,6 +57,14 @@ happy path сам поднимает стенд, прогоняет один che
 
 ```bash
 ./scripts/test-broker-checkout-e2e.sh
+```
+
+`rabbitmq-topology` завершается до запуска market publishers и consumers.
+Runtime permissions и ожидаемый запрет повторного provisioning проверяются
+отдельно:
+
+```bash
+./scripts/test-rabbitmq-runtime-permissions.sh
 ```
 
 Для уже запущенного стенда broker-level E2E сценарии запускаются командами:

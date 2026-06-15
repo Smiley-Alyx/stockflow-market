@@ -61,16 +61,19 @@ rollback и затем уничтожается.
 RabbitMQ credential ротируется через нового пользователя с теми же regex
 permissions. После переключения publishers и consumers нужно проверить
 publisher confirms, число consumers, retry/DLQ и отсутствие authentication
-errors, затем удалить старого пользователя.
+errors, затем удалить старого пользователя. Deployment job применяет пароль и
+permissions из `STOCKFLOW_RABBITMQ_RUNTIME_USER` и
+`STOCKFLOW_RABBITMQ_RUNTIME_PASSWORD`.
 
 ## Минимальные RabbitMQ permissions
 
 Production использует отдельный vhost `/stockflow`. Приложение не использует
 пользователя `guest` и не получает тег `administrator`.
 
-Runtime market сейчас сам объявляет exchanges, queues и bindings, поэтому ему
-нужен ограниченный `configure`. После вынесения topology provisioning в
-отдельный deployment job runtime `configure` следует установить в `^$`.
+Runtime market не объявляет exchanges, queues и bindings. Перед запуском
+publishers и consumers отдельный deployment job выполняет
+`php artisan messaging:rabbitmq:provision` под topology-admin credentials,
+создаёт market topology и назначает runtime-пользователю `configure=^$`.
 
 ```bash
 VHOST=/stockflow
@@ -78,8 +81,8 @@ RUNTIME_USER=stockflow-market-runtime
 
 rabbitmqctl add_vhost "$VHOST"
 rabbitmqctl set_permissions -p "$VHOST" "$RUNTIME_USER" \
-  '^(stockflow\.(domain\.events(\.(retry|retry-return|dlx))?|inventory|payment|delivery|market\.(domain\.events|provider\.outcomes)(\.(retry|dlq))?))$' \
-  '^(stockflow\.(domain\.events(\.(retry|dlx))?|inventory|payment|delivery|market\.provider\.outcomes\.(retry|dlx)))$' \
+  '^$' \
+  '^(stockflow\.(domain\.events(\.(retry|dlx))?|inventory|payment|delivery|market\.provider\.outcomes\.(retry|retry-return|dlx)))$' \
   '^(stockflow\.market\.(domain\.events|provider\.outcomes)(\.(retry|dlq))?)$'
 ```
 
@@ -89,7 +92,7 @@ rabbitmqctl set_permissions -p "$VHOST" "$RUNTIME_USER" \
 
 | Роль | Configure | Write | Read |
 | --- | --- | --- | --- |
-| `stockflow-market-runtime` | Только объекты topology market и provider exchanges | Domain events, provider requests, retry/DLX | Только market domain-event и provider-outcome queues |
+| `stockflow-market-runtime` | `^$` | Domain events, provider requests, retry/DLX | Только market domain-event и provider-outcome queues |
 | `stockflow-provider-*` | Только собственные exchange/queues | Только собственные outcomes и retry/DLX | Только собственные request queues |
 | `stockflow-monitoring` | `^$` | `^$` | `^$`; management tag `monitoring` |
 | `stockflow-topology-admin` | Только provisioning job | Только provisioning job | Только provisioning job |
@@ -104,7 +107,11 @@ rabbitmqctl set_permissions -p /stockflow stockflow-monitoring '^$' '^$' '^$'
 
 После изменения permissions обязательны негативные проверки: runtime не должен
 читать чужие queues, публиковать в произвольный exchange или создавать объект
-вне разрешённого namespace.
+вне разрешённого namespace. Локальная проверка выполняется командой:
+
+```bash
+./scripts/test-rabbitmq-runtime-permissions.sh
+```
 
 ## Supply-chain проверки
 

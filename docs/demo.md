@@ -24,9 +24,9 @@ projects/
 ./scripts/demo-all.sh
 ```
 
-Скрипт собирает контейнеры, запускает общий broker, применяет market migrations,
-проверяет HTTP endpoints и убеждается, что фоновые consumers и workers
-запущены.
+Скрипт собирает контейнеры, запускает общий broker, выполняет одноразовый
+`rabbitmq-topology`, применяет market migrations, проверяет HTTP endpoints и
+убеждается, что фоновые consumers и workers запущены.
 
 ## 1:00–2:00 — показать экосистему
 
@@ -52,6 +52,9 @@ curl -s http://localhost:8082/health | jq
 
 RabbitMQ management UI: `http://localhost:15672`, логин и пароль:
 `stockflow / stockflow`.
+
+Market publishers и consumers подключаются как `stockflow-market-runtime` без
+`configure` permission.
 
 ## 3:00–4:00 — показать reliability
 
@@ -96,6 +99,7 @@ docker compose -f docker-compose-all.yml exec php php artisan messaging:provider
 ./scripts/test-provider-saga-e2e.sh
 ./scripts/test-provider-saga-compensations-e2e.sh
 ./scripts/test-domain-event-redelivery-e2e.sh
+./scripts/test-rabbitmq-runtime-permissions.sh
 docker compose -f docker-compose-all.yml down
 ```
 

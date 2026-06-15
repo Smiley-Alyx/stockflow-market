@@ -117,6 +117,8 @@ inbox и выполняет компенсации release, refund и shipment c
 - добавлена provider saga `reserve → authorize → capture → shipment` с outbox relay, inbox-дедупликацией и компенсациями;
 - checkout read-модель проецирует статусы резервов из RabbitMQ outcomes и доступна через `GET /api/orders/{id}/checkout`;
 - межсервисные доменные события публикуются в RabbitMQ через outbox relay и потребляются с inbox-дедупликацией, retry и DLQ;
+- отдельный deployment job создаёт market exchanges, queues и bindings;
+  publishers и consumers работают под runtime-пользователем без `configure`;
 - payload каждого доменного события зафиксирован отдельной JSON Schema;
   producer/consumer contract tests и CI-проверка обратной совместимости
   защищают эволюцию событий от breaking changes;
@@ -322,13 +324,14 @@ docker compose -f docker-compose-all.yml up -d --build
 
 ```text
 PostgreSQL: stockflow / secret
-RabbitMQ:   stockflow / secret
+RabbitMQ admin: stockflow / secret
 ClickHouse: stockflow / secret
 ```
 
-Общий стенд из `docker-compose-all.yml` использует для RabbitMQ креды
-`stockflow / stockflow`, одинаковые для marketplace и трёх provider sandbox-
-сервисов.
+В общем стенде `rabbitmq-topology` и provider sandbox-сервисы используют
+локального администратора `stockflow / stockflow`. Market gateway, publishers
+и consumers используют `stockflow-market-runtime / stockflow-runtime-secret`
+с `configure=^$`.
 
 ## Быстрый старт
 
@@ -591,10 +594,6 @@ baseline.
    репрезентативный dataset, устранить основные причины текущего p95 `8.17s` и
    сравнить новый прогон с сохранённым baseline. Результат: следующий этап
    оптимизации опирается на измеримое изменение throughput и latency.
-2. **Вынести RabbitMQ topology provisioning из runtime.** Создать отдельный
-   deployment job для exchanges, queues и bindings, после чего убрать
-   `configure` permission у publishers и consumers. Результат: runtime работает
-   с минимальными RabbitMQ permissions.
 
 ## Лицензия
 
