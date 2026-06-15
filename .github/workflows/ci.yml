@@ -96,6 +96,58 @@ jobs:
       - name: Evaluate assistant baseline
         run: composer assistant-eval
 
+  supply-chain:
+    name: Backend audit, SBOM and container scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Audit backend dependencies
+        run: composer backend-audit
+
+      - name: Build backend image
+        run: docker build --tag stockflow-market-ci:${{ github.sha }} --file docker/php/Dockerfile .
+
+      - name: Generate source and container SBOM
+        run: |
+          mkdir -p artifacts
+          docker run --rm \
+            -v "$PWD:/src:ro" \
+            anchore/syft:v1.45.1 \
+            dir:/src -o cyclonedx-json > artifacts/backend-source-sbom.cdx.json
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            anchore/syft:v1.45.1 \
+            stockflow-market-ci:${{ github.sha }} -o cyclonedx-json > artifacts/backend-image-sbom.cdx.json
+
+      - name: Scan backend image
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v trivy-cache:/root/.cache/trivy \
+            aquasec/trivy:0.71.0 \
+            image --exit-code 1 --ignore-unfixed --severity HIGH,CRITICAL \
+            stockflow-market-ci:${{ github.sha }}
+
+      - name: Upload SBOM
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-sbom
+          path: artifacts/*.cdx.json
+          if-no-files-found: error
+
   compose:
     name: Docker Compose config
     runs-on: ubuntu-latest

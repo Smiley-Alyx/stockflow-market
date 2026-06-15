@@ -59,6 +59,9 @@
         "assistant-eval": [
             "@php scripts/evaluate-assistant.php tests/evals/assistant/runs/baseline.json"
         ],
+        "backend-audit": [
+            "@composer audit --locked --abandoned=fail"
+        ],
         "install-git-hooks": [
             "@php scripts/install-git-hooks.php"
         ],
