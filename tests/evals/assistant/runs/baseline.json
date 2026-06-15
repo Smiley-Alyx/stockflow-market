@@ -10,6 +10,7 @@
             "message": "Подойдёт Aurora Room Speaker.",
             "searched_product_ids": [101, 102],
             "selected_product_ids": [101],
+            "mentioned_product_ids": [101],
             "product_card_ids": [101]
         },
         {
@@ -17,6 +18,7 @@
             "message": "Для небольшого офиса подойдёт Aurora Pocket Speaker.",
             "searched_product_ids": [101, 102],
             "selected_product_ids": [102],
+            "mentioned_product_ids": [102],
             "product_card_ids": [102]
         },
         {
@@ -24,6 +26,7 @@
             "message": "Можно сравнить Aurora Room Speaker и Aurora Pocket Speaker.",
             "searched_product_ids": [101, 102],
             "selected_product_ids": [101, 102],
+            "mentioned_product_ids": [101, 102],
             "product_card_ids": [101, 102]
         },
         {
@@ -31,6 +34,7 @@
             "message": "Подходящих товаров нет, попробуйте увеличить бюджет.",
             "searched_product_ids": [],
             "selected_product_ids": [],
+            "mentioned_product_ids": [],
             "product_card_ids": []
         }
     ]

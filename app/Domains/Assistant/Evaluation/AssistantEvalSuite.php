@@ -24,18 +24,24 @@ class AssistantEvalSuite
 
         foreach ($this->cases() as $case) {
             $result = $results->get($case['id'], []);
+            $complete = $this->completeResult($result);
             $catalogIds = $this->productIds($case['catalog_products']);
             $allowedIds = $this->ids($case['allowed_product_ids']);
             $forbiddenIds = $this->ids($case['forbidden_product_ids']);
             $searchedIds = $this->ids($result['searched_product_ids'] ?? []);
             $selectedIds = $this->ids($result['selected_product_ids'] ?? []);
+            $mentionedIds = $this->ids($result['mentioned_product_ids'] ?? []);
             $cardIds = $this->ids($result['product_card_ids'] ?? []);
+            $recommendedIds = array_values(array_unique([...$selectedIds, ...$mentionedIds]));
 
             $checks = [
-                'grounding' => $this->subset($searchedIds, $catalogIds) && $this->subset($selectedIds, $searchedIds),
-                'relevance' => $this->relevant($selectedIds, $allowedIds),
-                'forbidden_recommendations' => array_intersect($selectedIds, $forbiddenIds) === [],
-                'no_hallucinated_cards' => $cardIds === $selectedIds && $this->subset($cardIds, $searchedIds),
+                'grounding' => $complete
+                    && $this->subset($searchedIds, $catalogIds)
+                    && $this->subset($selectedIds, $searchedIds)
+                    && $this->subset($mentionedIds, $searchedIds),
+                'relevance' => $complete && $this->relevant($selectedIds, $allowedIds),
+                'forbidden_recommendations' => $complete && array_intersect($recommendedIds, $forbiddenIds) === [],
+                'no_hallucinated_cards' => $complete && $cardIds === $selectedIds && $this->subset($cardIds, $searchedIds),
             ];
 
             $evaluated[] = [
@@ -150,6 +156,16 @@ class AssistantEvalSuite
     private function subset(array $values, array $allowed): bool
     {
         return array_diff($values, $allowed) === [];
+    }
+
+    private function completeResult(mixed $result): bool
+    {
+        return is_array($result)
+            && is_string($result['message'] ?? null)
+            && is_array($result['searched_product_ids'] ?? null)
+            && is_array($result['selected_product_ids'] ?? null)
+            && is_array($result['mentioned_product_ids'] ?? null)
+            && is_array($result['product_card_ids'] ?? null);
     }
 
     /**

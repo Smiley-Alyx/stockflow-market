@@ -44,6 +44,18 @@ class AssistantEvalSuiteTest extends TestCase
         $this->assertFalse($cases['speaker-comparison']['checks']['no_hallucinated_cards']);
     }
 
+    public function test_forbidden_textual_product_mention_is_rejected_without_a_card(): void
+    {
+        $run = $this->baseline();
+        $run['results'][0]['mentioned_product_ids'] = [101, 102];
+
+        $case = collect($this->suite()->evaluate($run)['cases'])->keyBy('case_id')['blue-speaker-budget'];
+
+        $this->assertTrue($case['checks']['grounding']);
+        $this->assertFalse($case['checks']['forbidden_recommendations']);
+        $this->assertTrue($case['checks']['no_hallucinated_cards']);
+    }
+
     public function test_comparison_reports_regressions_between_provider_model_and_prompt(): void
     {
         $comparison = $this->suite()->compare($this->regressedRun(), $this->baseline());
@@ -80,9 +92,11 @@ class AssistantEvalSuiteTest extends TestCase
         ];
         $run['results'][0]['searched_product_ids'] = [999];
         $run['results'][0]['selected_product_ids'] = [999];
+        $run['results'][0]['mentioned_product_ids'] = [999];
         $run['results'][0]['product_card_ids'] = [999];
         $run['results'][1]['searched_product_ids'] = [201];
         $run['results'][1]['selected_product_ids'] = [201];
+        $run['results'][1]['mentioned_product_ids'] = [201];
         $run['results'][1]['product_card_ids'] = [201];
         $run['results'][2]['product_card_ids'] = [999];
 
