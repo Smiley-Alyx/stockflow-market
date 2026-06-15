@@ -15,6 +15,10 @@
 
 Машиночитаемый формат envelope зафиксирован в
 `services/gateway/contracts/domain-event-envelope.v1.schema.json`.
+Payload каждого зарегистрированного события описан отдельной JSON Schema в
+`services/gateway/contracts/domain-events/v1/`. Manifest
+`services/gateway/contracts/domain-events/manifest.json` связывает имя события,
+версию и файл схемы.
 
 Пример envelope:
 
@@ -52,6 +56,40 @@
 effect один раз, временная ошибка отправляет сообщение в retry queue,
 исчерпанные попытки отправляют сообщение в DLQ, а ошибка retry-публикации
 возвращает исходное сообщение в очередь.
+
+## Эволюция контрактов
+
+Producer и consumer используют один `DomainEventSchemaRegistry`. Producer
+проверяет результат `payload()` перед записью в outbox, consumer проверяет
+полученный payload до восстановления и dispatch события.
+
+`DomainEventContractTest` выполняет контрактные проверки обеих сторон:
+
+- каждый зарегистрированный тип события обязан иметь схему в manifest;
+- реальные producer payload должны соответствовать своим схемам;
+- consumer должен отклонять payload без обязательных полей;
+- consumer должен восстанавливать валидные stateless-события.
+
+Схемы текущей версии допускают новые необязательные поля через
+`additionalProperties: true`. Для несовместимого изменения нужно выпустить
+новую версию схемы и сохранить поддержку старой версии на время миграции
+consumers.
+
+В pull request CI запускает:
+
+```bash
+php scripts/check-event-contract-compatibility.php <base-git-ref>
+```
+
+Проверка останавливает сборку при удалении события, добавлении обязательного
+поля, сужении допустимого типа или enum, смене `const`, ужесточении числовых и
+размерных ограничений и запрете ранее допустимых дополнительных полей.
+
+Локально текущую ветку можно сравнить с основной:
+
+```bash
+php scripts/check-event-contract-compatibility.php origin/main
+```
 
 ## Проверка очередей
 
