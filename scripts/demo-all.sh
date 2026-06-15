@@ -46,6 +46,7 @@ if grep -q '^APP_KEY=$' "$ROOT_DIR/.env"; then
     docker compose -f "$COMPOSE_FILE" run --rm php php artisan key:generate --force
 fi
 
+docker compose -f "$COMPOSE_FILE" run --rm rabbitmq-topology
 docker compose -f "$COMPOSE_FILE" up -d --build
 docker compose -f "$COMPOSE_FILE" exec -T php php artisan migrate --force
 docker compose -f "$COMPOSE_FILE" exec -T php php artisan db:seed --force

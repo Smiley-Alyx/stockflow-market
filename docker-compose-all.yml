@@ -5,8 +5,8 @@ services:
       service: php
     environment:
       RABBITMQ_ENABLED: "true"
-      RABBITMQ_PASSWORD: stockflow
-      RABBITMQ_USER: stockflow
+      RABBITMQ_PASSWORD: stockflow-runtime-secret
+      RABBITMQ_USER: stockflow-market-runtime
       CLICKHOUSE_ENABLED: "true"
       STOCKFLOW_FAULT_INJECTION_ENABLED: "true"
     depends_on:
@@ -45,8 +45,11 @@ services:
     command: php artisan messaging:provider-outbox:publish --loop
     environment:
       RABBITMQ_ENABLED: "true"
-      RABBITMQ_PASSWORD: stockflow
-      RABBITMQ_USER: stockflow
+      RABBITMQ_PASSWORD: stockflow-runtime-secret
+      RABBITMQ_USER: stockflow-market-runtime
+    depends_on:
+      rabbitmq-topology:
+        condition: service_completed_successfully
 
   domain-outbox-worker:
     extends:
@@ -56,10 +59,13 @@ services:
     command: php artisan messaging:outbox:publish --loop
     environment:
       RABBITMQ_ENABLED: "true"
-      RABBITMQ_PASSWORD: stockflow
-      RABBITMQ_USER: stockflow
+      RABBITMQ_PASSWORD: stockflow-runtime-secret
+      RABBITMQ_USER: stockflow-market-runtime
       CLICKHOUSE_ENABLED: "true"
       STOCKFLOW_EVENT_BUS: rabbitmq
+    depends_on:
+      rabbitmq-topology:
+        condition: service_completed_successfully
 
   domain-event-worker:
     extends:
@@ -69,9 +75,12 @@ services:
     command: php artisan messaging:domain-events:consume
     environment:
       RABBITMQ_ENABLED: "true"
-      RABBITMQ_PASSWORD: stockflow
-      RABBITMQ_USER: stockflow
+      RABBITMQ_PASSWORD: stockflow-runtime-secret
+      RABBITMQ_USER: stockflow-market-runtime
       CLICKHOUSE_ENABLED: "true"
+    depends_on:
+      rabbitmq-topology:
+        condition: service_completed_successfully
 
   provider-outcome-worker:
     extends:
@@ -81,8 +90,11 @@ services:
     command: php artisan messaging:provider-outcomes:consume
     environment:
       RABBITMQ_ENABLED: "true"
-      RABBITMQ_PASSWORD: stockflow
-      RABBITMQ_USER: stockflow
+      RABBITMQ_PASSWORD: stockflow-runtime-secret
+      RABBITMQ_USER: stockflow-market-runtime
+    depends_on:
+      rabbitmq-topology:
+        condition: service_completed_successfully
 
   frontend:
     extends:
@@ -135,6 +147,29 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
+
+  rabbitmq-topology:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: stockflow-rabbitmq-topology
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+      - composer-cache:/tmp/composer-cache
+    environment:
+      APP_ENV: local
+      RABBITMQ_ENABLED: "true"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PASSWORD: stockflow
+      RABBITMQ_USER: stockflow
+      STOCKFLOW_RABBITMQ_MANAGEMENT_URL: http://rabbitmq:15672
+      STOCKFLOW_RABBITMQ_RUNTIME_PASSWORD: stockflow-runtime-secret
+      STOCKFLOW_RABBITMQ_RUNTIME_USER: stockflow-market-runtime
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    command: php artisan messaging:rabbitmq:provision
 
   elasticsearch:
     extends:
