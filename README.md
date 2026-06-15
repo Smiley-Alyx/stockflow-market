@@ -85,6 +85,7 @@ inbox и выполняет компенсации release, refund и shipment c
 | [`docs/alerting.md`](docs/alerting.md) | Prometheus alert rules, пороги и порядок диагностики |
 | [`docs/ai-assistant-providers.md`](docs/ai-assistant-providers.md) | Подключение OpenAI, GigaChat, Yandex AI и других AI-провайдеров |
 | [`docs/assistant-evals.md`](docs/assistant-evals.md) | Eval-набор, метрики grounding и сравнение AI-конфигураций |
+| [`docs/operational-security.md`](docs/operational-security.md) | Ротация секретов, RabbitMQ permissions и supply-chain проверки |
 | [`docs/demo.md`](docs/demo.md) | Пятиминутный сценарий демонстрации техлиду |
 
 ## Текущий статус
