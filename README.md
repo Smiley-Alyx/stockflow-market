@@ -86,6 +86,7 @@ inbox и выполняет компенсации release, refund и shipment c
 | [`docs/ai-assistant-providers.md`](docs/ai-assistant-providers.md) | Подключение OpenAI, GigaChat, Yandex AI и других AI-провайдеров |
 | [`docs/assistant-evals.md`](docs/assistant-evals.md) | Eval-набор, метрики grounding и сравнение AI-конфигураций |
 | [`docs/operational-security.md`](docs/operational-security.md) | Ротация секретов, RabbitMQ permissions и supply-chain проверки |
+| [`docs/backup-restore.md`](docs/backup-restore.md) | Backup-стратегия и автоматический restore drill PostgreSQL, RabbitMQ и ClickHouse |
 | [`docs/demo.md`](docs/demo.md) | Пятиминутный сценарий демонстрации техлиду |
 
 ## Текущий статус
@@ -128,6 +129,8 @@ inbox и выполняет компенсации release, refund и shipment c
   receiver с доступной для проверок историей;
 - автоматизированный failure drill воспроизводит рост DLQ, остановку consumer,
   RabbitMQ outage и высокую latency, проверяя доставку и восстановление alerts;
+- CI выполняет backend dependency audit, формирует SBOM, сканирует backend image
+  и регулярно проверяет восстановление PostgreSQL, RabbitMQ и ClickHouse из backup;
 - provider-backed AI-ассистент использует `search_catalog`, структурированный
   ответ и серверную проверку выбранных product ID; старый браузерный
   эвристический подбор удалён;

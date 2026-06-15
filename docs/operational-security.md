@@ -116,3 +116,6 @@ CI job `supply-chain` выполняет:
 
 SBOM загружается как CI artifact. Перед релизом он должен храниться рядом с
 артефактом сборки и связываться с digest образа.
+
+Требования к резервным копиям и автоматический restore drill описаны в
+[`backup-restore.md`](backup-restore.md).
