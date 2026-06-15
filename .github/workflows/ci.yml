@@ -318,3 +318,32 @@ jobs:
       - name: Stop alert drill stack
         if: always()
         run: docker compose -f docker-compose-all.yml down --volumes --remove-orphans
+
+  backup-restore-drill:
+    name: Backup restore drill
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run backup restore drill
+        run: ./scripts/test-backup-restore.sh
+
+      - name: Collect backup restore logs
+        if: failure()
+        run: docker compose -p stockflow-backup-drill -f docker/backup-restore/compose.yml logs --no-color > backup-restore.log 2>&1 || true
+
+      - name: Upload backup restore logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-restore-logs
+          path: backup-restore.log
+          if-no-files-found: ignore
+
+      - name: Stop backup restore stack
+        if: always()
+        run: docker compose -p stockflow-backup-drill -f docker/backup-restore/compose.yml down --volumes --remove-orphans
