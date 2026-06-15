@@ -11,6 +11,7 @@ use App\Domains\Inventory\Events\StockChanged;
 use App\Domains\Inventory\Listeners\ProjectStockMovementAnalytics;
 use App\Domains\Orders\Events\OrderConfirmationRequested;
 use App\Domains\Orders\Listeners\StartCheckoutSaga;
+use App\Domains\Search\Contracts\BulkSearchIndexer;
 use App\Domains\Search\Contracts\ProductSearch;
 use App\Domains\Search\Contracts\SearchIndexer;
 use App\Domains\Search\DeadLetters\SearchIndexDeadLetterStore;
@@ -40,6 +41,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(ProductSearch::class, ElasticsearchProductSearch::class);
         $this->app->bind(CatalogProductSearch::class, ElasticsearchCatalogProductSearch::class);
+        $this->app->bind(BulkSearchIndexer::class, ElasticsearchSearchIndexer::class);
         $this->app->bind(SearchIndexer::class, ElasticsearchSearchIndexer::class);
         $this->app->bind(SearchIndexDeadLetterStore::class, match (config('stockflow.search.indexing.dead_letter_backend')) {
             'array' => ArraySearchIndexDeadLetterStore::class,

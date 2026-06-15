@@ -6,6 +6,7 @@ use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Models\Product;
 use App\Domains\Search\Jobs\IndexSearchDocument;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -47,6 +48,42 @@ class RebuildSearchIndexCommandTest extends TestCase
             return $job->index === 'catalog_products'
                 && $job->documentId === (string) $headphones->id
                 && $job->document['slug'] === 'wireless-headphones';
+        });
+    }
+
+    public function test_rebuild_command_bulk_indexes_all_catalog_products_synchronously(): void
+    {
+        Queue::fake();
+        Http::fake([
+            '*/_bulk' => Http::response(['errors' => false]),
+        ]);
+
+        $category = Category::query()->create([
+            'name' => 'Audio',
+            'slug' => 'audio',
+        ]);
+
+        foreach (['Wireless Headphones', 'Portable Speaker'] as $index => $name) {
+            Product::query()->create([
+                'category_id' => $category->id,
+                'name' => $name,
+                'slug' => str($name)->slug(),
+                'sku' => 'AUDIO-00'.($index + 1),
+                'status' => 'published',
+                'published_at' => now(),
+            ]);
+        }
+
+        $this->artisan('search:index:rebuild --sync --chunk=10')
+            ->expectsOutput('Indexed 2 catalog search document(s).')
+            ->assertSuccessful();
+
+        Queue::assertNothingPushed();
+        Http::assertSent(function ($request): bool {
+            return $request->url() === 'http://elasticsearch:9200/_bulk'
+                && $request->hasHeader('Content-Type', 'application/x-ndjson')
+                && substr_count($request->body(), '"_index":"catalog_products"') === 2
+                && str_ends_with($request->body(), "\n");
         });
     }
 }
