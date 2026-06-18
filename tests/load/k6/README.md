@@ -65,3 +65,5 @@ k6 run tests/load/k6/stockflow.js
 - [Локальный k6 baseline: 2026-06-01](results/2026-06-01-local-baseline.md):
   профиль, p95, RPS, размер dataset, аппаратная конфигурация и ограничения
   интерпретации.
+- [Реалистичный k6 baseline: 2026-06-18](results/2026-06-18-realistic-catalog-baseline.md):
+  повтор на 50k+ каталоге, сравнение latency/throughput и следующий bottleneck.
