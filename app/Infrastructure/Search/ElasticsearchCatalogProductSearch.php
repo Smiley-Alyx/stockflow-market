@@ -3,12 +3,14 @@
 namespace App\Infrastructure\Search;
 
 use App\Domains\Catalog\Models\Category;
+use App\Domains\Catalog\Models\CatalogProductProjection;
 use App\Domains\Catalog\Search\CatalogProductQuery;
 use App\Domains\Catalog\Search\CatalogProductSearch;
 use App\Domains\Catalog\Services\CatalogUrlService;
 use App\Domains\Inventory\Read\InventoryReadService;
 use App\Domains\Pricing\Read\PricingReadService;
 use App\Infrastructure\Resilience\CircuitBreaker;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
@@ -349,8 +351,16 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
      */
     private function degradedResults(CatalogProductQuery $query, ?Category $category): array
     {
+        $products = $this->fallbackQuery($query, $category)
+            ->paginate(perPage: $query->perPage, page: $query->page);
+        $data = $products
+            ->getCollection()
+            ->map(fn (CatalogProductProjection $projection): array => $projection->payload)
+            ->values()
+            ->all();
+
         return [
-            'data' => [],
+            'data' => $this->enrich($data, $query->cityCode),
             'meta' => [
                 'query' => $query->query,
                 'category' => $query->category,
@@ -368,14 +378,65 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
                 ],
                 'city_code' => $query->cityCode,
                 'sort' => $query->sort,
-                'current_page' => $query->page,
-                'per_page' => $query->perPage,
-                'total' => 0,
+                'current_page' => $products->currentPage(),
+                'per_page' => $products->perPage(),
+                'total' => $products->total(),
                 'filters' => [],
                 'status' => 'degraded',
                 'reason' => 'elasticsearch_unavailable',
             ],
         ];
+    }
+
+    private function fallbackQuery(CatalogProductQuery $query, ?Category $category): Builder
+    {
+        return CatalogProductProjection::query()
+            ->where('status', 'published')
+            ->where('category_is_active', true)
+            ->when($category !== null, function (Builder $builder) use ($category): Builder {
+                return $builder->whereIn('category_id', $this->categoryTree($category)->pluck('id')->push($category->id)->unique());
+            })
+            ->when($query->brands !== [], function (Builder $builder) use ($query): Builder {
+                return $builder->where(function (Builder $builder) use ($query): void {
+                    foreach ($query->brands as $brand) {
+                        $builder->orWhere('payload->brand->slug', $brand);
+                    }
+                });
+            })
+            ->when($query->inStock !== null, fn (Builder $builder): Builder => $builder->where('in_stock', $query->inStock))
+            ->when($query->priceFrom !== null || $query->priceTo !== null, function (Builder $builder) use ($query): Builder {
+                return $builder->whereIn('product_id', function ($subquery) use ($query): void {
+                    $subquery
+                        ->select('product_id')
+                        ->from('pricing_product_prices')
+                        ->whereIn('price_type', ['retail', 'sale'])
+                        ->where('is_active', true)
+                        ->whereNull('city_code')
+                        ->when($query->priceFrom !== null, fn ($queryBuilder) => $queryBuilder->where('amount_minor', '>=', $query->priceFrom))
+                        ->when($query->priceTo !== null, fn ($queryBuilder) => $queryBuilder->where('amount_minor', '<=', $query->priceTo));
+                });
+            })
+            ->when($query->query !== null, function (Builder $builder) use ($query): Builder {
+                $term = mb_strtolower($query->query);
+
+                return $builder->where(function (Builder $builder) use ($term): void {
+                    $builder
+                        ->whereRaw('LOWER(name) LIKE ?', ["%{$term}%"])
+                        ->orWhereRaw('LOWER(sku) LIKE ?', ["%{$term}%"])
+                        ->orWhereRaw('LOWER(slug) LIKE ?', ["%{$term}%"])
+                        ->orWhereRaw("LOWER(payload->>'description') LIKE ?", ["%{$term}%"]);
+                });
+            })
+            ->tap(fn (Builder $builder): Builder => $this->applyFallbackSort($builder, $query->sort));
+    }
+
+    private function applyFallbackSort(Builder $builder, string $sort): Builder
+    {
+        return match ($sort) {
+            'rating_asc' => $builder->orderByRaw("(payload->>'rating')::numeric asc")->orderBy('product_id'),
+            'rating_desc' => $builder->orderByRaw("(payload->>'rating')::numeric desc")->orderBy('product_id'),
+            default => $builder->orderByDesc('published_at')->orderBy('product_id'),
+        };
     }
 
     /**

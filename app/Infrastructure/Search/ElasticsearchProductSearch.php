@@ -2,8 +2,10 @@
 
 namespace App\Infrastructure\Search;
 
+use App\Domains\Catalog\Models\CatalogProductProjection;
 use App\Domains\Search\Contracts\ProductSearch;
 use App\Infrastructure\Resilience\CircuitBreaker;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -75,13 +77,33 @@ class ElasticsearchProductSearch implements ProductSearch
      */
     private function degradedResults(string $query, int $page, int $perPage): array
     {
+        $products = CatalogProductProjection::query()
+            ->where('status', 'published')
+            ->where('category_is_active', true)
+            ->where(function (Builder $builder) use ($query): void {
+                $term = mb_strtolower($query);
+
+                $builder
+                    ->whereRaw('LOWER(name) LIKE ?', ["%{$term}%"])
+                    ->orWhereRaw('LOWER(sku) LIKE ?', ["%{$term}%"])
+                    ->orWhereRaw('LOWER(slug) LIKE ?', ["%{$term}%"])
+                    ->orWhereRaw("LOWER(payload->>'description') LIKE ?", ["%{$term}%"]);
+            })
+            ->orderByDesc('published_at')
+            ->orderBy('product_id')
+            ->paginate(perPage: $perPage, page: $page);
+
         return [
-            'data' => [],
+            'data' => $products
+                ->getCollection()
+                ->map(fn (CatalogProductProjection $projection): array => $projection->payload)
+                ->values()
+                ->all(),
             'meta' => [
                 'query' => $query,
-                'current_page' => $page,
-                'per_page' => $perPage,
-                'total' => 0,
+                'current_page' => $products->currentPage(),
+                'per_page' => $products->perPage(),
+                'total' => $products->total(),
                 'status' => 'degraded',
                 'reason' => 'elasticsearch_unavailable',
             ],
