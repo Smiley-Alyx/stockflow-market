@@ -38,6 +38,7 @@ services:
       CLICKHOUSE_DATABASE: stockflow
       CLICKHOUSE_USERNAME: stockflow
       CLICKHOUSE_PASSWORD: secret
+      PHP_CLI_SERVER_WORKERS: ${PHP_CLI_SERVER_WORKERS:-8}
     depends_on:
       postgres:
         condition: service_healthy
