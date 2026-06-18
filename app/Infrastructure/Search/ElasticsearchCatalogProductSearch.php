@@ -2,8 +2,8 @@
 
 namespace App\Infrastructure\Search;
 
-use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Models\CatalogProductProjection;
+use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Search\CatalogProductQuery;
 use App\Domains\Catalog\Search\CatalogProductSearch;
 use App\Domains\Catalog\Services\CatalogUrlService;
@@ -399,7 +399,7 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
             ->when($query->brands !== [], function (Builder $builder) use ($query): Builder {
                 return $builder->where(function (Builder $builder) use ($query): void {
                     foreach ($query->brands as $brand) {
-                        $builder->orWhere('payload->brand->slug', $brand);
+                        $builder->orWhereRaw($this->jsonTextExpression('brand.slug').' = ?', [$brand]);
                     }
                 });
             })
@@ -424,7 +424,7 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
                         ->whereRaw('LOWER(name) LIKE ?', ["%{$term}%"])
                         ->orWhereRaw('LOWER(sku) LIKE ?', ["%{$term}%"])
                         ->orWhereRaw('LOWER(slug) LIKE ?', ["%{$term}%"])
-                        ->orWhereRaw("LOWER(payload->>'description') LIKE ?", ["%{$term}%"]);
+                        ->orWhereRaw('LOWER('.$this->jsonTextExpression('description').') LIKE ?', ["%{$term}%"]);
                 });
             })
             ->tap(fn (Builder $builder): Builder => $this->applyFallbackSort($builder, $query->sort));
@@ -433,9 +433,35 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
     private function applyFallbackSort(Builder $builder, string $sort): Builder
     {
         return match ($sort) {
-            'rating_asc' => $builder->orderByRaw("(payload->>'rating')::numeric asc")->orderBy('product_id'),
-            'rating_desc' => $builder->orderByRaw("(payload->>'rating')::numeric desc")->orderBy('product_id'),
+            'rating_asc' => $builder->orderByRaw($this->jsonNumericExpression('rating').' asc')->orderBy('product_id'),
+            'rating_desc' => $builder->orderByRaw($this->jsonNumericExpression('rating').' desc')->orderBy('product_id'),
             default => $builder->orderByDesc('published_at')->orderBy('product_id'),
+        };
+    }
+
+    private function jsonTextExpression(string $path): string
+    {
+        $segments = explode('.', $path);
+        $leaf = array_pop($segments);
+        $postgresPath = array_reduce(
+            $segments,
+            fn (string $expression, string $segment): string => $expression."->'{$segment}'",
+            'payload',
+        )."->>'{$leaf}'";
+
+        return match (CatalogProductProjection::query()->getConnection()->getDriverName()) {
+            'sqlite' => "json_extract(payload, '$.{$path}')",
+            default => $postgresPath,
+        };
+    }
+
+    private function jsonNumericExpression(string $path): string
+    {
+        $expression = $this->jsonTextExpression($path);
+
+        return match (CatalogProductProjection::query()->getConnection()->getDriverName()) {
+            'sqlite' => "CAST(json_extract(payload, '$.{$path}') AS REAL)",
+            default => "({$expression})::numeric",
         };
     }
 

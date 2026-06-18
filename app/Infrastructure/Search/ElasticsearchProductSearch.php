@@ -87,7 +87,7 @@ class ElasticsearchProductSearch implements ProductSearch
                     ->whereRaw('LOWER(name) LIKE ?', ["%{$term}%"])
                     ->orWhereRaw('LOWER(sku) LIKE ?', ["%{$term}%"])
                     ->orWhereRaw('LOWER(slug) LIKE ?', ["%{$term}%"])
-                    ->orWhereRaw("LOWER(payload->>'description') LIKE ?", ["%{$term}%"]);
+                    ->orWhereRaw('LOWER('.$this->jsonTextExpression('description').') LIKE ?', ["%{$term}%"]);
             })
             ->orderByDesc('published_at')
             ->orderBy('product_id')
@@ -108,6 +108,22 @@ class ElasticsearchProductSearch implements ProductSearch
                 'reason' => 'elasticsearch_unavailable',
             ],
         ];
+    }
+
+    private function jsonTextExpression(string $path): string
+    {
+        $segments = explode('.', $path);
+        $leaf = array_pop($segments);
+        $postgresPath = array_reduce(
+            $segments,
+            fn (string $expression, string $segment): string => $expression."->'{$segment}'",
+            'payload',
+        )."->>'{$leaf}'";
+
+        return match (CatalogProductProjection::query()->getConnection()->getDriverName()) {
+            'sqlite' => "json_extract(payload, '$.{$path}')",
+            default => $postgresPath,
+        };
     }
 
     /**
