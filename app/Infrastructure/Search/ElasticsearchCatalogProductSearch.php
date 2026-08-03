@@ -153,7 +153,7 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
                 'must' => $query->query === null ? [] : [[
                     'multi_match' => [
                         'query' => $query->query,
-                        'fields' => ['name^3', 'sku^3', 'offers.sku^2', 'slug', 'description'],
+                        'fields' => ['name^3', 'sku^3', 'offers.sku^2', 'slug', 'short_description^2', 'description'],
                         'fuzziness' => 'AUTO',
                     ],
                 ]],
@@ -424,6 +424,7 @@ class ElasticsearchCatalogProductSearch implements CatalogProductSearch
                         ->whereRaw('LOWER(name) LIKE ?', ["%{$term}%"])
                         ->orWhereRaw('LOWER(sku) LIKE ?', ["%{$term}%"])
                         ->orWhereRaw('LOWER(slug) LIKE ?', ["%{$term}%"])
+                        ->orWhereRaw('LOWER('.$this->jsonTextExpression('short_description').') LIKE ?', ["%{$term}%"])
                         ->orWhereRaw('LOWER('.$this->jsonTextExpression('description').') LIKE ?', ["%{$term}%"]);
                 });
             })
