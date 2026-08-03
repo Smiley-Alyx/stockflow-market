@@ -140,7 +140,7 @@ class CatalogSearchApiTest extends TestCase
 
             return $request->url() === 'http://elasticsearch:9200/catalog_products/_search'
                 && $body['track_total_hits'] === true
-                && $body['query']['bool']['must'][0]['multi_match']['fields'] === ['name^3', 'sku^3', 'offers.sku^2', 'slug', 'description']
+                && $body['query']['bool']['must'][0]['multi_match']['fields'] === ['name^3', 'sku^3', 'offers.sku^2', 'slug', 'short_description^2', 'description']
                 && in_array(['terms' => ['filters.color.keyword' => ['black', 'white']]], $body['query']['bool']['filter'], true)
                 && in_array(['terms' => ['filters.memory.keyword' => ['128gb']]], $body['query']['bool']['filter'], true)
                 && in_array(['terms' => ['brand.slug.keyword' => ['acme']]], $body['query']['bool']['filter'], true)
